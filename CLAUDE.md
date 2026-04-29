@@ -67,7 +67,7 @@ docker compose exec app php artisan test tests/Feature/AuthTest.php
 
 ### API routes
 
-Routes are registered in `backend/routes/api.php` (does not exist yet — must be created and registered in `bootstrap/app.php`).
+Routes are registered in `backend/routes/api.php`, already wired in `bootstrap/app.php`.
 
 Protected routes use `middleware('auth:sanctum')`. Public routes are `register` and `login`.
 
@@ -85,11 +85,11 @@ Work happens inside `frontend/`. Node.js must be installed locally — Expo does
 
 ```bash
 cd frontend
-npm install
+npm install   # only needed after cloning — dependencies are in package.json
 npx expo start
 ```
 
-Structure to follow: `frontend/src/screens/`, `frontend/src/components/`, `frontend/src/services/` (API calls go in services).
+Structure: `frontend/src/screens/`, `frontend/src/components/`, `frontend/src/services/`. All API calls go through `src/services/api.js` (axios instance with Sanctum token support already configured).
 
 ## Git workflow
 
