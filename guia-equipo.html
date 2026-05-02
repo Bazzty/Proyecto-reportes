@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;font-size:12.5px;color:#1e293b;background:#fff;line-height:1.65}
+
+/* COVER */
+.cover{background:linear-gradient(145deg,#020617 0%,#0f2744 40%,#064e3b 100%);color:white;padding:0;min-height:100vh;display:flex;flex-direction:column;justify-content:space-between;page-break-after:always}
+.cover-top{padding:50px 60px 0}
+.cover-logo{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);padding:6px 14px;border-radius:30px;font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:#86efac;margin-bottom:50px}
+.cover h1{font-size:52px;font-weight:900;line-height:1.1;margin-bottom:16px;letter-spacing:-1px}
+.cover h1 em{font-style:normal;color:#4ade80}
+.cover-sub{font-size:16px;color:#94a3b8;margin-bottom:40px;font-weight:300;max-width:520px;line-height:1.6}
+.cover-pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:50px}
+.pill{padding:6px 16px;border-radius:20px;font-size:11.5px;font-weight:500;border:1px solid rgba(255,255,255,.2);color:#e2e8f0;background:rgba(255,255,255,.07)}
+.cover-members{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:30px 60px}
+.member-chip{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:12px 16px}
+.member-chip .role{font-size:9.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+.role-be{color:#60a5fa}.role-fe{color:#4ade80}.role-lead{color:#fbbf24}
+.member-chip .mname{font-size:14px;font-weight:700;color:white}
+.cover-bottom{padding:20px 60px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center}
+.cover-bottom span{font-size:11px;color:#475569}
+
+/* TOC */
+.toc-page{padding:50px 60px;page-break-after:always;min-height:100vh}
+.toc-title{font-size:28px;font-weight:800;margin-bottom:8px;color:#0f172a}
+.toc-sub{color:#64748b;margin-bottom:36px;font-size:13px}
+.toc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.toc-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border:1px solid #e2e8f0;border-radius:8px;text-decoration:none;color:#1e293b}
+.toc-item:hover{background:#f8fafc}
+.toc-num{width:28px;height:28px;border-radius:6px;background:#0f172a;color:white;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.toc-text strong{display:block;font-size:12.5px;font-weight:600}
+.toc-text span{font-size:11px;color:#64748b}
+
+/* PAGE */
+.page{padding:44px 56px;page-break-before:always}
+.page:first-of-type{page-break-before:auto}
+
+/* SECTION HEADER */
+.sh{display:flex;align-items:center;gap:12px;margin-bottom:22px;padding-bottom:14px;border-bottom:2px solid #f1f5f9}
+.sh-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.ic-blue{background:#dbeafe}.ic-green{background:#dcfce7}.ic-purple{background:#f3e8ff}
+.ic-orange{background:#ffedd5}.ic-red{background:#fee2e2}.ic-yellow{background:#fef9c3}
+.ic-slate{background:#f1f5f9}.ic-teal{background:#ccfbf1}
+.sh h2{font-size:20px;font-weight:800;color:#0f172a}
+h3{font-size:13.5px;font-weight:700;color:#0f172a;margin:20px 0 10px}
+h4{font-size:12px;font-weight:700;color:#475569;margin:14px 0 8px;text-transform:uppercase;letter-spacing:.5px}
+p{margin-bottom:10px;color:#374151}
+
+/* TEAM */
+.team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.tc{border:1px solid #e2e8f0;border-radius:12px;padding:16px;transition:all .2s}
+.tc.be{border-top:3px solid #3b82f6}.tc.fe{border-top:3px solid #22c55e}.tc.lead{border-top:3px solid #f59e0b}
+.tc .badge{font-size:9.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:10px;display:inline-block;margin-bottom:8px}
+.b-be{background:#dbeafe;color:#1d4ed8}.b-fe{background:#dcfce7;color:#15803d}.b-lead{background:#fef3c7;color:#92400e}
+.tc .nm{font-size:15px;font-weight:800;margin-bottom:6px}
+.tc .desc{font-size:11.5px;color:#64748b;line-height:1.5}
+.tc .tasks{margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0}
+.tc .tasks li{font-size:11px;color:#475569;list-style:none;padding:2px 0}
+.tc .tasks li::before{content:"→ ";color:#94a3b8}
+
+/* ARCH */
+.arch-box{background:#0f172a;border-radius:12px;padding:24px 28px;color:#e2e8f0;font-family:'JetBrains Mono',monospace;font-size:12px;margin:14px 0;line-height:2.2}
+.a-user{color:#fbbf24;font-weight:700}.a-fe{color:#4ade80;font-weight:700}.a-nginx{color:#60a5fa;font-weight:700}.a-php{color:#c084fc;font-weight:700}.a-db{color:#f87171;font-weight:700}
+.a-arrow{color:#475569}.a-label{color:#64748b;font-size:10.5px}
+
+/* CODE */
+pre{background:#0f172a;color:#e2e8f0;padding:16px 18px;border-radius:10px;font-family:'JetBrains Mono',monospace;font-size:11.5px;margin:10px 0;line-height:1.8;overflow:hidden}
+.cm{color:#475569}.cmd{color:#86efac;font-weight:500}.fl{color:#fbbf24}.str{color:#f9a8d4}.kw{color:#a5f3fc}.num{color:#fb923c}
+code{font-family:'JetBrains Mono',monospace;background:#f1f5f9;color:#dc2626;padding:1px 6px;border-radius:4px;font-size:11px}
+
+/* STEPS */
+.steps{list-style:none;margin:10px 0}
+.steps li{display:flex;gap:14px;margin-bottom:16px;align-items:flex-start}
+.sn{width:28px;height:28px;border-radius:50%;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.sn-dark{background:#0f172a;color:white}.sn-blue{background:#3b82f6;color:white}.sn-green{background:#22c55e;color:white}
+.steps li .sc{flex:1}
+.steps li .sc strong{display:block;font-size:13px;font-weight:600;margin-bottom:4px}
+.steps li .sc p{font-size:12px;color:#64748b;margin:0}
+
+/* TABLES */
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12px}
+th{background:#0f172a;color:white;padding:9px 13px;text-align:left;font-size:11px;font-weight:600;letter-spacing:.3px}
+th:first-child{border-radius:6px 0 0 0}th:last-child{border-radius:0 6px 0 0}
+td{padding:8px 13px;border-bottom:1px solid #f1f5f9}
+tr:last-child td{border-bottom:none}
+tr:nth-child(even) td{background:#f8fafc}
+.mt{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:10.5px;padding:2px 7px;border-radius:4px}
+.get{background:#dcfce7;color:#15803d}.post{background:#dbeafe;color:#1d4ed8}
+.yes{color:#15803d;font-weight:700}.no{color:#94a3b8}
+
+/* CALLOUTS */
+.cal{border-radius:8px;padding:11px 16px;margin:12px 0;font-size:12px;display:flex;gap:10px;align-items:flex-start;line-height:1.5}
+.cal-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.cal-blue{background:#eff6ff;border-left:3px solid #3b82f6}
+.cal-green{background:#f0fdf4;border-left:3px solid #22c55e}
+.cal-yellow{background:#fefce8;border-left:3px solid #eab308}
+.cal-red{background:#fff1f2;border-left:3px solid #f43f5e}
+.cal-purple{background:#faf5ff;border-left:3px solid #a855f7}
+.cal-slate{background:#f8fafc;border-left:3px solid #64748b}
+
+/* COLS */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+hr{border:none;border-top:1px solid #f1f5f9;margin:22px 0}
+
+/* ROADMAP */
+.road{display:flex;flex-direction:column;gap:8px}
+.wk{border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;display:grid;grid-template-columns:80px 1fr 1fr}
+.wn{background:#0f172a;color:white;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 8px;text-align:center}
+.wn .n{font-size:22px;font-weight:900}.wn .l{font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:#64748b;margin-top:2px}
+.wn .h{font-size:10px;color:#4ade80;font-weight:700;margin-top:6px;padding:2px 8px;background:rgba(74,222,128,.15);border-radius:10px}
+.wc{padding:12px 16px;font-size:11.5px}.wc:nth-child(2){border-left:1px solid #e2e8f0}.wc:last-child{border-left:1px solid #e2e8f0;background:#fafafa}
+.wc .ct{font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px}
+.ct-be{color:#3b82f6}.ct-fe{color:#22c55e}
+.wc ul{list-style:none}.wc ul li{padding:2px 0;color:#374151}.wc ul li::before{content:"· ";color:#94a3b8}
+
+/* TOPICS */
+.tg{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.tcard{border:1px solid #e2e8f0;border-radius:10px;overflow:hidden}
+.thead-be{background:linear-gradient(90deg,#1e3a8a,#3b82f6);color:white;padding:12px 16px;font-size:12.5px;font-weight:700}
+.thead-fe{background:linear-gradient(90deg,#14532d,#22c55e);color:white;padding:12px 16px;font-size:12.5px;font-weight:700}
+.thead-sub{font-size:10px;font-weight:400;opacity:.8;margin-top:2px}
+.tlist{padding:8px 0}
+.ti{display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid #f8fafc;font-size:11.5px}
+.ti:last-child{border-bottom:none}
+.pr{font-size:9px;font-weight:700;letter-spacing:.5px;padding:2px 7px;border-radius:8px;flex-shrink:0}
+.ph{background:#fee2e2;color:#b91c1c}.pm{background:#fef9c3;color:#854d0e}.pl{background:#f0fdf4;color:#166534}
+
+/* GIT FLOW VISUAL */
+.gf{background:#0f172a;border-radius:12px;padding:24px 28px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:2.2;color:#e2e8f0;margin:14px 0}
+.gf-main{color:#f43f5e;font-weight:700}.gf-dev{color:#fbbf24;font-weight:700}.gf-feat{color:#4ade80;font-weight:700}.gf-arrow{color:#475569}
+
+/* ERRORS */
+.err-card{border:1px solid #e2e8f0;border-radius:10px;margin-bottom:12px;overflow:hidden}
+.err-q{background:#fef2f2;border-left:3px solid #ef4444;padding:10px 16px;font-weight:600;font-size:12.5px;display:flex;gap:8px;align-items:center}
+.err-a{padding:12px 16px;font-size:12px;color:#374151}
+.err-a pre{margin:6px 0;font-size:11px}
+
+/* FAQ */
+.faq{border:1px solid #e2e8f0;border-radius:10px;margin-bottom:10px;overflow:hidden}
+.faq-q{background:#f8fafc;padding:10px 16px;font-weight:600;font-size:12.5px;display:flex;gap:10px;align-items:center}
+.faq-q::before{content:"?";background:#0f172a;color:white;width:19px;height:19px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.faq-a{padding:10px 16px;font-size:12px;color:#475569;border-top:1px solid #f1f5f9}
+
+/* GLOSSARY */
+.glos-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.glos-item{border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px}
+.glos-term{font-size:12px;font-weight:700;color:#0f172a;margin-bottom:3px;font-family:'JetBrains Mono',monospace}
+.glos-def{font-size:11.5px;color:#475569;line-height:1.5}
+
+/* FOOTER */
+.footer{margin-top:28px;padding:12px 20px;background:#f8fafc;border-radius:8px;font-size:10.5px;color:#94a3b8;text-align:center;border-top:1px solid #e2e8f0}
+
+/* JSON RESPONSE */
+.json-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0}
+.json-block{background:#0f172a;border-radius:8px;overflow:hidden}
+.json-label{padding:6px 14px;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+.jl-req{background:#1e3a5f;color:#60a5fa}.jl-res{background:#14532d;color:#4ade80}
+.json-block pre{margin:0;border-radius:0;padding:12px 14px;font-size:11px}
+.jk{color:#93c5fd}.jv{color:#86efac}.js{color:#f9a8d4}.jn{color:#fb923c}.jb{color:#fbbf24}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════ PORTADA ══════════════════════════════ -->
+<div class="cover">
+  <div class="cover-top">
+    <div class="cover-logo">🌿 Universidad San Sebastián · 2025</div>
+    <h1>Guía del Equipo<br><em>App de Reportes<br>Ambientales</em></h1>
+    <p class="cover-sub">Todo lo que necesitas saber para contribuir al proyecto desde el primer día: setup, flujo de trabajo, arquitectura y recursos de estudio.</p>
+    <div class="cover-pills">
+      <span class="pill">Laravel 12</span>
+      <span class="pill">React Native + Expo</span>
+      <span class="pill">Docker</span>
+      <span class="pill">MySQL</span>
+      <span class="pill">GitHub</span>
+      <span class="pill">Laravel Sanctum</span>
+    </div>
+  </div>
+  <div class="cover-members">
+    <div class="member-chip">
+      <div class="role role-lead">Líder + Backend</div>
+      <div class="mname">Bastian</div>
+    </div>
+    <div class="member-chip">
+      <div class="role role-be">Backend Developer</div>
+      <div class="mname">Mathias</div>
+    </div>
+    <div class="member-chip">
+      <div class="role role-be">Backend Developer</div>
+      <div class="mname">Sebastian</div>
+    </div>
+    <div class="member-chip">
+      <div class="role role-fe">Frontend Developer</div>
+      <div class="mname">Alonso</div>
+    </div>
+    <div class="member-chip">
+      <div class="role role-fe">Frontend Developer</div>
+      <div class="mname">Catalina</div>
+    </div>
+    <div class="member-chip">
+      <div class="role role-fe">Frontend Developer</div>
+      <div class="mname">Oskar</div>
+    </div>
+  </div>
+  <div class="cover-bottom">
+    <span>Proyecto Universitario · 2025</span>
+    <span>Stack: Laravel 12 + React Native Expo + Docker + MySQL</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ ÍNDICE ══════════════════════════════ -->
+<div class="toc-page">
+  <div class="toc-title">Tabla de Contenidos</div>
+  <p class="toc-sub">Esta guía está dividida en secciones. Cada una cubre un aspecto diferente del proyecto.</p>
+  <div class="toc-grid">
+    <div class="toc-item"><div class="toc-num">1</div><div class="toc-text"><strong>El Equipo y Roles</strong><span>Quién hace qué y por qué</span></div></div>
+    <div class="toc-item"><div class="toc-num">2</div><div class="toc-text"><strong>¿Qué estamos construyendo?</strong><span>Descripción y arquitectura del sistema</span></div></div>
+    <div class="toc-item"><div class="toc-num">3</div><div class="toc-text"><strong>Setup Backend</strong><span>Docker, Laravel, base de datos</span></div></div>
+    <div class="toc-item"><div class="toc-num">4</div><div class="toc-text"><strong>Setup Frontend</strong><span>Expo, dependencias, estructura</span></div></div>
+    <div class="toc-item"><div class="toc-num">5</div><div class="toc-text"><strong>Flujo de Trabajo Git</strong><span>Ramas, commits, Pull Requests</span></div></div>
+    <div class="toc-item"><div class="toc-num">6</div><div class="toc-text"><strong>Contrato de API</strong><span>Endpoints, requests y responses</span></div></div>
+    <div class="toc-item"><div class="toc-num">7</div><div class="toc-text"><strong>Base de Datos</strong><span>Esquema y relaciones</span></div></div>
+    <div class="toc-item"><div class="toc-num">8</div><div class="toc-text"><strong>Roadmap Semanal</strong><span>Qué construir cada semana</span></div></div>
+    <div class="toc-item"><div class="toc-num">9</div><div class="toc-text"><strong>Temas a Estudiar</strong><span>Por rol, con prioridad</span></div></div>
+    <div class="toc-item"><div class="toc-num">10</div><div class="toc-text"><strong>Errores Comunes</strong><span>Problemas frecuentes y soluciones</span></div></div>
+    <div class="toc-item"><div class="toc-num">11</div><div class="toc-text"><strong>Preguntas Frecuentes</strong><span>Dudas del equipo</span></div></div>
+    <div class="toc-item"><div class="toc-num">12</div><div class="toc-text"><strong>Glosario</strong><span>Términos técnicos explicados</span></div></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ 1. EQUIPO ══════════════════════════════ -->
+<div class="page">
+  <div class="sh"><div class="sh-icon ic-blue">👥</div><h2>1. El Equipo y Roles</h2></div>
+
+  <div class="team-grid">
+    <div class="tc lead">
+      <span class="badge b-lead">Líder + Backend</span>
+      <div class="nm">Bastian</div>
+      <div class="desc">Es el responsable técnico del proyecto. Toma decisiones de arquitectura, revisa el trabajo de todos y mantiene el repositorio.</div>
+      <ul class="tasks">
+        <li>Administrar el repo en GitHub</li>
+        <li>Revisar y aprobar Pull Requests</li>
+        <li>Mantener el Kanban actualizado</li>
+        <li>Configurar y mantener Docker</li>
+        <li>Definir la estructura de la API</li>
+      </ul>
+    </div>
+    <div class="tc be">
+      <span class="badge b-be">Backend</span>
+      <div class="nm">Mathias</div>
+      <div class="desc">Implementa el sistema de autenticación. Los usuarios solo pueden usar la app si Mathias construyó bien el login.</div>
+      <ul class="tasks">
+        <li>Endpoint POST /api/register</li>
+        <li>Endpoint POST /api/login</li>
+        <li>Endpoint POST /api/logout</li>
+        <li>Integrar Laravel Sanctum</li>
+      </ul>
+    </div>
+    <div class="tc be">
+      <span class="badge b-be">Backend</span>
+      <div class="nm">Sebastian</div>
+      <div class="desc">Construye el sistema de reportes y la base de datos. Es quien define las tablas y la lógica del heatmap.</div>
+      <ul class="tasks">
+        <li>Migraciones de reports y categories</li>
+        <li>Modelos Eloquent con relaciones</li>
+        <li>CRUD de reportes + subida de fotos</li>
+        <li>Endpoint GET /api/reports/heatmap</li>
+      </ul>
+    </div>
+    <div class="tc fe">
+      <span class="badge b-fe">Frontend</span>
+      <div class="nm">Alonso</div>
+      <div class="desc">La primera impresión de la app. Crea las pantallas de entrada y conecta el login real con el backend de Mathias.</div>
+      <ul class="tasks">
+        <li>Pantalla de Login</li>
+        <li>Pantalla de Registro</li>
+        <li>Navegación entre pantallas</li>
+        <li>Guardar token de sesión</li>
+      </ul>
+    </div>
+    <div class="tc fe">
+      <span class="badge b-fe">Frontend</span>
+      <div class="nm">Catalina</div>
+      <div class="desc">La función principal de la app. Muestra todos los reportes en el mapa y el heatmap que conecta con el backend de Sebastian.</div>
+      <ul class="tasks">
+        <li>Mapa general con react-native-maps</li>
+        <li>Marcadores de reportes</li>
+        <li>Visualización del heatmap</li>
+        <li>Pantalla de detalle de reporte</li>
+      </ul>
+    </div>
+    <div class="tc fe">
+      <span class="badge b-fe">Frontend</span>
+      <div class="nm">Oskar</div>
+      <div class="desc">La acción más importante de la app: crear reportes. Integra GPS, cámara y el envío de datos al backend de Sebastian.</div>
+      <ul class="tasks">
+        <li>Formulario de nuevo reporte</li>
+        <li>Acceso a cámara y galería</li>
+        <li>Obtener ubicación GPS automática</li>
+        <li>Enviar reporte con foto al backend</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="cal cal-yellow">
+    <span class="cal-icon">⚠️</span>
+    <div><strong>Dependencias entre roles:</strong> El frontend de Alonso depende de que Mathias termine los endpoints de auth. El frontend de Oskar y Catalina depende de que Sebastian termine los endpoints de reportes. Coordínense antes de integrar.</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ 2. QUÉ CONSTRUIMOS ══════════════════════════════ -->
+<div class="page">
+  <div class="sh"><div class="sh-icon ic-green">🌍</div><h2>2. ¿Qué estamos construyendo?</h2></div>
+
+  <p>Una <strong>app móvil de reporte ciudadano ambiental</strong>. Cualquier persona puede fotografiar un problema ambiental (basura, escombros, aguas contaminadas), y la app lo geolocaliza automáticamente y lo publica en un mapa compartido.</p>
+  <p>El diferencial es el <strong>mapa de calor</strong>: las zonas con más reportes se muestran en rojo, permitiendo a autoridades o ciudadanos identificar los sectores más afectados.</p>
+
+  <hr>
+  <h3>Arquitectura del Sistema</h3>
+  <p>El proyecto tiene dos partes completamente independientes que se comunican por HTTP:</p>
+
+  <div class="arch-box">
+    <span class="a-user">📱 Usuario</span><br>
+    &nbsp;&nbsp;&nbsp;<span class="a-arrow">↕ abre la app</span><br>
+    <span class="a-fe">React Native (Expo)</span> <span class="a-label">— frontend, corre en el celular</span><br>
+    &nbsp;&nbsp;&nbsp;<span class="a-arrow">↕ HTTP requests (JSON) al puerto 8000</span><br>
+    <span class="a-nginx">Nginx</span> <span class="a-label">— servidor web, recibe las peticiones HTTP</span><br>
+    &nbsp;&nbsp;&nbsp;<span class="a-arrow">↕ FastCGI al puerto 9000</span><br>
+    <span class="a-php">PHP-FPM (Laravel 12)</span> <span class="a-label">— ejecuta la lógica de la API</span><br>
+    &nbsp;&nbsp;&nbsp;<span class="a-arrow">↕ TCP al puerto 3306</span><br>
+    <span class="a-db">MySQL 8</span> <span class="a-label">— guarda usuarios, reportes y categorías</span>
+  </div>
+
+  <div class="cal cal-blue">
+    <span class="cal-icon">💡</span>
+    <div><strong>Punto clave:</strong> El backend y el frontend nunca se "mezclan". El backend solo devuelve JSON. El frontend solo muestra lo que recibe. El contrato entre ambos está definido en <code>docs/API.md</code>.</div>
+  </div>
+
+  <hr>
+  <h3>Cómo funciona la autenticación</h3>
+  <p>Usamos <strong>Laravel Sanctum</strong> con tokens. El flujo es:</p>
+
+  <div class="arch-box" style="font-size:11.5px;line-height:2">
+    <span class="a-fe">App</span> <span class="a-arrow">──→</span> <span class="kw">POST /api/login</span> <span class="str">{ email, password }</span><br>
+    <span class="a-php">Backend</span> <span class="a-arrow">verifica credenciales → genera token</span><br>
+    <span class="a-fe">App</span> <span class="a-arrow">←──</span> <span class="str">{ token: "5|abc123xyz..." }</span><br>
+    <span class="a-arrow">────────────────────────────────────────</span><br>
+    <span class="a-fe">App</span> <span class="a-arrow">──→</span> <span class="kw">GET /api/reports</span> + header: <span class="fl">Authorization: Bearer 5|abc123...</span><br>
+    <span class="a-php">Backend</span> <span class="a-arrow">valida el token → sabe quién eres → devuelve datos</span>
+  </div>
+
+  <h3>Funcionalidades de la App</h3>
+  <div class="three" style="margin-top:8px;">
+    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;">
+      <div style="font-size:20px;margin-bottom:6px;">🔐</div>
+      <strong style="font-size:12px;">Autenticación</strong>
+      <p style="font-size:11.5px;margin-top:4px;color:#64748b">Registro e inicio de sesión con token seguro.</p>
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;">
+      <div style="font-size:20px;margin-bottom:6px;">📸</div>
+      <strong style="font-size:12px;">Crear Reporte</strong>
+      <p style="font-size:11.5px;margin-top:4px;color:#64748b">Foto + descripción + GPS automático.</p>
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;">
+      <div style="font-size:20px;margin-bottom:6px;">🗺️</div>
+      <strong style="font-size:12px;">Mapa + Heatmap</strong>
+      <p style="font-size:11.5px;margin-top:4px;color:#64748b">Ver todos los reportes y zonas críticas.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ 3. SETUP BACKEND ══════════════════════════════ -->
+<div class="page">
+  <div class="sh"><div class="sh-icon ic-blue">⚙️</div><h2>3. Setup Backend — Bastian, Mathias, Sebastian</h2></div>
+
+  <div class="cal cal-yellow">
+    <span class="cal-icon">📋</span>
+    <div><strong>Requisito único:</strong> <strong>Docker Desktop</strong> instalado y corriendo. No necesitas instalar PHP, Composer ni MySQL en tu máquina. Todo corre dentro de los contenedores.</div>
+  </div>
+
+  <h3>¿Qué hace Docker por nosotros?</h3>
+  <p>Docker crea 4 "computadores virtuales" (contenedores) en tu máquina, todos conectados entre sí:</p>
+  <table>
+    <tr><th>Contenedor</th><th>Qué es</th><th>Puerto en tu máquina</th></tr>
+    <tr><td><code>reportes_app</code></td><td>PHP 8.2 — ejecuta Laravel</td><td>Interno (9000)</td></tr>
+    <tr><td><code>reportes_nginx</code></td><td>Servidor web — recibe tus peticiones</td><td><strong>8000</strong></td></tr>
+    <tr><td><code>reportes_db</code></td><td>MySQL 8 — base de datos</td><td>3306</td></tr>
+    <tr><td><code>reportes_phpmyadmin</code></td><td>Panel visual para gestionar la BD</td><td><strong>8080</strong></td></tr>
+  </table>
+
+  <h3>Primera vez — Paso a Paso</h3>
+  <ol class="steps">
+    <li>
+      <div class="sn sn-blue">1</div>
+      <div class="sc">
+        <strong>Clonar el repositorio</strong>
+        <pre><span class="cmd">git clone</span> https://github.com/Bazzty/proyecto-reportes.git
+<span class="cmd">cd</span> proyecto-reportes &amp;&amp; <span class="cmd">git checkout</span> develop</pre>
+      </div>
+    </li>
+    <li>
+      <div class="sn sn-blue">2</div>
+      <div class="sc">
+        <strong>Crear tu archivo de entorno con tus contraseñas</strong>
+        <pre><span class="cmd">cp</span> backend/.env.example backend/.env
+<span class="cm"># Abre backend/.env y completa estas líneas:</span>
+<span class="fl">DB_PASSWORD</span>=<span class="str">tu_contraseña_aqui</span>
+<span class="fl">DB_ROOT_PASSWORD</span>=<span class="str">otra_contraseña_aqui</span></pre>
+        <p>Puedes poner cualquier contraseña, es solo para tu entorno local.</p>
+      </div>
+    </li>
+    <li>
+      <div class="sn sn-blue">3</div>
+      <div class="sc">
+        <strong>Construir y levantar los contenedores</strong>
+        <pre><span class="cmd">cd</span> backend
+<span class="cmd">docker compose up -d --build</span>
+<span class="cm"># La primera vez descarga imágenes, puede tardar 3-5 minutos</span></pre>
+      </div>
+    </li>
+    <li>
+      <div class="sn sn-blue">4</div>
+      <div class="sc">
+        <strong>Configurar Laravel (solo una vez)</strong>
+        <pre><span class="cmd">docker compose exec app</span> php artisan key:generate
+<span class="cmd">docker compose exec app</span> php artisan vendor:publish <span class="fl">--provider=</span><span class="str">"Laravel\Sanctum\SanctumServiceProvider"</span>
+<span class="cmd">docker compose exec app</span> php artisan migrate</pre>
+      </div>
+    </li>
+    <li>
+      <div class="sn sn-blue">5</div>
+      <div class="sc">
+        <strong>Verificar que todo funciona</strong>
+        <p>Abre tu navegador en <code>http://localhost:8000/up</code> — debe mostrar un mensaje verde.</p>
+        <p>Abre <code>http://localhost:8080</code> — debe mostrar phpMyAdmin.</p>
+      </div>
+    </li>
+  </ol>
+
+  <h3>Uso Diario</h3>
+  <pre><span class="cm"># Encender (cada vez que quieras trabajar)</span>
+<span class="cmd">cd</span> backend &amp;&amp; <span class="cmd">docker compose up -d</span>
+
+<span class="cm"># Apagar (cuando termines)</span>
+<span class="cmd">docker compose down</span>
+
+<span class="cm"># Ver logs si algo falla</span>
+<span class="cmd">docker compose logs</span> app
+<span class="cmd">docker compose logs</span> db</pre>
+
+  <h3>Comandos de Laravel más usados</h3>
+  <pre><span class="cm"># Crear una migración nueva (tabla nueva)</span>
+<span class="cmd">docker compose exec app</span> php artisan make:migration <span class="fl">create_reports_table</span>
+
+<span class="cm"># Crear modelo + migración + controlador en un paso</span>
+<span class="cmd">docker compose exec app</span> php artisan make:model Report <span class="fl">-mc</span>
+
+<span class="cm"># Correr migraciones pendientes</span>
+<span class="cmd">docker compose exec app</span> php artisan migrate
+
+<span class="cm"># Borrar todo y recrear desde cero (útil en desarrollo)</span>
+<span class="cmd">docker compose exec app</span> php artisan migrate:fresh
+
+<span class="cm"># Correr los tests</span>
+<span class="cmd">docker compose exec app</span> php artisan test
+
+<span class="cm"># Abrir la consola interactiva de Laravel</span>
+<span class="cmd">docker compose exec app</span> php artisan tinker</pre>
+</div>
+
+<!-- ══════════════════════════════ 4. SETUP FRONTEND ══════════════════════════════ -->
+<div class="page">
+  <div class="sh"><div class="sh-icon ic-green">📱</div><h2>4. Setup Frontend — Alonso, Catalina, Oskar</h2></div>
+
+  <div class="cal cal-yellow">
+    <span class="cal-icon">📋</span>
+    <div><strong>Requisitos:</strong> <strong>Node.js</strong> instalado + app <strong>Expo Go</strong> en tu celular (App Store / Play Store). Tu celular y computador deben estar en la misma red WiFi para probar.</div>
+  </div>
+
+  <div class="cal cal-purple">
+    <span class="cal-icon">💡</span>
+    <div><strong>¿Qué es Expo?</strong> Expo es una capa sobre React Native que simplifica el desarrollo. En vez de configurar Android Studio y Xcode (que es muy complejo), simplemente corres un comando y escaneas un QR con tu celular. El código que escribes ES React Native — Expo solo facilita el proceso.</div>
+  </div>
+
+  <h3>Primera vez — Paso a Paso</h3>
+  <ol class="steps">
+    <li>
+      <div class="sn sn-green">1</div>
+      <div class="sc">
+        <strong>Instalar dependencias</strong>
+        <pre><span class="cmd">cd</span> proyecto-reportes/frontend
+<span class="cmd">npm install</span>
+<span class="cm"># Descarga todas las librerías del package.json</span></pre>
+      </div>
+    </li>
+    <li>
+      <div class="sn sn-green">2</div>
+      <div class="sc">
+        <strong>Iniciar el servidor de desarrollo</strong>
+        <pre><span class="cmd">npx expo start</span></pre>
+        <p>Aparece un QR en la terminal y se abre una página web con opciones.</p>
+      </div>
+    </li>
+    <li>
+      <div class="sn sn-green">3</div>
+      <div class="sc">
+        <strong>Abrir en tu celular</strong>
+        <p>Abre la app <strong>Expo Go</strong> en tu celular → escanea el QR. La app se carga en segundos. Cada cambio que hagas en el código se refleja automáticamente.</p>
+      </div>
+    </li>
+  </ol>
+
+  <hr>
+  <h3>Estructura del Código</h3>
+  <pre>frontend/src/
+├── <span class="fl">screens/</span>              <span class="cm">← una pantalla por archivo</span>
+│   ├── LoginScreen.js
+│   ├── RegisterScreen.js
+│   ├── HomeScreen.js
+│   ├── MapScreen.js
+│   ├── NewReportScreen.js
+│   └── MyReportsScreen.js
+├── <span class="fl">components/</span>           <span class="cm">← piezas reutilizables</span>
+│   ├── ReportCard.js     <span class="cm">← tarjeta de un reporte</span>
+│   └── LoadingButton.js  <span class="cm">← botón con estado de carga</span>
+└── <span class="fl">services/</span>
+    └── api.js            <span class="cm">← TODAS las llamadas al backend van aquí</span></pre>
+
+  <hr>
+  <h3>Cómo usar el cliente de la API</h3>
+  <p>El archivo <code>services/api.js</code> ya tiene configurado axios con la URL base del backend y las funciones para manejar el token.</p>
+
+  <div class="json-grid">
+    <div class="json-block">
+      <div class="json-label jl-req">Autenticación</div>
+      <pre><span class="cm">// Login</span>
+<span class="kw">import</span> api, { setAuthToken } <span class="kw">from</span> <span class="str">'../services/api'</span>;
+
+<span class="kw">const</span> res = <span class="kw">await</span> api.<span class="cmd">post</span>(<span class="str">'/login'</span>, {
+  email, password
+});
+<span class="cm">// Guardar el token para siguientes peticiones</span>
+setAuthToken(res.data.token);</pre>
+    </div>
+    <div class="json-block">
+      <div class="json-label jl-res">Crear Reporte con Foto</div>
+      <pre><span class="cm">// Enviar foto como multipart/form-data</span>
+<span class="kw">const</span> form = <span class="kw">new</span> FormData();
+form.append(<span class="str">'description'</span>, <span class="str">'Basura'</span>);
+form.append(<span class="str">'latitude'</span>, <span class="num">-33.45</span>);
+form.append(<span class="str">'longitude'</span>, <span class="num">-70.65</span>);
+form.append(<span class="str">'photo'</span>, {
+  uri, type: <span class="str">'image/jpeg'</span>, name: <span class="str">'p.jpg'</span>
+});
+<span class="kw">await</span> api.<span class="cmd">post</span>(<span class="str">'/reports'</span>, form);</pre>
+    </div>
+  </div>
+
+  <h3>Librerías instaladas y para qué sirven</h3>
+  <table>
+    <tr><th>Librería</th><th>Para qué se usa</th><th>Quién la usa</th></tr>
+    <tr><td><code>axios</code></td><td>Hacer llamadas HTTP al backend</td><td>Todos</td></tr>
+    <tr><td><code>@react-navigation/native</code></td><td>Navegar entre pantallas</td><td>Alonso</td></tr>
+    <tr><td><code>expo-location</code></td><td>Obtener coordenadas GPS del celular</td><td>Oskar</td></tr>
+    <tr><td><code>expo-image-picker</code></td><td>Abrir cámara o galería del celular</td><td>Oskar</td></tr>
+    <tr><td><code>react-native-maps</code></td><td>Mostrar mapas y marcadores</td><td>Catalina</td></tr>
+  </table>
+</div>
+
+<!-- ══════════════════════════════ 5. GIT ══════════════════════════════ -->
+<div class="page">
+  <div class="sh"><div class="sh-icon ic-purple">🌿</div><h2>5. Flujo de Trabajo con Git</h2></div>
+
+  <div class="cal cal-red">
+    <span class="cal-icon">🚫</span>
+    <div><strong>Regla de oro:</strong> Nadie sube código directamente a <code>main</code> ni a <code>develop</code>. Siempre creas tu rama <code>feat/</code>, trabajas ahí, y abres un Pull Request para que Bastian lo revise.</div>
+  </div>
+
+  <h3>Estructura de Ramas</h3>
+  <div class="gf">
+    <span class="gf-main">main</span> <span class="gf-arrow">──────────────────────────────</span> código estable para la entrega final<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="gf-arrow">↑ solo via Pull Request desde develop (aprobado por Bastian)</span><br>
+    <span class="gf-dev">develop</span> <span class="gf-arrow">────────────────────────────</span> integración del equipo<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="gf-arrow">↑ solo via Pull Request desde feat/*</span><br>
+    <span class="gf-feat">feat/login-api</span>&nbsp;&nbsp;&nbsp;<span class="gf-feat">feat/pantalla-login</span>&nbsp;&nbsp;&nbsp;<span class="gf-feat">feat/mapa-heatmap</span>
+  </div>
+
+  <h3>Ciclo Completo por Tarea</h3>
+  <ol class="steps">
+    <li>
+      <div class="sn sn-dark">1</div>
+      <div class="sc">
+        <strong>Siempre partir desde develop actualizado</strong>
+        <pre><span class="cmd">git checkout</span> develop
+<span class="cmd">git pull</span> origin develop</pre>
+      </div>
+    </li>
+    <li>
+      <div class="sn sn-dark">2</div>
+      <div class="sc">
+        <strong>Crear tu rama con el nombre de la tarea</strong>
+        <pre><span class="cm"># Formato: feat/descripcion-corta</span>
+<span class="cmd">git checkout -b</span> <span class="fl">feat/login-api</span>           <span class="cm"># backend</span>
+<span class="cmd">git checkout -b</span> <span class="fl">feat/pantalla-login</span>      <span class="cm"># frontend</span></pre>
+      </div>
+    </li>
+    <li>
+      <div class="sn sn-dark">3</div>
+      <div class="sc">
+        <strong>Trabajar y hacer commits frecuentes</strong>
+        <pre><span class="cmd">git add</span> .
+<span class="cmd">git commit -m</span> <span class="str">"feat: endpoint POST /api/login con Sanctum"</span></pre>
+        <p>Haz un commit cada vez que algo funciona, no esperes a terminar todo.</p>
+      </div>
+    </li>
+    <li>
+      <div class="sn sn-dark">4</div>
+      <div class="sc">
+        <strong>Subir tu rama a GitHub</strong>
+        <pre><span class="cmd">git push</span> origin feat/login-api</pre>
+      </div>
+    </li>
+    <li>
+      <div class="sn sn-dark">5</div>
+      <div class="sc">
+        <strong>Abrir un Pull Request en GitHub</strong>
+        <p>Ve a GitHub → tu repo → aparece un banner "Compare &amp; pull request" → haz click → asegúrate de que el PR va hacia <strong>develop</strong> (no main) → asigna a Bastian como reviewer → Submit.</p>
+      </div>
+    </li>
+    <li>
+      <div class="sn sn-dark">6</div>
+      <div class="sc">
+        <strong>Esperar revisión y hacer merge</strong>
+        <p>Bastian revisa el código, puede pedir cambios o aprobarlo. Una vez aprobado, hace merge y elimina la rama. ¡Tarea completada!</p>
+      </div>
+    </li>
+  </ol>
+
+  <hr>
+  <h3>Formato de Commits</h3>
+  <table>
+    <tr><th>Prefijo</th><th>Cuándo usarlo</th><th>Ejemplo real</th></tr>
+    <tr><td><code>feat:</code></td><td>Nueva funcionalidad</td><td>feat: endpoint POST /api/reports con validación</td></tr>
+    <tr><td><code>fix:</code></td><td>Corrección de un bug</td><td>fix: GPS no pedía permisos en Android</td></tr>
+    <tr><td><code>docs:</code></td><td>Solo documentación</td><td>docs: agregar ejemplos JSON al API.md</td></tr>
+    <tr><td><code>chore:</code></td><td>Configuración, sin código de negocio</td><td>chore: instalar expo-image-picker</td></tr>
+    <tr><td><code>refactor:</code></td><td>Mejorar código sin cambiar funcionalidad</td><td>refactor: extraer lógica del mapa a hook</td></tr>
+  </table>
+</div>
+
+<!-- ══════════════════════════════ 6. API ══════════════════════════════ -->
+<div class="page">
+  <div class="sh"><div class="sh-icon ic-orange">🔌</div><h2>6. Contrato de API</h2></div>
+
+  <div class="cal cal-blue">
+    <span class="cal-icon">🔑</span>
+    <div>Todas las rutas protegidas requieren el token en el header de cada petición: <code>Authorization: Bearer {token}</code>. El token se obtiene al hacer login y se guarda en la app.</div>
+  </div>
+
+  <table style="margin-top:12px">
+    <tr><th>Método</th><th>Endpoint</th><th>Descripción</th><th>Auth</th><th>Quién lo hace</th></tr>
+    <tr><td><span class="mt post">POST</span></td><td><code>/api/register</code></td><td>Registrar nuevo usuario</td><td class="no">No</td><td>Mathias</td></tr>
+    <tr><td><span class="mt post">POST</span></td><td><code>/api/login</code></td><td>Login, devuelve token</td><td class="no">No</td><td>Mathias</td></tr>
+    <tr><td><span class="mt post">POST</span></td><td><code>/api/logout</code></td><td>Cerrar sesión, invalida token</td><td class="yes">Sí</td><td>Mathias</td></tr>
+    <tr><td><span class="mt get">GET</span></td><td><code>/api/reports</code></td><td>Listar todos los reportes</td><td class="yes">Sí</td><td>Sebastian</td></tr>
+    <tr><td><span class="mt post">POST</span></td><td><code>/api/reports</code></td><td>Crear reporte con foto</td><td class="yes">Sí</td><td>Sebastian</td></tr>
+    <tr><td><span class="mt get">GET</span></td><td><code>/api/reports/{id}</code></td><td>Detalle de un reporte</td><td class="yes">Sí</td><td>Sebastian</td></tr>
+    <tr><td><span class="mt get">GET</span></td><td><code>/api/reports/heatmap</code></td><td>Puntos para el mapa de calor</td><td class="yes">Sí</td><td>Sebastian</td></tr>
+    <tr><td><span class="mt get">GET</span></td><td><code>/api/user/reports</code></td><td>Reportes del usuario autenticado</td><td class="yes">Sí</td><td>Sebastian</td></tr>
+  </table>
+
+  <hr>
+  <h3>Ejemplos de Request y Response</h3>
+
+  <h4>POST /api/login</h4>
+  <div class="json-grid">
+    <div class="json-block">
+      <div class="json-label jl-req">Request Body (JSON)</div>
+      <pre>{
+  <span class="jk">"email"</span>: <span class="js">"bastian@email.com"</span>,
+  <span class="jk">"password"</span>: <span class="js">"mi_contraseña"</span>
+}</pre>
+    </div>
+    <div class="json-block">
+      <div class="json-label jl-res">Response 200 OK</div>
+      <pre>{
+  <span class="jk">"token"</span>: <span class="js">"5|abc123xyz..."</span>,
+  <span class="jk">"user"</span>: {
+    <span class="jk">"id"</span>: <span class="jn">1</span>,
+    <span class="jk">"name"</span>: <span class="js">"Bastian"</span>,
+    <span class="jk">"email"</span>: <span class="js">"bastian@email.com"</span>
+  }
+}</pre>
+    </div>
+  </div>
+
+  <h4>POST /api/reports (multipart/form-data)</h4>
+  <div class="json-grid">
+    <div class="json-block">
+      <div class="json-label jl-req">Campos del formulario</div>
+      <pre>description: <span class="js">"Basura acumulada"</span>
+latitude:    <span class="jn">-33.4569</span>
+longitude:   <span class="jn">-70.6483</span>
+photo:       <span class="js">[archivo imagen]</span>
+category_id: <span class="jn">1</span></pre>
+    </div>
+    <div class="json-block">
+      <div class="json-label jl-res">Response 201 Created</div>
+      <pre>{
+  <span class="jk">"id"</span>: <span class="jn">42</span>,
+  <span class="jk">"description"</span>: <span class="js">"Basura acumulada"</span>,
+  <span class="jk">"latitude"</span>: <span class="jn">-33.4569</span>,
+  <span class="jk">"longitude"</span>: <span class="jn">-70.6483</span>,
+  <span class="jk">"photo_url"</span>: <span class="js">"http://..."</span>,
+  <span class="jk">"status"</span>: <span class="js">"pendiente"</span>
+}</pre>
+    </div>
+  </div>
+
+  <h4>GET /api/reports/heatmap</h4>
+  <div class="json-block" style="max-width:340px">
+    <div class="json-label jl-res">Response 200 OK</div>
+    <pre>[
+  { <span class="jk">"lat"</span>: <span class="jn">-33.45</span>, <span class="jk">"lng"</span>: <span class="jn">-70.64</span>, <span class="jk">"weight"</span>: <span class="jn">5</span> },
+  { <span class="jk">"lat"</span>: <span class="jn">-33.46</span>, <span class="jk">"lng"</span>: <span class="jn">-70.65</span>, <span class="jk">"weight"</span>: <span class="jn">2</span> }
+]</pre>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ 7. BASE DE DATOS ══════════════════════════════ -->
+<div class="page">
+  <div class="sh"><div class="sh-icon ic-yellow">🗄️</div><h2>7. Base de Datos</h2></div>
+
+  <div class="two">
+    <div>
+      <h3>Tabla: users</h3>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Descripción</th></tr>
+        <tr><td><code>id</code></td><td>BIGINT</td><td>Identificador único autoincremental</td></tr>
+        <tr><td><code>name</code></td><td>VARCHAR</td><td>Nombre completo del usuario</td></tr>
+        <tr><td><code>email</code></td><td>VARCHAR</td><td>Correo único, usado para login</td></tr>
+        <tr><td><code>password</code></td><td>VARCHAR</td><td>Contraseña encriptada con bcrypt</td></tr>
+        <tr><td><code>created_at</code></td><td>TIMESTAMP</td><td>Fecha de registro</td></tr>
+      </table>
+
+      <h3>Tabla: categories</h3>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Descripción</th></tr>
+        <tr><td><code>id</code></td><td>BIGINT</td><td>Identificador único</td></tr>
+        <tr><td><code>name</code></td><td>VARCHAR</td><td>basura · escombros · aguas · otro</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Tabla: reports</h3>
+      <table>
+        <tr><th>Campo</th><th>Tipo</th><th>Descripción</th></tr>
+        <tr><td><code>id</code></td><td>BIGINT</td><td>Identificador único</td></tr>
+        <tr><td><code>user_id</code></td><td>FK → users</td><td>Quién hizo el reporte</td></tr>
+        <tr><td><code>category_id</code></td><td>FK → categories</td><td>Tipo de problema</td></tr>
+        <tr><td><code>description</code></td><td>TEXT</td><td>Descripción del problema</td></tr>
+        <tr><td><code>latitude</code></td><td>DECIMAL(10,8)</td><td>Coordenada GPS latitud</td></tr>
+        <tr><td><code>longitude</code></td><td>DECIMAL(11,8)</td><td>Coordenada GPS longitud</td></tr>
+        <tr><td><code>photo_url</code></td><td>VARCHAR</td><td>URL pública de la foto</td></tr>
+        <tr><td><code>status</code></td><td>ENUM</td><td>pendiente / en revisión / resuelto</td></tr>
+        <tr><td><code>created_at</code></td><td>TIMESTAMP</td><td>Fecha del reporte</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <hr>
+  <h3>Relaciones entre tablas</h3>
+  <div class="arch-box" style="font-size:12px;line-height:2.2">
+    <span class="a-user">users</span> <span class="a-arrow">──hasMany──▶</span> <span class="a-fe">reports</span> &nbsp;<span class="a-label">(un usuario puede tener muchos reportes)</span><br>
+    <span class="a-fe">reports</span> <span class="a-arrow">──belongsTo──▶</span> <span class="a-user">users</span> &nbsp;<span class="a-label">(cada reporte pertenece a un usuario)</span><br>
+    <span class="a-db">categories</span> <span class="a-arrow">──hasMany──▶</span> <span class="a-fe">reports</span> &nbsp;<span class="a-label">(una categoría tiene muchos reportes)</span><br>
+    <span class="a-fe">reports</span> <span class="a-arrow">──belongsTo──▶</span> <span class="a-db">categories</span> &nbsp;<span class="a-label">(cada reporte tiene una categoría)</span>
+  </div>
+
+  <h3>Cómo se escribe en Laravel (Eloquent)</h3>
+  <div class="two">
+    <pre><span class="cm">// Modelo Report</span>
+<span class="kw">class</span> Report <span class="kw">extends</span> Model {
+  <span class="kw">protected</span> $fillable = [
+    <span class="str">'user_id'</span>, <span class="str">'description'</span>,
+    <span class="str">'latitude'</span>, <span class="str">'longitude'</span>,
+    <span class="str">'photo_url'</span>, <span class="str">'status'</span>
+  ];
+
+  <span class="kw">public function</span> <span class="cmd">user</span>() {
+    <span class="kw">return</span> $this->belongsTo(User::<span class="kw">class</span>);
+  }
+}</pre>
+    <pre><span class="cm">// Crear un reporte en el controlador</span>
+$report = Report::create([
+  <span class="str">'user_id'</span>     => auth()->id(),
+  <span class="str">'description'</span> => $request->description,
+  <span class="str">'latitude'</span>    => $request->latitude,
+  <span class="str">'longitude'</span>   => $request->longitude,
+  <span class="str">'photo_url'</span>   => $photoUrl,
+  <span class="str">'status'</span>      => <span class="str">'pendiente'</span>,
+]);
+
+<span class="kw">return</span> response()->json($report, <span class="num">201</span>);</pre>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ 8. ROADMAP ══════════════════════════════ -->
+<div class="page">
+  <div class="sh"><div class="sh-icon ic-teal">🗓️</div><h2>8. Roadmap Semanal</h2></div>
+
+  <div class="road">
+    <div class="wk">
+      <div class="wn"><div class="n">1</div><div class="l">Semana</div><div class="h">Setup</div></div>
+      <div class="wc"><div class="ct ct-be">Backend</div><ul><li>Docker corriendo con los 4 contenedores</li><li>Laravel respondiendo en <code>http://localhost:8000/up</code></li><li>phpMyAdmin accesible en puerto 8080</li></ul></div>
+      <div class="wc"><div class="ct ct-fe">Frontend</div><ul><li>Expo corriendo y visible en el celular</li><li>Pantalla de bienvenida con el nombre del proyecto</li></ul></div>
+    </div>
+    <div class="wk">
+      <div class="wn"><div class="n">2</div><div class="l">Semana</div><div class="h">Contrato</div></div>
+      <div class="wc"><div class="ct ct-be">Backend</div><ul><li><code>docs/API.md</code> completo con ejemplos JSON</li><li>Migraciones de users, reports y categories creadas</li><li>Diagrama de base de datos subido como imagen</li></ul></div>
+      <div class="wc"><div class="ct ct-fe">Frontend</div><ul><li>Wireframes de todas las pantallas (sin lógica)</li><li>Navegación configurada entre pantallas</li></ul></div>
+    </div>
+    <div class="wk">
+      <div class="wn"><div class="n">3–4</div><div class="l">Semana</div><div class="h">Auth</div></div>
+      <div class="wc"><div class="ct ct-be">Backend</div><ul><li>POST /api/register funcionando</li><li>POST /api/login devolviendo token</li><li>POST /api/logout invalidando token</li><li>Rutas protegidas con Sanctum</li></ul></div>
+      <div class="wc"><div class="ct ct-fe">Frontend</div><ul><li>Pantallas Login y Registro con formularios</li><li>Token guardado en AsyncStorage</li><li>Redirección al home tras login exitoso</li></ul></div>
+    </div>
+    <div class="wk">
+      <div class="wn"><div class="n">5</div><div class="l">Semana</div><div class="h">Reportes</div></div>
+      <div class="wc"><div class="ct ct-be">Backend</div><ul><li>GET/POST/GET{id} de reportes</li><li>Subida de fotos con storage público</li><li>GET /api/user/reports</li></ul></div>
+      <div class="wc"><div class="ct ct-fe">Frontend</div><ul><li>Formulario con cámara y GPS automático</li><li>Lista de reportes propios del usuario</li><li>Envío real de datos al backend</li></ul></div>
+    </div>
+    <div class="wk">
+      <div class="wn"><div class="n">6</div><div class="l">Semana</div><div class="h">Mapa</div></div>
+      <div class="wc"><div class="ct ct-be">Backend</div><ul><li>GET /api/reports/heatmap con agrupación por zona</li><li>GET /api/reports con coordenadas para marcadores</li></ul></div>
+      <div class="wc"><div class="ct ct-fe">Frontend</div><ul><li>Mapa con marcadores de todos los reportes</li><li>Capa de heatmap sobre el mapa</li><li>Clic en marcador → detalle del reporte</li></ul></div>
+    </div>
+    <div class="wk">
+      <div class="wn" style="background:#166534"><div class="n">7</div><div class="l">Semana</div><div class="h">QA</div></div>
+      <div class="wc"><div class="ct ct-be">Backend</div><ul><li>Tests de todos los endpoints</li><li>Corrección de bugs encontrados</li><li>Revisión de seguridad básica</li></ul></div>
+      <div class="wc"><div class="ct ct-fe">Frontend</div><ul><li>APK de Android generado con EAS Build</li><li>Pruebas en dispositivo real</li><li>Pulir UI/UX de todas las pantallas</li></ul></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ 9. TEMAS ══════════════════════════════ -->
+<div class="page">
+  <div class="sh"><div class="sh-icon ic-purple">📚</div><h2>9. Temas a Estudiar por Rol</h2></div>
+
+  <div class="cal cal-green">
+    <span class="cal-icon">✅</span>
+    <div>No necesitas dominarlo todo antes de empezar. Estudia los temas de <strong style="color:#b91c1c">Alta prioridad</strong> primero. Los de <strong style="color:#854d0e">Media</strong> los irás aprendiendo mientras programas. Los de <strong style="color:#166534">Baja</strong> son para profundizar después.</div>
+  </div>
+
+  <div class="tg">
+    <div class="tcard">
+      <div class="thead-be">Backend — Bastian, Mathias, Sebastian<div class="thead-sub">Enfocado en Laravel 12 y APIs REST</div></div>
+      <div class="tlist">
+        <div class="ti"><span class="pr ph">Alta</span> PHP orientado a objetos (clases, herencia)</div>
+        <div class="ti"><span class="pr ph">Alta</span> Rutas en Laravel (routes/api.php)</div>
+        <div class="ti"><span class="pr ph">Alta</span> Controladores y métodos HTTP (GET, POST)</div>
+        <div class="ti"><span class="pr ph">Alta</span> Migraciones de base de datos</div>
+        <div class="ti"><span class="pr ph">Alta</span> Modelos Eloquent básicos</div>
+        <div class="ti"><span class="pr ph">Alta</span> Laravel Sanctum — tokens de autenticación</div>
+        <div class="ti"><span class="pr ph">Alta</span> Qué es JSON y cómo devolver respuestas</div>
+        <div class="ti"><span class="pr pm">Media</span> Relaciones Eloquent (hasMany, belongsTo)</div>
+        <div class="ti"><span class="pr pm">Media</span> Validaciones (Form Requests en Laravel)</div>
+        <div class="ti"><span class="pr pm">Media</span> Subida y almacenamiento de archivos</div>
+        <div class="ti"><span class="pr pm">Media</span> Variables de entorno y archivo .env</div>
+        <div class="ti"><span class="pr pm">Media</span> Middleware en Laravel</div>
+        <div class="ti"><span class="pr pl">Baja</span> Docker — comandos básicos (up, down, exec)</div>
+        <div class="ti"><span class="pr pl">Baja</span> MySQL / consultas SQL básicas</div>
+        <div class="ti"><span class="pr pl">Baja</span> Tests en Laravel (PHPUnit)</div>
+      </div>
+    </div>
+    <div class="tcard">
+      <div class="thead-fe">Frontend — Alonso, Catalina, Oskar<div class="thead-sub">Enfocado en React Native y Expo</div></div>
+      <div class="tlist">
+        <div class="ti"><span class="pr ph">Alta</span> JavaScript ES6+ (let/const, arrow functions)</div>
+        <div class="ti"><span class="pr ph">Alta</span> Async/Await y manejo de promesas</div>
+        <div class="ti"><span class="pr ph">Alta</span> React: componentes funcionales y JSX</div>
+        <div class="ti"><span class="pr ph">Alta</span> React Hooks: useState y useEffect</div>
+        <div class="ti"><span class="pr ph">Alta</span> React Native: View, Text, TextInput, Button</div>
+        <div class="ti"><span class="pr ph">Alta</span> StyleSheet y Flexbox en React Native</div>
+        <div class="ti"><span class="pr ph">Alta</span> React Navigation — Stack Navigator</div>
+        <div class="ti"><span class="pr ph">Alta</span> Axios: peticiones GET y POST con headers</div>
+        <div class="ti"><span class="pr pm">Media</span> expo-location — pedir permiso GPS y obtener coordenadas</div>
+        <div class="ti"><span class="pr pm">Media</span> expo-image-picker — acceder a cámara y galería</div>
+        <div class="ti"><span class="pr pm">Media</span> react-native-maps — MapView y Markers</div>
+        <div class="ti"><span class="pr pm">Media</span> AsyncStorage — guardar datos localmente</div>
+        <div class="ti"><span class="pr pm">Media</span> FormData — enviar imágenes al servidor</div>
+        <div class="ti"><span class="pr pl">Baja</span> Context API — estado global de la app</div>
+        <div class="ti"><span class="pr pl">Baja</span> EAS Build — generar APK para Android</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cal cal-slate" style="margin-top:16px">
+    <span class="cal-icon">🔗</span>
+    <div><strong>Recursos recomendados:</strong> Documentación oficial de Laravel en <code>laravel.com/docs</code> · React Native en <code>reactnative.dev</code> · Expo en <code>docs.expo.dev</code> · Sanctum en <code>laravel.com/docs/sanctum</code></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ 10. ERRORES COMUNES ══════════════════════════════ -->
+<div class="page">
+  <div class="sh"><div class="sh-icon ic-red">🐛</div><h2>10. Errores Comunes y Soluciones</h2></div>
+
+  <div class="err-card">
+    <div class="err-q">Docker: "No se estableció la conexión" en phpMyAdmin</div>
+    <div class="err-a">
+      MySQL todavía está inicializándose. Espera 30 segundos y recarga la página. Si persiste, el volumen tiene credenciales viejas:
+      <pre><span class="cmd">docker compose down -v</span>   <span class="cm"># elimina el volumen con datos viejos</span>
+<span class="cmd">docker compose up -d</span>     <span class="cm"># crea todo de nuevo</span></pre>
+    </div>
+  </div>
+
+  <div class="err-card">
+    <div class="err-q">Laravel: "No application encryption key has been specified"</div>
+    <div class="err-a">
+      El archivo <code>.env</code> no tiene APP_KEY. Genera una:
+      <pre><span class="cmd">docker compose exec app</span> php artisan key:generate</pre>
+    </div>
+  </div>
+
+  <div class="err-card">
+    <div class="err-q">Laravel: "SQLSTATE: Connection refused" al hacer migrate</div>
+    <div class="err-a">
+      MySQL aún no está listo cuando se intenta conectar. Espera unos segundos y vuelve a intentar. Si el error persiste, verifica que <code>DB_HOST=db</code> en el <code>.env</code> (no <code>127.0.0.1</code>).
+    </div>
+  </div>
+
+  <div class="err-card">
+    <div class="err-q">Git: "fatal: The current branch has no upstream branch"</div>
+    <div class="err-a">
+      La rama no existe en GitHub todavía. Usa el flag <code>-u</code> la primera vez:
+      <pre><span class="cmd">git push -u</span> origin feat/nombre-de-tu-rama</pre>
+    </div>
+  </div>
+
+  <div class="err-card">
+    <div class="err-q">Expo: "Network request failed" al llamar al backend</div>
+    <div class="err-a">
+      El celular no puede conectarse a <code>localhost</code> porque eso apunta al celular mismo, no a tu computador. Cambia la URL en <code>services/api.js</code> por la IP local de tu máquina:
+      <pre><span class="cm"># En Mac/Linux:</span>  <span class="cmd">ifconfig</span> | grep "inet "
+<span class="cm"># En Windows:</span>    <span class="cmd">ipconfig</span> | grep "IPv4"
+<span class="cm"># Luego en api.js:</span>
+baseURL: <span class="str">'http://192.168.1.X:8000/api'</span>  <span class="cm">← reemplaza con tu IP</span></pre>
+    </div>
+  </div>
+
+  <div class="err-card">
+    <div class="err-q">Laravel: "419 CSRF token mismatch"</div>
+    <div class="err-a">
+      Estás usando rutas web en vez de rutas API. Asegúrate de que todos tus endpoints estén en <code>routes/api.php</code> y que el frontend llame a <code>/api/...</code> (con el prefijo <code>/api</code>).
+    </div>
+  </div>
+
+  <div class="err-card">
+    <div class="err-q">Expo: El QR aparece pero el celular no carga la app</div>
+    <div class="err-a">
+      Tu celular y tu computador deben estar en la misma red WiFi. Si estás en la universidad y estás en redes separadas (WiFi del cel vs cable del PC), no va a funcionar. Conecta ambos a la misma red.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ 11. FAQ ══════════════════════════════ -->
+<div class="page">
+  <div class="sh"><div class="sh-icon ic-orange">❓</div><h2>11. Preguntas Frecuentes</h2></div>
+
+  <div class="faq">
+    <div class="faq-q">¿Dónde escribo mi código?</div>
+    <div class="faq-a"><strong>Backend:</strong> controladores en <code>backend/app/Http/Controllers/</code>, migraciones en <code>backend/database/migrations/</code>, modelos en <code>backend/app/Models/</code>.<br><strong>Frontend:</strong> pantallas en <code>frontend/src/screens/</code>, componentes en <code>frontend/src/components/</code>, llamadas al backend en <code>frontend/src/services/api.js</code>.</div>
+  </div>
+
+  <div class="faq">
+    <div class="faq-q">¿Por qué no subo vendor/ ni node_modules/?</div>
+    <div class="faq-a">Porque pesan 100-500 MB y no hace falta. Esas carpetas contienen las librerías descargadas, y cada developer las genera en su máquina corriendo <code>composer install</code> (backend) o <code>npm install</code> (frontend). El archivo <code>composer.json</code> y <code>package.json</code> tienen la lista de qué instalar.</div>
+  </div>
+
+  <div class="faq">
+    <div class="faq-q">¿El archivo .env va al repositorio?</div>
+    <div class="faq-a">No. Cada developer tiene su propio <code>.env</code> con sus contraseñas locales. Está listado en <code>.gitignore</code> así que Git lo ignora automáticamente. Solo el <code>.env.example</code> (sin contraseñas) va al repo, para que cada developer sepa qué variables configurar.</div>
+  </div>
+
+  <div class="faq">
+    <div class="faq-q">¿Puedo subir directo a main o a develop?</div>
+    <div class="faq-a">No. La rama <code>main</code> está protegida en GitHub: requiere aprobación de Bastian para hacer merge. Siempre creas una rama <code>feat/</code>, trabajas ahí, abres un Pull Request hacia <code>develop</code> y esperas la revisión.</div>
+  </div>
+
+  <div class="faq">
+    <div class="faq-q">¿Qué hago si hay conflictos en Git?</div>
+    <div class="faq-a">Avísale a Bastian antes de intentar resolverlos solo. Los conflictos mal resueltos pueden eliminar código de tus compañeros. Para prevenirlos, haz <code>git pull origin develop</code> frecuentemente en tu rama.</div>
+  </div>
+
+  <div class="faq">
+    <div class="faq-q">¿Cómo pruebo los endpoints del backend sin el frontend?</div>
+    <div class="faq-a">Usa <strong>Postman</strong> o <strong>Thunder Client</strong> (extensión de VS Code). Son herramientas que te permiten hacer peticiones HTTP directamente, como si fueras el frontend. Es la forma estándar de probar APIs.</div>
+  </div>
+
+  <div class="faq">
+    <div class="faq-q">¿Cómo sé que mi código funciona antes de hacer el PR?</div>
+    <div class="faq-a">Backend: corre <code>docker compose exec app php artisan test</code>. Frontend: prueba manualmente en tu celular con Expo Go. Asegúrate de que lo básico funciona: no hay errores en consola y la pantalla muestra lo esperado.</div>
+  </div>
+
+  <div class="faq">
+    <div class="faq-q">¿Qué es un Pull Request?</div>
+    <div class="faq-a">Es una solicitud en GitHub para fusionar tu rama con <code>develop</code>. Sirve para que Bastian revise tu código antes de integrarlo. Puedes escribir una descripción explicando qué hiciste. Es la forma profesional de colaborar en equipo.</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ 12. GLOSARIO ══════════════════════════════ -->
+<div class="page">
+  <div class="sh"><div class="sh-icon ic-slate">📖</div><h2>12. Glosario</h2></div>
+  <p>Términos técnicos que aparecen en el proyecto, explicados en simple.</p>
+
+  <div class="glos-grid">
+    <div class="glos-item"><div class="glos-term">API (REST)</div><div class="glos-def">Sistema de comunicación entre apps. El backend expone "rutas" y el frontend las llama enviando/recibiendo JSON.</div></div>
+    <div class="glos-item"><div class="glos-term">JWT / Token</div><div class="glos-def">Cadena de texto que identifica a un usuario. Se obtiene al login y se envía en cada petición para demostrar quién eres.</div></div>
+    <div class="glos-item"><div class="glos-term">Laravel Sanctum</div><div class="glos-def">Paquete oficial de Laravel para autenticación de APIs. Genera y valida tokens de usuario.</div></div>
+    <div class="glos-item"><div class="glos-term">Migración</div><div class="glos-def">Archivo PHP que describe cómo crear o modificar una tabla en la base de datos. Se corre con <code>php artisan migrate</code>.</div></div>
+    <div class="glos-item"><div class="glos-term">Eloquent ORM</div><div class="glos-def">Sistema de Laravel para interactuar con la BD usando objetos PHP en vez de SQL crudo. Cada tabla tiene un Modelo.</div></div>
+    <div class="glos-item"><div class="glos-term">Docker / Contenedor</div><div class="glos-def">Tecnología que empaqueta una aplicación con todo lo que necesita para correr. Permite que todos trabajen con el mismo entorno.</div></div>
+    <div class="glos-item"><div class="glos-term">Nginx</div><div class="glos-def">Servidor web que recibe las peticiones HTTP y las redirige al servidor PHP. Es la "puerta de entrada" de la API.</div></div>
+    <div class="glos-item"><div class="glos-term">FastCGI</div><div class="glos-def">Protocolo interno que usa Nginx para comunicarse con PHP. No lo configuras directamente, solo existe en el docker-compose.</div></div>
+    <div class="glos-item"><div class="glos-term">Expo / Expo Go</div><div class="glos-def">Herramienta que simplifica el desarrollo de React Native. Expo Go es la app del celular que ejecuta tu código sin compilar.</div></div>
+    <div class="glos-item"><div class="glos-term">Axios</div><div class="glos-def">Librería JavaScript para hacer peticiones HTTP. Es lo que el frontend usa para llamar al backend.</div></div>
+    <div class="glos-item"><div class="glos-term">useState / useEffect</div><div class="glos-def">Hooks de React. useState guarda datos en la pantalla. useEffect ejecuta código cuando la pantalla carga o cuando algo cambia.</div></div>
+    <div class="glos-item"><div class="glos-term">Pull Request (PR)</div><div class="glos-def">Solicitud en GitHub para fusionar una rama. Permite revisar el código antes de integrarlo al proyecto.</div></div>
+    <div class="glos-item"><div class="glos-term">Heatmap</div><div class="glos-def">Mapa de calor. Visualización que colorea zonas según la densidad de datos. Rojo = muchos reportes. Verde = pocos.</div></div>
+    <div class="glos-item"><div class="glos-term">multipart/form-data</div><div class="glos-def">Formato para enviar archivos (fotos) por HTTP. Es diferente a JSON y se usa cuando hay imágenes en el request.</div></div>
+    <div class="glos-item"><div class="glos-term">AsyncStorage</div><div class="glos-def">Almacenamiento local en el celular. Se usa para guardar el token de sesión, igual que las cookies en un navegador web.</div></div>
+    <div class="glos-item"><div class="glos-term">.env</div><div class="glos-def">Archivo de variables de entorno. Guarda configuraciones sensibles (contraseñas, URLs) fuera del código. No va al repositorio.</div></div>
+  </div>
+
+  <div class="footer">
+    App de Reportes Ambientales · Universidad San Sebastián · Stack: Laravel 12 + React Native Expo + Docker + MySQL<br>
+    Bastian · Mathias · Sebastian · Alonso · Catalina · Oskar
+  </div>
+</div>
+
+</body>
+</html>
