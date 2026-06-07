@@ -13,15 +13,14 @@ return new class extends Migration
     {
         Schema::create('reports', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade'); #  El usuario debe estar registrado para poder hacer un reporte y si el usuario se elimina, también se eliminarán sus reportes.
-            $table->foreignId('category_id')->constrained()->onDelete('cascade');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('category_id')->constrained()->onDelete('restrict');
             $table->text('description');
             $table->decimal('latitude', 10, 8);
             $table->decimal('longitude', 10, 8);
-            $table->string('photo_path');
+            $table->string('photo_path')->nullable();
             $table->enum('status', ['Pendiente', 'En Progreso', 'Resuelto'])->default('Pendiente');
             $table->timestamps();
-
         });
     }
 
@@ -33,4 +32,3 @@ return new class extends Migration
         Schema::dropIfExists('reports');
     }
 };
-      

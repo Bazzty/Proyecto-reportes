@@ -118,7 +118,7 @@ Requiere token.
     "latitude": -33.4569,
     "longitude": -70.6483,
     "photo_url": "http://localhost:8000/storage/photos/reporte_1.jpg",
-    "status": "pendiente",
+    "status": "Pendiente",
     "category": {
       "id": 1,
       "name": "basura"
@@ -250,7 +250,7 @@ Requiere token. Devuelve solo los reportes del usuario que hace la petición.
     "latitude": -33.4580,
     "longitude": -70.6500,
     "photo_url": "http://localhost:8000/storage/photos/reporte_2.jpg",
-    "status": "pendiente",
+    "status": "Pendiente",
     "category": {
       "id": 2,
       "name": "escombros"
@@ -273,7 +273,7 @@ Requiere token. Devuelve solo los reportes del usuario que hace la petición.
 | 4 | otro |
 
 ### Estados de un reporte
-`pendiente` → `en revisión` → `resuelto`
+`Pendiente` → `En Progreso` → `Resuelto`
 
 ### Códigos HTTP usados
 | Código | Significado |
