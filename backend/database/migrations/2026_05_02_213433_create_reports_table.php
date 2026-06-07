@@ -16,10 +16,10 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade'); #  El usuario debe estar registrado para poder hacer un reporte y si el usuario se elimina, también se eliminarán sus reportes.
             $table->foreignId('category_id')->constrained()->onDelete('cascade');
             $table->text('description');
-            $table->latitude('latitude', 10, 8);
-            $table->longitude('longitude', 10, 8);
+            $table->decimal('latitude', 10, 8);
+            $table->decimal('longitude', 10, 8);
             $table->string('photo_path');
-            $table->enum('status', ['Pendiente', 'En Progreso', 'Resuelto'])->default('pendiente');
+            $table->enum('status', ['Pendiente', 'En Progreso', 'Resuelto'])->default('Pendiente');
             $table->timestamps();
 
         });
