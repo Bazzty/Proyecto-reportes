@@ -13,10 +13,10 @@ export default function MapScreen() {
         <MapView
           style={styles.map}
           initialRegion={{
-            latitude: -33.4569, // Coordenada de ejemplo de la API
-            longitude: -70.6483,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
+            latitude: -41.31946, 
+            longitude: -72.98356,
+            latitudeDelta: 0.01, // Un valor menor acerca más la cámara a la plaza
+            longitudeDelta: 0.01,
           }}
         >
           {/* Marcador de prueba. Luego se generarán dinámicamente con un .map() */}
