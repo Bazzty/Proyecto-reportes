@@ -16,6 +16,11 @@ export default function App() {
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Welcome">
         <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'Iniciar Sesión' }} />
+        <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Registro' }} />
+        <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Mis Reportes' }} />
+        <Stack.Screen name="Map" component={MapScreen} options={{ title: 'Mapa' }} />
+        <Stack.Screen name="NewReport" component={NewReportScreen} options={{ title: 'Nuevo Reporte' }} />
+        <Stack.Screen name="MyReports" component={MyReportsScreen} options={{ title: 'Mis Reportes' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
