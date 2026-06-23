@@ -36,7 +36,8 @@ export default function RegisterScreen({ navigation }) {
       await AsyncStorage.setItem('token', token);
       setAuthToken(token);
 
-      navigation.replace('Home');
+      // reset: evita que quede [Login, Home]
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (error) {
       // Laravel devuelve errores de validación en error.response.data.errors
       const errors = error.response?.data?.errors;
