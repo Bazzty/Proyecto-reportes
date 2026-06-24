@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/basti/AppData/Local/Temp/pdf-gen/**)",
+      "Bash(node -e ' *)"
+    ]
+  }
+}
