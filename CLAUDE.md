@@ -10,6 +10,17 @@ Monorepo for an environmental reports mobile app. Users report pollution/waste w
 - `frontend/` — React Native (Expo) mobile app
 - `docs/` — API contract and database diagram
 
+## Team
+
+| Nombre | Rol | Responsabilidades |
+|--------|-----|-------------------|
+| **Bastian** | Líder + Backend | Arquitectura, revisión de PRs, Docker, estructura API |
+| **Mathias** | Backend | Auth: register, login, logout, Sanctum |
+| **Sebastian** | Backend | Migraciones, modelos, CRUD reportes, heatmap, seeder |
+| **Alonso** | Frontend | Pantallas Login/Registro, navegación, token |
+| **Catalina** | Frontend | MapScreen, marcadores, heatmap visual, detalle reporte |
+| **Oskar** | Frontend | Formulario nuevo reporte, cámara, GPS, envío al backend |
+
 ## Architecture
 
 The API is a pure JSON backend — no Blade views, no sessions. All endpoints live under `/api/*` and are protected via Sanctum token auth (Bearer token in `Authorization` header). The frontend is completely decoupled and communicates only through the documented API contract in `docs/API.md`.
@@ -76,8 +87,12 @@ Protected routes use `middleware('auth:sanctum')`. Public routes are `register` 
 | Table        | Key fields |
 |--------------|------------|
 | `users`      | id, name, email, password |
-| `reports`    | id, user_id, description, latitude, longitude, photo_url, status (pendiente/en revisión/resuelto) |
+| `reports`    | id, user_id, category_id, description, latitude, longitude, photo_path, status (Pendiente/En Progreso/Resuelto) |
 | `categories` | id, name (basura, escombros, aguas, otro) |
+
+### Current state
+
+Migraciones y modelos (`Report`, `Category`) ya están creados. El roadmap semanal original ya no aplica — el proyecto estuvo pausado y se retoma sin seguir esa planificación. Las tareas se priorizan por funcionalidad: auth → reportes → heatmap.
 
 ## Frontend (React Native Expo)
 
