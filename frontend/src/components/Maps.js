@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Dimensions
 import MapView, { Marker, Heatmap } from 'react-native-maps';
 import axios from 'axios';
 
-const API_URL = 'http://192.168.1.88:8080/api/reports'; 
+const API_URL = 'apiconlainfo'; 
 
 const COLORS = {
   'SOLID RESIDUE': '#E6A100',
