@@ -89,4 +89,82 @@ class ReportApiTest extends TestCase
                 'user' => ['id' => $user->id, 'name' => $user->name],
             ]);
     }
+
+    public function test_user_can_list_own_reports_only()
+    {
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+        $category = Category::create(['name' => 'aguas']);
+
+        Report::create([
+            'user_id' => $user->id,
+            'category_id' => $category->id,
+            'description' => 'Mi reporte',
+            'latitude' => -33.4489,
+            'longitude' => -70.6693,
+            'photo_path' => 'photos/a.jpg',
+            'status' => 'Pendiente',
+        ]);
+
+        Report::create([
+            'user_id' => $other->id,
+            'category_id' => $category->id,
+            'description' => 'Reporte de otro usuario',
+            'latitude' => -33.4500,
+            'longitude' => -70.6700,
+            'photo_path' => 'photos/b.jpg',
+            'status' => 'Pendiente',
+        ]);
+
+        Sanctum::actingAs($user, ['*']);
+
+        $response = $this->getJson('/api/user/reports');
+
+        $response->assertStatus(200)
+            ->assertJsonCount(1)
+            ->assertJsonFragment(['description' => 'Mi reporte'])
+            ->assertJsonMissing(['description' => 'Reporte de otro usuario']);
+    }
+
+    public function test_heatmap_returns_only_coordinates()
+    {
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+
+        Report::create([
+            'user_id' => $user->id,
+            'category_id' => $category->id,
+            'description' => 'Punto 1',
+            'latitude' => -33.4489,
+            'longitude' => -70.6693,
+            'photo_path' => 'photos/a.jpg',
+            'status' => 'Pendiente',
+        ]);
+
+        Report::create([
+            'user_id' => $user->id,
+            'category_id' => $category->id,
+            'description' => 'Punto 2',
+            'latitude' => -33.4600,
+            'longitude' => -70.6800,
+            'photo_path' => 'photos/b.jpg',
+            'status' => 'Resuelto',
+        ]);
+
+        Sanctum::actingAs($user, ['*']);
+
+        $response = $this->getJson('/api/reports/heatmap');
+
+        $response->assertStatus(200)
+            ->assertJsonCount(2)
+            ->assertJsonFragment(['latitude' => -33.4489, 'longitude' => -70.6693])
+            ->assertJsonFragment(['latitude' => -33.4600, 'longitude' => -70.6800]);
+
+        // Solo coordenadas, sin description ni status
+        $first = $response->json()[0];
+        $this->assertArrayHasKey('latitude', $first);
+        $this->assertArrayHasKey('longitude', $first);
+        $this->assertArrayNotHasKey('description', $first);
+        $this->assertArrayNotHasKey('status', $first);
+    }
 }
