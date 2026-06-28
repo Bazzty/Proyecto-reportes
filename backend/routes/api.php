@@ -8,6 +8,7 @@ Route::post('/login',    [App\Http\Controllers\AuthController::class, 'login']);
 
 // Protected routes (require Sanctum token)
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/categories', [App\Http\Controllers\CategoryController::class, 'index']);
     Route::post('/logout', [App\Http\Controllers\AuthController::class, 'logout']);
 
     Route::get('/reports/heatmap',  [App\Http\Controllers\ReportController::class, 'heatmap']);
