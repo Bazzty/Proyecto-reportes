@@ -27,8 +27,8 @@ class ReportController extends Controller
             'description' => 'required|string',
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
-            'category_id' => 'required|integer|exists:categories,id',
-            'photo' => 'required|file|image|max:5120',
+            'category_id' => 'nullable|integer|exists:categories,id',
+            'photo' => 'required|file|mimes:jpeg,jpg,png,webp,gif|max:5120',
         ]);
 
         $path = $request->file('photo')->store('photos', 'public');
@@ -74,10 +74,10 @@ class ReportController extends Controller
             'longitude' => (float) $report->longitude,
             'photo_url' => $report->photo_path ? url('storage/' . $report->photo_path) : null,
             'status' => $report->status,
-            'category' => [
+            'category' => $report->category ? [
                 'id' => $report->category->id,
                 'name' => $report->category->name,
-            ],
+            ] : null,
             'user' => [
                 'id' => $report->user->id,
                 'name' => $report->user->name,

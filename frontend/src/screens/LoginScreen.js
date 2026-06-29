@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert
+  View, Text, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback,
+  StyleSheet, ActivityIndicator, Alert, Image, Dimensions
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { setAuthToken } from '../services/api';
+
+const { height } = Dimensions.get('window');
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail]       = useState('');
@@ -37,12 +40,23 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
     <View style={styles.container}>
+      <View style={styles.imageWrapper}>
+        <Image source={require('../../assets/lake.png')} style={styles.image} />
+        <LinearGradient
+          colors={['transparent', '#0e7490']}
+          style={styles.fade}
+        />
+      </View>
+
       <Text style={styles.title}>Iniciar Sesión</Text>
+      <Text style={styles.subtitle}>Bienvenido de vuelta</Text>
 
       <TextInput
         style={styles.input}
         placeholder="Correo electrónico"
+        placeholderTextColor="#99f6e4"
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
@@ -51,6 +65,7 @@ export default function LoginScreen({ navigation }) {
       <TextInput
         style={styles.input}
         placeholder="Contraseña"
+        placeholderTextColor="#99f6e4"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
@@ -71,18 +86,26 @@ export default function LoginScreen({ navigation }) {
         <Text style={styles.link}>¿No tienes cuenta? Regístrate</Text>
       </TouchableOpacity>
     </View>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
-  container:      { flex: 1, padding: 24, justifyContent: 'center', backgroundColor: '#fff' },
-  title:          { fontSize: 24, fontWeight: 'bold', marginBottom: 24, color: '#111827' },
-  input: {
-    borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8,
-    padding: 12, marginBottom: 12, backgroundColor: '#f9fafb',
+  container:    { flex: 1, backgroundColor: '#0e7490', paddingHorizontal: 24, paddingBottom: 40 },
+  imageWrapper: { height: height * 0.42, marginHorizontal: -24 },
+  image:        { width: '100%', height: '100%', resizeMode: 'cover' },
+  fade: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%',
   },
-  button:         { backgroundColor: '#15803d', padding: 14, borderRadius: 8, alignItems: 'center', marginBottom: 12 },
-  buttonDisabled: { backgroundColor: '#86efac' },
-  buttonText:     { color: 'white', fontWeight: 'bold', fontSize: 16 },
-  link:           { color: '#15803d', textAlign: 'center' },
+  title:          { fontSize: 28, fontWeight: 'bold', marginTop: 24, marginBottom: 4, color: '#ffffff' },
+  subtitle:       { fontSize: 15, color: '#ccfbf1', marginBottom: 32 },
+  input: {
+    borderWidth: 1.5, borderColor: '#5eead4', borderRadius: 12,
+    padding: 14, marginBottom: 14, backgroundColor: 'rgba(255,255,255,0.15)',
+    color: '#ffffff', fontSize: 15,
+  },
+  button:         { backgroundColor: '#ffffff', padding: 15, borderRadius: 12, alignItems: 'center', marginBottom: 16, marginTop: 4 },
+  buttonDisabled: { backgroundColor: '#ccfbf1' },
+  buttonText:     { color: '#0e7490', fontWeight: 'bold', fontSize: 16 },
+  link:           { color: '#ccfbf1', textAlign: 'center', fontSize: 14 },
 });

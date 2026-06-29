@@ -96,6 +96,10 @@ Protected routes use `middleware('auth:sanctum')`. Public routes are `register` 
 
 Migraciones y modelos (`Report`, `Category`) ya están creados. El roadmap semanal original ya no aplica — el proyecto estuvo pausado y se retoma sin seguir esa planificación. Las tareas se priorizan por funcionalidad: auth → reportes → heatmap.
 
+## Pendiente
+
+- **Informe de sesión develop**: redactar un documento que detalle todo lo implementado en `develop` durante la última sesión de trabajo (paleta turquesa, rediseño de pantallas, mapa con marcadores, foto en marcadores, filtros por categoría, colores por estado, polling inteligente, expo-image con caché en disco, UI optimista, compatibilidad HEIC, límites de subida Docker/nginx, ngrok). Debe quedar en `docs/` y servir como bitácora para el equipo.
+
 ## Frontend (React Native Expo)
 
 Work happens inside `frontend/`. Node.js must be installed locally — Expo does not run inside Docker.

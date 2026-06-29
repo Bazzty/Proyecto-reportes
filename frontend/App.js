@@ -21,7 +21,10 @@ export default function App() {
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        const token = await AsyncStorage.getItem('token');
+        const [token] = await Promise.all([
+          AsyncStorage.getItem('token'),
+          new Promise(resolve => setTimeout(resolve, 2500)),
+        ]);
         if (token) {
           setAuthToken(token);
           setInitialRoute('Home');
@@ -43,12 +46,12 @@ export default function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName={initialRoute}>
-        <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'Iniciar Sesión' }} />
-        <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Registro' }} />
-        <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Inicio' }} />
-        <Stack.Screen name="Map" component={MapScreen} options={{ title: 'Mapa' }} />
-        <Stack.Screen name="NewReport" component={NewReportScreen} options={{ title: 'Nuevo Reporte' }} />
-        <Stack.Screen name="MyReports" component={MyReportsScreen} options={{ title: 'Mis Reportes' }} />
+        <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Map" component={MapScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="NewReport" component={NewReportScreen} options={{ title: 'Nuevo Reporte', headerTintColor: '#0e7490' }} />
+        <Stack.Screen name="MyReports" component={MyReportsScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

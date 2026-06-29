@@ -12,4 +12,6 @@ WORKDIR /var/www
 
 COPY . .
 
+COPY docker/php/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache

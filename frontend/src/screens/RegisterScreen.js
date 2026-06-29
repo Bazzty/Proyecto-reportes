@@ -1,17 +1,20 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert, ScrollView
+  StyleSheet, ActivityIndicator, Alert, Image, Dimensions, ScrollView
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { setAuthToken } from '../services/api';
 
+const { height } = Dimensions.get('window');
+
 export default function RegisterScreen({ navigation }) {
-  const [name, setName]                         = useState('');
-  const [email, setEmail]                       = useState('');
-  const [password, setPassword]                 = useState('');
-  const [passwordConfirm, setPasswordConfirm]   = useState('');
-  const [loading, setLoading]                   = useState(false);
+  const [name, setName]                       = useState('');
+  const [email, setEmail]                     = useState('');
+  const [password, setPassword]               = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [loading, setLoading]                 = useState(false);
 
   const handleRegister = async () => {
     if (!name || !email || !password || !passwordConfirm) {
@@ -36,10 +39,8 @@ export default function RegisterScreen({ navigation }) {
       await AsyncStorage.setItem('token', token);
       setAuthToken(token);
 
-      // reset: evita que quede [Login, Home]
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (error) {
-      // Laravel devuelve errores de validación en error.response.data.errors
       const errors = error.response?.data?.errors;
       if (errors) {
         const primerError = Object.values(errors)[0][0];
@@ -53,65 +54,83 @@ export default function RegisterScreen({ navigation }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Crear Cuenta</Text>
+    <View style={styles.wrapper}>
+      <View style={styles.imageWrapper}>
+        <Image source={require('../../assets/lake.png')} style={styles.image} />
+        <LinearGradient colors={['transparent', '#0e7490']} style={styles.fade} />
+      </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Nombre completo"
-        value={name}
-        onChangeText={setName}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Correo electrónico"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Contraseña"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Confirmar contraseña"
-        value={passwordConfirm}
-        onChangeText={setPasswordConfirm}
-        secureTextEntry
-      />
+      <ScrollView contentContainerStyle={styles.container} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
+        <Text style={styles.title}>Crear Cuenta</Text>
+        <Text style={styles.subtitle}>Únete a la comunidad</Text>
 
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handleRegister}
-        disabled={loading}
-      >
-        {loading
-          ? <ActivityIndicator color="white" />
-          : <Text style={styles.buttonText}>Registrarse</Text>
-        }
-      </TouchableOpacity>
+        <TextInput
+          style={styles.input}
+          placeholder="Nombre completo"
+          placeholderTextColor="#99f6e4"
+          value={name}
+          onChangeText={setName}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Correo electrónico"
+          placeholderTextColor="#99f6e4"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Contraseña"
+          placeholderTextColor="#99f6e4"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Confirmar contraseña"
+          placeholderTextColor="#99f6e4"
+          value={passwordConfirm}
+          onChangeText={setPasswordConfirm}
+          secureTextEntry
+        />
 
-      <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-        <Text style={styles.link}>¿Ya tienes cuenta? Inicia sesión</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleRegister}
+          disabled={loading}
+        >
+          {loading
+            ? <ActivityIndicator color="#0e7490" />
+            : <Text style={styles.buttonText}>Registrarse</Text>
+          }
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+          <Text style={styles.link}>¿Ya tienes cuenta? Inicia sesión</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container:      { flexGrow: 1, padding: 24, justifyContent: 'center', backgroundColor: '#fff' },
-  title:          { fontSize: 24, fontWeight: 'bold', marginBottom: 24, color: '#111827' },
+  wrapper:      { flex: 1, backgroundColor: '#0e7490' },
+  imageWrapper: { height: height * 0.28, marginHorizontal: 0 },
+  image:        { width: '100%', height: '100%', resizeMode: 'cover' },
+  fade:         { position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' },
+  container:    { paddingHorizontal: 24, paddingBottom: 40 },
+  title:        { fontSize: 28, fontWeight: 'bold', marginBottom: 4, color: '#ffffff' },
+  subtitle:     { fontSize: 15, color: '#ccfbf1', marginBottom: 24 },
   input: {
-    borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8,
-    padding: 12, marginBottom: 12, backgroundColor: '#f9fafb',
+    borderWidth: 1.5, borderColor: '#5eead4', borderRadius: 12,
+    padding: 14, marginBottom: 14, backgroundColor: 'rgba(255,255,255,0.15)',
+    color: '#ffffff', fontSize: 15,
   },
-  button:         { backgroundColor: '#15803d', padding: 14, borderRadius: 8, alignItems: 'center', marginBottom: 12, marginTop: 8 },
-  buttonDisabled: { backgroundColor: '#86efac' },
-  buttonText:     { color: 'white', fontWeight: 'bold', fontSize: 16 },
-  link:           { color: '#15803d', textAlign: 'center', fontWeight: '500', marginTop: 12 },
+  button:         { backgroundColor: '#ffffff', padding: 15, borderRadius: 12, alignItems: 'center', marginBottom: 16, marginTop: 4 },
+  buttonDisabled: { backgroundColor: '#ccfbf1' },
+  buttonText:     { color: '#0e7490', fontWeight: 'bold', fontSize: 16 },
+  link:           { color: '#ccfbf1', textAlign: 'center', fontSize: 14 },
 });
