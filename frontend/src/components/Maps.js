@@ -4,11 +4,6 @@ import MapView, { Marker, Heatmap, PROVIDER_GOOGLE } from 'react-native-maps';
 
 const API_URL = 'http://10.0.2.2:8000/api';
 
-export default function Maps({ navigation }) {
-  const [reports, setReports] = useState([]);
-  const [heatmapPoints, setHeatmapPoints] = useState([]);
-  const [loading, setLoading] = useState(true);
-
  // Coordenadas unificadas centradas en el Lago Llanquihue
 export const LAGO_LLANQUIHUE_REGION = {
   latitude: -41.134,
@@ -24,6 +19,11 @@ export const CATEGORY_COLORS = {
   AguasServidas: '#007BFF',
   General: '#8E44AD'
 };
+
+export default function Maps({ navigation }) {
+  const [reports, setReports] = useState([]);
+  const [heatmapPoints, setHeatmapPoints] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchData();
@@ -79,38 +79,15 @@ export const CATEGORY_COLORS = {
       <MapView
         provider={PROVIDER_GOOGLE}
         style={styles.map}
-        initialRegion={REGION_LLANQUIHUE}
+        initialRegion={LAGO_LLANQUIHUE_REGION} // Aquí usas la constante
       >
-        {/* Tarea 5: Renderizar capa de Calor si existen puntos */}
-        {heatmapPoints.length > 0 && (
-          <Heatmap 
-            points={heatmapPoints} 
-            radius={40} 
-            opacity={0.7} 
-          />
-        )}
-
-        {/* Tarea 1 & 4: Marcadores dinámicos unificados en la región */}
-        {reports.map((report) => (
-          <Marker
-            key={report.id.toString()}
-            coordinate={{
-              latitude: parseFloat(report.latitude),
-              longitude: parseFloat(report.longitude),
-            }}
-            title={report.title}
-            description={report.description}
-            // Tarea 6: Al presionar, navega a Detalle enviando el ID
-            onPress={() => navigation.navigate('DetalleReporte', { reportId: report.id })}
-          />
-        ))}
+        {/* Marcadores y Heatmap */}
       </MapView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { ...StyleSheet.absoluteFillObject, justifyContent: 'end', alignItems: 'center' },
+  container: { ...StyleSheet.absoluteFillObject },
   map: { ...StyleSheet.absoluteFillObject },
-  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });
