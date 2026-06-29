@@ -8,7 +8,6 @@ import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { clearAuthToken } from '../services/api';
 
-const CATEGORIES = ['Basura', 'Escombros', 'Aguas', 'Otro'];
 
 const statusColor = (status) => {
   if (!status) return '#0e7490';
@@ -24,6 +23,13 @@ export default function HomeScreen({ navigation, route }) {
   const [reports, setReports]           = useState([]);
   const [myReports, setMyReports]       = useState([]);
   const [activeFilter, setActiveFilter] = useState(null);
+  const [categories, setCategories]     = useState([]);
+
+  useEffect(() => {
+    api.get('/categories')
+      .then(res => setCategories(res.data))
+      .catch(() => setCategories([]));
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -50,17 +56,19 @@ export default function HomeScreen({ navigation, route }) {
     setMyReports(prev =>
       prev.some(r => r.id === newReport.id) ? prev : [newReport, ...prev]
     );
+    navigation.setParams({ newReport: undefined });
   }, [route.params?.newReport]);
 
   useFocusEffect(
     useCallback(() => {
+      let active = true;
       const fetchReports = async () => {
         try {
           const [allRes, myRes] = await Promise.all([
             api.get('/reports'),
             api.get('/user/reports'),
           ]);
-          // Solo actualiza estado si los datos cambiaron
+          if (!active) return;
           setReports(prev => {
             const next = allRes.data;
             return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
@@ -74,7 +82,7 @@ export default function HomeScreen({ navigation, route }) {
 
       fetchReports();
       const interval = setInterval(fetchReports, 5000);
-      return () => clearInterval(interval);
+      return () => { active = false; clearInterval(interval); };
     }, [])
   );
 
@@ -98,7 +106,7 @@ export default function HomeScreen({ navigation, route }) {
   const resueltos  = myReports.filter(r => r.status?.toLowerCase() === 'resuelto').length;
 
   const visibleReports = activeFilter
-    ? reports.filter(r => r.category?.name?.toLowerCase() === activeFilter.toLowerCase())
+    ? reports.filter(r => r.category?.name === activeFilter)
     : reports;
 
   return (
@@ -202,13 +210,15 @@ export default function HomeScreen({ navigation, route }) {
           >
             <Text style={[styles.chipText, !activeFilter && styles.chipTextActive]}>Todos</Text>
           </TouchableOpacity>
-          {CATEGORIES.map(cat => (
+          {categories.map(cat => (
             <TouchableOpacity
-              key={cat}
-              style={[styles.chip, activeFilter === cat && styles.chipActive]}
-              onPress={() => setActiveFilter(activeFilter === cat ? null : cat)}
+              key={cat.id}
+              style={[styles.chip, activeFilter === cat.name && styles.chipActive]}
+              onPress={() => setActiveFilter(activeFilter === cat.name ? null : cat.name)}
             >
-              <Text style={[styles.chipText, activeFilter === cat && styles.chipTextActive]}>{cat}</Text>
+              <Text style={[styles.chipText, activeFilter === cat.name && styles.chipTextActive]}>
+                {cat.name.charAt(0).toUpperCase() + cat.name.slice(1)}
+              </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>

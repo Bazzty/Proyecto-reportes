@@ -44,7 +44,6 @@ cd backend && docker compose up -d --build
 docker compose exec app php artisan key:generate
 docker compose exec app php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
 docker compose exec app php artisan migrate
-# Si usa almacenamiento público para fotos, habilite el enlace simbólico:
 docker compose exec app php artisan storage:link
 ```
 

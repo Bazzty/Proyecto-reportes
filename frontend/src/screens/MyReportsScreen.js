@@ -50,9 +50,6 @@ export default function MyReportsScreen({ navigation }) {
         <Text style={styles.description} numberOfLines={2}>
           {item.description}
         </Text>
-        <TouchableOpacity style={styles.detailsButton}>
-          <Text style={styles.detailsButtonText}>Ver detalles</Text>
-        </TouchableOpacity>
       </View>
     );
   };

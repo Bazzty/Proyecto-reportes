@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity,
+  View, Text, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback,
   StyleSheet, ActivityIndicator, Alert, Image, Dimensions, ScrollView
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -54,6 +54,7 @@ export default function RegisterScreen({ navigation }) {
   };
 
   return (
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
     <View style={styles.wrapper}>
       <View style={styles.imageWrapper}>
         <Image source={require('../../assets/lake.png')} style={styles.image} />
@@ -113,6 +114,7 @@ export default function RegisterScreen({ navigation }) {
         </TouchableOpacity>
       </ScrollView>
     </View>
+    </TouchableWithoutFeedback>
   );
 }
 

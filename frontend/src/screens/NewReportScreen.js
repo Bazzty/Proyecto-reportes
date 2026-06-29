@@ -94,7 +94,7 @@ export default function NewReportScreen({ navigation }) {
       form.append('description', description);
       form.append('latitude',    String(location.latitude));
       form.append('longitude',   String(location.longitude));
-      if (categoryId) form.append('category_id', String(categoryId));
+      form.append('category_id', String(categoryId));
       form.append('photo', {
         uri:  photo.uri,
         type: 'image/jpeg',
