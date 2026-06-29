@@ -3,9 +3,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import MapScreen from './MapScreen';
-import DetalleReporteScreen from './DetalleReporteScreen';
-import ReportScreen from './reportScreen';
+import MapScreen from './src/screens/MapScreen';
+import DetalleReporteScreen from './src/screens/DetalleReporteScreen';
+import ReportScreen from './src/services/reportService';
 
 const Stack = createNativeStackNavigator();
 
