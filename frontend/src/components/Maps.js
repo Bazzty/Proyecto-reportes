@@ -1,4 +1,3 @@
-// src/components/Maps.js
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import MapView, { Marker, Heatmap, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -6,7 +5,6 @@ import MapView, { Marker, Heatmap, PROVIDER_GOOGLE } from 'react-native-maps';
 const API_URL = 'http://10.0.2.2:8000/api';
 const USER_TOKEN = 'PLACEHOLDER_TOKEN';
 
-// Coordenadas unificadas centradas en el Lago Llanquihue
 export const LAGO_LLANQUIHUE_REGION = {
   latitude: -41.134,
   longitude: -72.828,
@@ -14,12 +12,11 @@ export const LAGO_LLANQUIHUE_REGION = {
   longitudeDelta: 0.6,
 };
 
-// Colores por defecto para tus marcadores o categorías
 export const CATEGORY_COLORS = {
-  Contaminacion: '#FF0000',   // Rojo
-  Escombros: '#FFA500',       // Naranja
-  AguasServidas: '#007BFF',   // Azul
-  General: '#8E44AD'          // Morado
+  Contaminacion: '#FF0000',
+  Escombros: '#FFA500',
+  AguasServidas: '#007BFF',
+  General: '#8E44AD'
 };
 
 export default function Maps({ navigation }) {
@@ -39,7 +36,6 @@ export default function Maps({ navigation }) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-      // Tarea 4: Consumir GET /api/reports
       const reportsResponse = await fetch(`${API_URL}/reports`, {
         headers: { 'Authorization': `Bearer ${USER_TOKEN}`, 'Accept': 'application/json' },
         signal: controller.signal
@@ -47,7 +43,6 @@ export default function Maps({ navigation }) {
       const reportsData = await reportsResponse.json();
       setReports(reportsData);
 
-      // Tarea 5: Consumir GET /api/reports/heatmap
       const heatmapResponse = await fetch(`${API_URL}/reports/heatmap`, {
         headers: { 'Authorization': `Bearer ${USER_TOKEN}`, 'Accept': 'application/json' },
         signal: controller.signal
@@ -104,7 +99,6 @@ export default function Maps({ navigation }) {
 
       setReports(placeholders);
       
-      // Seteamos los mismos puntos para la capa de calor analítica
       setHeatmapPoints(placeholders.map(p => ({
         latitude: p.latitude,
         longitude: p.longitude,
@@ -126,7 +120,6 @@ export default function Maps({ navigation }) {
         style={styles.map}
         initialRegion={LAGO_LLANQUIHUE_REGION}
       >
-        {/* Tarea 5: Renderizar Capa de Calor si existen datos */}
         {heatmapPoints.length > 0 && (
           <Heatmap 
             points={heatmapPoints} 
@@ -135,7 +128,6 @@ export default function Maps({ navigation }) {
           />
         )}
 
-        {/* Tarea 4 y 6: Renderizado dinámico de los marcadores con acción onPress */}
         {reports.map((report) => (
           <Marker
             key={report.id.toString()}
@@ -145,9 +137,7 @@ export default function Maps({ navigation }) {
             }}
             title={report.title}
             description={report.description}
-            // Asigna dinámicamente el color configurado según su propiedad category
             pinColor={CATEGORY_COLORS[report.category] || '#8E44AD'}
-            // Al presionar el pin, viaja a la pantalla de detalle enviando el ID del reporte
             onPress={() => navigation.navigate('DetalleReporte', { reportId: report.id })}
           />
         ))}
