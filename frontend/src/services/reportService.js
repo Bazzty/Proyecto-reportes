@@ -1,18 +1,29 @@
-import api from './api';
+import React from 'react';
+import { StyleSheet, Text, View, SafeAreaView } from 'react-native';
 
-export const getReports = async () => {
-  const response = await api.get('/reports');
-  return response.data;
-};
+export default function ReportScreen() {
+  return (
+    // Tarea 2: Implementación de SafeAreaView
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <Text style={styles.text}>Pantalla de Creación de Reportes Ambientales</Text>
+      </View>
+    </SafeAreaView>
+  );
+}
 
-// Trae solo coordenadas GPS para el mapa
-export const getHeatmapPoints = async () => {
-  const response = await api.get('/reports/heatmap');
-  return response.data;
-};
-
-// Trae el detalle de un solo reporte
-export const getReportById = async (id) => {
-  const response = await api.get(`/reports/${id}`);
-  return response.data;
-};
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  container: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  text: {
+    fontSize: 18,
+  }
+});

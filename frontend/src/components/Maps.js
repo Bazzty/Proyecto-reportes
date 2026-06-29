@@ -1,43 +1,116 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, Heatmap } from 'react-native-maps';
-import axios from 'axios';
+import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import MapView, { Marker, Heatmap, PROVIDER_GOOGLE } from 'react-native-maps';
 
+const API_URL = 'http://10.0.2.2:8000/api';
 
-const IP_COMPUTADORA = '192.168.1.87'; 
-const API_URL = `http://${IP_COMPUTADORA}:8000/api`;
+export default function Maps({ navigation }) {
+  const [reports, setReports] = useState([]);
+  const [heatmapPoints, setHeatmapPoints] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-// Tarea 1: Región geográfica fija centrada en el Lago Llanquihue
+ // Coordenadas unificadas centradas en el Lago Llanquihue
 export const LAGO_LLANQUIHUE_REGION = {
-  latitude: -41.1350,
-  longitude: -72.8900,
-  latitudeDelta: 0.45,
-  longitudeDelta: 0.45,
+  latitude: -41.134,
+  longitude: -72.828,
+  latitudeDelta: 0.6,
+  longitudeDelta: 0.6,
 };
 
-// Mapeo de colores oficiales según categorías del proyecto
+// Colores por defecto para tus marcadores o categorías
 export const CATEGORY_COLORS = {
-  'basura': '#E6A100',
-  'escombros': '#7F8C8D',
-  'aguas': '#007AFF',
-  'otro': '#9B59B6',
+  Contaminacion: '#FF0000',
+  Escombros: '#FFA500',
+  AguasServidas: '#007BFF',
+  General: '#8E44AD'
 };
 
-// Datos locales de respaldo por si el servidor backend está apagado
-export const PLACEHOLDER_REPORTS = [
-  { 
-    id: 1, 
-    description: "Acumulación de residuos plásticos en la costanera", 
-    latitude: -41.3195, 
-    longitude: -72.9854, 
-    category: { name: "basura" } 
-  },
-  { 
-    id: 2, 
-    description: "Descarga sospechosa cerca del muelle", 
-    latitude: -41.1255, 
-    longitude: -73.0375, 
-    category: { name: "aguas" } 
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Tarea 4: Consumir GET /api/reports (Marcadores reales o placeholder)
+      const reportsResponse = await fetch(`${API_URL}/reports`, {
+        headers: { 'Authorization': `Bearer ${USER_TOKEN}`, 'Accept': 'application/json' }
+      });
+      const reportsData = await reportsResponse.json();
+      setReports(reportsData);
+
+      // Tarea 5: Consumir GET /api/reports/heatmap (Capa de calor)
+      const heatmapResponse = await fetch(`${API_URL}/reports/heatmap`, {
+        headers: { 'Authorization': `Bearer ${USER_TOKEN}`, 'Accept': 'application/json' }
+      });
+      const heatmapData = await heatmapResponse.json();
+      // Formatear los puntos al formato de react-native-maps: { latitude, longitude, weight }
+      const formattedHeatmap = heatmapData.map(point => ({
+        latitude: parseFloat(point.latitude),
+        longitude: parseFloat(point.longitude),
+        weight: 1
+      }));
+      setHeatmapPoints(formattedHeatmap);
+
+    } catch (error) {
+      console.log("Error cargando API, usando placeholders...", error);
+      
+      // Placeholders en caso de que la API no esté disponible aún
+      setReports([
+        { id: 1, latitude: -41.134, longitude: -72.828, title: "Reporte Lago Llanquihue 1", description: "Contaminación visible" },
+        { id: 2, latitude: -41.310, longitude: -72.980, title: "Reporte Puerto Varas", description: "Escombros en la playa" }
+      ]);
+      setHeatmapPoints([
+        { latitude: -41.134, longitude: -72.828, weight: 1 },
+        { latitude: -41.310, longitude: -72.980, weight: 1 }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <ActivityIndicator size="large" color="#0000ff" style={styles.loader} />;
   }
-];
+
+  return (
+    <View style={styles.container}>
+      <MapView
+        provider={PROVIDER_GOOGLE}
+        style={styles.map}
+        initialRegion={REGION_LLANQUIHUE}
+      >
+        {/* Tarea 5: Renderizar capa de Calor si existen puntos */}
+        {heatmapPoints.length > 0 && (
+          <Heatmap 
+            points={heatmapPoints} 
+            radius={40} 
+            opacity={0.7} 
+          />
+        )}
+
+        {/* Tarea 1 & 4: Marcadores dinámicos unificados en la región */}
+        {reports.map((report) => (
+          <Marker
+            key={report.id.toString()}
+            coordinate={{
+              latitude: parseFloat(report.latitude),
+              longitude: parseFloat(report.longitude),
+            }}
+            title={report.title}
+            description={report.description}
+            // Tarea 6: Al presionar, navega a Detalle enviando el ID
+            onPress={() => navigation.navigate('DetalleReporte', { reportId: report.id })}
+          />
+        ))}
+      </MapView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { ...StyleSheet.absoluteFillObject, justifyContent: 'end', alignItems: 'center' },
+  map: { ...StyleSheet.absoluteFillObject },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' }
+});
