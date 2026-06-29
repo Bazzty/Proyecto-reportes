@@ -1,6 +1,5 @@
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
-// Asegúrate de tener instalada la librería: npm install react-native-maps
-import MapView, { Marker } from 'react-native-maps';
+import { View, Text, StyleSheet } from 'react-native';
+import MapView from 'react-native-maps';
 
 export default function MapScreen() {
   return (
@@ -9,23 +8,15 @@ export default function MapScreen() {
       <Text style={styles.description}>Zonas críticas y reportes ciudadanos</Text>
 
       <View style={styles.mapContainer}>
-        {/* Componente del mapa de react-native-maps */}
         <MapView
           style={styles.map}
           initialRegion={{
-            latitude: -41.31946, 
+            latitude: -41.31946,
             longitude: -72.98356,
-            latitudeDelta: 0.01, // Un valor menor acerca más la cámara a la plaza
+            latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           }}
-        >
-          {/* Marcador de prueba. Luego se generarán dinámicamente con un .map() */}
-          <Marker
-            coordinate={{ latitude: -33.4569, longitude: -70.6483 }}
-            title="Basura acumulada"
-            description="Reporte en estado: pendiente"
-          />
-        </MapView>
+        />
       </View>
     </View>
   );
