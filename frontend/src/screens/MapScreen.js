@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, SafeAreaView } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { getReports, getHeatmapPoints } from '../services/reportService';
 import { LAGO_LLANQUIHUE_REGION, CATEGORY_COLORS, PLACEHOLDER_REPORTS } from '../../src/components/Maps';
 
@@ -15,6 +16,6 @@ export default function MapScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff', // Evita que se vea transparente abajo del notch
+    backgroundColor: '#fff', 
   },
 });
