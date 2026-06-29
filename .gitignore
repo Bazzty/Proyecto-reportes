@@ -1,1 +1,15 @@
 node_modules
+
+# AI collaboration (local only)
+AI_BRIDGE.md
+
+# Archivos generados localmente
+informe_backend.pdf
+generar_informe.py
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/

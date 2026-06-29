@@ -14,7 +14,7 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: Sever nginx
+    container_name: reportes_nginx
     restart: unless-stopped
     ports:
       - "8000:80"
@@ -26,7 +26,7 @@ services:
 
   db:
     image: mysql:8.0
-    container_name: Db MySQL
+    container_name: reportes_db
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${DB_DATABASE}
@@ -42,7 +42,7 @@ services:
 
   phpmyadmin:
     image: phpmyadmin:latest
-    container_name: PhpMyAdmin
+    container_name: reportes_phpmyadmin
     restart: unless-stopped
     ports:
       - "8080:80"
