@@ -33,20 +33,26 @@ export default function Maps({ navigation }) {
   const fetchData = async () => {
     try {
       setLoading(true);
-      
-      // Tarea 4: Consumir GET /api/reports (Marcadores reales o placeholder)
+
+      // Creamos un controlador para abortar la petición si tarda mucho
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 segundos máximo
+
+      // Tarea 4: Consumir GET /api/reports
       const reportsResponse = await fetch(`${API_URL}/reports`, {
-        headers: { 'Authorization': `Bearer ${USER_TOKEN}`, 'Accept': 'application/json' }
+        headers: { 'Authorization': `Bearer ${USER_TOKEN}`, 'Accept': 'application/json' },
+        signal: controller.signal // Le pasamos la señal de control
       });
       const reportsData = await reportsResponse.json();
       setReports(reportsData);
 
-      // Tarea 5: Consumir GET /api/reports/heatmap (Capa de calor)
+      // Tarea 5: Consumir GET /api/reports/heatmap
       const heatmapResponse = await fetch(`${API_URL}/reports/heatmap`, {
-        headers: { 'Authorization': `Bearer ${USER_TOKEN}`, 'Accept': 'application/json' }
+        headers: { 'Authorization': `Bearer ${USER_TOKEN}`, 'Accept': 'application/json' },
+        signal: controller.signal
       });
       const heatmapData = await heatmapResponse.json();
-      // Formatear los puntos al formato de react-native-maps: { latitude, longitude, weight }
+      
       const formattedHeatmap = heatmapData.map(point => ({
         latitude: parseFloat(point.latitude),
         longitude: parseFloat(point.longitude),
@@ -54,50 +60,23 @@ export default function Maps({ navigation }) {
       }));
       setHeatmapPoints(formattedHeatmap);
 
+      // Si todo sale bien antes de los 3 segundos, limpiamos el temporizador
+      clearTimeout(timeoutId);
+
     } catch (error) {
-      console.log("Error cargando API, usando placeholders...", error);
+      console.log("Error o Timeout cargando API, usando placeholders...", error.message);
       
-      // Placeholders en caso de que la API no esté disponible aún
+      // Placeholders distribuidos en el Lago Llanquihue
       const placeholders = [
-        { 
-          id: 1, 
-          latitude: -41.320, 
-          longitude: -72.985, 
-          title: "Derrame de Combustible", 
-          description: "Mancha aceitosa detectada cerca de la costanera de Puerto Varas.",
-          category: "Contaminacion"
-        },
-        { 
-          id: 2, 
-          latitude: -41.135, 
-          longitude: -73.025, 
-          title: "Acumulación de Plásticos", 
-          description: "Escombros y botellas abandonadas en la playa de Frutillar Bajo.",
-          category: "Escombros"
-        },
-        { 
-          id: 3, 
-          latitude: -41.255, 
-          longitude: -73.008, 
-          title: "Descarga de Aguas Servidas", 
-          description: "Salida anómala de tubería directo al lago en la comuna de Llanquihue.",
-          category: "AguasServidas"
-        },
-        { 
-          id: 4, 
-          latitude: -40.975, 
-          longitude: -72.885, 
-          title: "Microbasural en la Bahía", 
-          description: "Reporte preventivo por desechos domésticos en el sector de Puerto Octay.",
-          category: "General"
-        }
+        { id: 1, latitude: -41.320, longitude: -72.985, title: "Derrame de Combustible", description: "Puerto Varas", category: "Contaminacion" },
+        { id: 2, latitude: -41.135, longitude: -73.025, title: "Acumulación de Plásticos", description: "Frutillar Bajo", category: "Escombros" },
+        { id: 3, latitude: -41.255, longitude: -73.008, title: "Descarga de Aguas Servidas", description: "Llanquihue", category: "AguasServidas" },
+        { id: 4, latitude: -40.975, longitude: -72.885, title: "Microbasural en la Bahía", description: "Puerto Octay", category: "General" }
       ];
+
       setReports(placeholders);
-      
-      setHeatmapPoints([
-        { latitude: -41.134, longitude: -72.828, weight: 1 },
-        { latitude: -41.310, longitude: -72.980, weight: 1 }
-      ]);
+      setHeatmapPoints(placeholders.map(p => ({ latitude: p.latitude, longitude: p.longitude, weight: 1 })));
+
     } finally {
       setLoading(false);
     }
