@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('category_id')->constrained()->onDelete('restrict');
             $table->text('description');
             $table->decimal('latitude', 10, 8);
-            $table->decimal('longitude', 10, 8);
+            $table->decimal('longitude', 11, 8);
             $table->string('photo_path')->nullable();
             $table->enum('status', ['Pendiente', 'En Progreso', 'Resuelto'])->default('Pendiente');
             $table->timestamps();
