@@ -1,13 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getReports, getHeatmapPoints } from '../services/reportService';
-import { LAGO_LLANQUIHUE_REGION, CATEGORY_COLORS, PLACEHOLDER_REPORTS } from '../components/Maps';
+import Maps from '../components/Maps'; 
 
 export default function MapScreen({ navigation }) {
   return (
-    // Tarea 2: Envolver el contenido con SafeAreaView
     <SafeAreaView style={styles.safeArea}>
+      {/* Ahora Git/React ya sabe qué es "Maps" */}
       <Maps navigation={navigation} />
     </SafeAreaView>
   );
