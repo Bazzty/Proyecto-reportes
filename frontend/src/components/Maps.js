@@ -93,12 +93,11 @@ export default function Maps({ navigation }) {
         }
       ];
       setReports(placeholders);
-
+      
       setHeatmapPoints([
         { latitude: -41.134, longitude: -72.828, weight: 1 },
         { latitude: -41.310, longitude: -72.980, weight: 1 }
       ]);
-      
     } finally {
       setLoading(false);
     }
@@ -113,33 +112,9 @@ export default function Maps({ navigation }) {
       <MapView
         provider={PROVIDER_GOOGLE}
         style={styles.map}
-        initialRegion={LAGO_LLANQUIHUE_REGION}
+        initialRegion={LAGO_LLANQUIHUE_REGION} // Aquí usas la constante
       >
-        {/* Tarea 5: Renderizar capa de Calor si existen puntos */}
-        {heatmapPoints.length > 0 && (
-          <Heatmap 
-            points={heatmapPoints} 
-            radius={45} 
-            opacity={0.6} 
-          />
-        )}
-
-        {/* 2. SOLUCIÓN: Renderizado dinámico de marcadores en el mapa */}
-        {reports.map((report) => (
-          <Marker
-            key={report.id.toString()}
-            coordinate={{
-              latitude: parseFloat(report.latitude),
-              longitude: parseFloat(report.longitude),
-            }}
-            title={report.title}
-            description={report.description}
-            // Asigna dinámicamente el color configurado arriba según su categoría
-            pinColor={CATEGORY_COLORS[report.category] || '#8E44AD'}
-            // Tarea 6: Al presionar, viaja a la pantalla de detalle enviando el ID
-            onPress={() => navigation.navigate('DetalleReporte', { reportId: report.id })}
-          />
-        ))}
+        {/* Marcadores y Heatmap */}
       </MapView>
     </View>
   );
@@ -148,5 +123,4 @@ export default function Maps({ navigation }) {
 const styles = StyleSheet.create({
   container: { ...StyleSheet.absoluteFillObject },
   map: { ...StyleSheet.absoluteFillObject },
-  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });
