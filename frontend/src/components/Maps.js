@@ -5,22 +5,8 @@ import MapView, { Marker, Heatmap } from 'react-native-maps';
 import axios from 'axios';
 
 
-const IP_COMPUTADORA = '192.168.1.15'; 
+const IP_COMPUTADORA = '192.168.1.87'; 
 const API_URL = `http://${IP_COMPUTADORA}:8000/api`;
-
-const LAGO_LLANQUIHUE_REGION = {
-  latitude: -41.1350,
-  longitude: -72.8900,
-  latitudeDelta: 0.45,
-  longitudeDelta: 0.45,
-};
-
-const COLORS = {
-  'basura': '#E6A100',
-  'escombros': '#7F8C8D',
-  'aguas': '#007AFF',
-  'otro': '#9B59B6',
-};
 
 // Tarea 1: Región geográfica fija centrada en el Lago Llanquihue
 export const LAGO_LLANQUIHUE_REGION = {
