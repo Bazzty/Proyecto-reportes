@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, Image, Alert, ActivityIndicator
@@ -10,19 +10,24 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as Location from 'expo-location';
 import api from '../services/api';
 
-const CATEGORIES = [
-  { id: 1, name: 'Basura' },
-  { id: 2, name: 'Escombros' },
-  { id: 3, name: 'Aguas' },
-  { id: 4, name: 'Otro' },
-];
-
 export default function NewReportScreen({ navigation }) {
   const [photo, setPhoto]             = useState(null);
   const [location, setLocation]       = useState(null);
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId]   = useState(null);
   const [loading, setLoading]         = useState(false);
+  const [categories, setCategories]   = useState([]);
+
+  useEffect(() => {
+    api.get('/categories')
+      .then(res => setCategories(res.data))
+      .catch(() => setCategories([
+        { id: 1, name: 'basura' },
+        { id: 2, name: 'escombros' },
+        { id: 3, name: 'aguas' },
+        { id: 4, name: 'otro' },
+      ]));
+  }, []);
 
   const toJpeg = async (asset) => {
     const manipulated = await ImageManipulator.manipulateAsync(
@@ -81,6 +86,7 @@ export default function NewReportScreen({ navigation }) {
     if (!photo)             { Alert.alert('Falta foto', 'Debes adjuntar una foto.');         return; }
     if (!location)          { Alert.alert('Falta ubicación', 'Obtén tu ubicación GPS.');     return; }
     if (!description.trim()){ Alert.alert('Falta descripción', 'Escribe una descripción.'); return; }
+    if (!categoryId)        { Alert.alert('Falta categoría', 'Selecciona una categoría.');   return; }
 
     setLoading(true);
     try {
@@ -104,7 +110,9 @@ export default function NewReportScreen({ navigation }) {
       ]);
     } catch (error) {
       const message = error.response?.data?.message
-        || error.response?.data?.errors && JSON.stringify(error.response.data.errors)
+        || (error.response?.data?.errors
+            ? Object.values(error.response.data.errors).flat()[0]
+            : null)
         || error.message
         || 'No se pudo enviar el reporte.';
       Alert.alert('Error', message);
@@ -161,7 +169,7 @@ export default function NewReportScreen({ navigation }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Categoría</Text>
         <View style={styles.categoryContainer}>
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <TouchableOpacity
               key={cat.id}
               style={[
@@ -255,6 +263,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#0e7490', padding: 16,
     borderRadius: 8, alignItems: 'center', marginTop: 8, marginBottom: 32,
   },
-  submitButtonDisabled:       { backgroundColor: '#86efac' },
+  submitButtonDisabled:       { backgroundColor: '#9ca3af' },
   submitButtonText:           { color: 'white', fontWeight: 'bold', fontSize: 18 },
 });

@@ -85,6 +85,7 @@ export default function HomeScreen({ navigation, route }) {
         text: 'Salir',
         style: 'destructive',
         onPress: async () => {
+          try { await api.post('/logout'); } catch {}
           await AsyncStorage.removeItem('token');
           clearAuthToken();
           navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
@@ -97,7 +98,7 @@ export default function HomeScreen({ navigation, route }) {
   const resueltos  = myReports.filter(r => r.status?.toLowerCase() === 'resuelto').length;
 
   const visibleReports = activeFilter
-    ? reports.filter(r => r.category?.name === activeFilter)
+    ? reports.filter(r => r.category?.name?.toLowerCase() === activeFilter.toLowerCase())
     : reports;
 
   return (

@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
 
 const getStatusStyle = (status) => {
-  switch (status) {
-    case 'resuelto':     return { bg: '#dcfce7', text: '#166534', accent: '#16a34a' };
-    case 'en revisión':  return { bg: '#dbeafe', text: '#1e40af', accent: '#2563eb' };
+  const s = (status ?? '').toLowerCase();
+  switch (s) {
+    case 'resuelto':    return { bg: '#dcfce7', text: '#166534', accent: '#16a34a' };
+    case 'en progreso': return { bg: '#dbeafe', text: '#1e40af', accent: '#2563eb' };
     case 'pendiente':
-    default:             return { bg: '#fef9c3', text: '#854d0e', accent: '#ca8a04' };
+    default:            return { bg: '#fef9c3', text: '#854d0e', accent: '#ca8a04' };
   }
 };
 
@@ -23,12 +25,15 @@ export default function MyReportsScreen({ navigation }) {
   const [reports, setReports]   = useState([]);
   const [loading, setLoading]   = useState(true);
 
-  useEffect(() => {
-    api.get('/user/reports')
-      .then(res => setReports(res.data))
-      .catch(() => setReports([]))
-      .finally(() => setLoading(false));
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      api.get('/user/reports')
+        .then(res => setReports(res.data))
+        .catch(() => setReports([]))
+        .finally(() => setLoading(false));
+    }, [])
+  );
 
   const renderReportCard = ({ item }) => {
     const statusColors = getStatusStyle(item.status);
@@ -38,7 +43,7 @@ export default function MyReportsScreen({ navigation }) {
           <Text style={styles.date}>{formatDate(item.created_at)}</Text>
           <View style={[styles.badge, { backgroundColor: statusColors.bg }]}>
             <Text style={[styles.badgeText, { color: statusColors.text }]}>
-              {item.status.toUpperCase()}
+              {(item.status ?? '').toUpperCase()}
             </Text>
           </View>
         </View>
@@ -100,7 +105,6 @@ const styles = StyleSheet.create({
   backButton:        { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 4 },
   backText:          { color: '#0e7490', fontSize: 16, fontWeight: '500' },
   title:             { fontSize: 28, fontWeight: 'bold', color: '#111827', marginBottom: 4 },
-  subtitle:          { fontSize: 14, color: '#6b7280', marginBottom: 24 },
   listContent:       { paddingBottom: 40 },
   card: {
     backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16,
