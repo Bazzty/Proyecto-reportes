@@ -11,10 +11,10 @@ export const LAGO_LLANQUIHUE_REGION = {
 };
 
 export const CATEGORY_COLORS = {
-  Contaminacion: '#FF0000',
-  Escombros: '#FFA500',
-  AguasServidas: '#007BFF',
-  General: '#8E44AD'
+  basura: '#FF0000',
+  escombros: '#FFA500',
+  aguas: '#007BFF',
+  otro: '#8E44AD'
 };
 
 export default function Maps({ navigation }) {
@@ -46,37 +46,33 @@ export default function Maps({ navigation }) {
       
       // Placeholders distribuidos por categorías dentro del Lago Llanquihue
       const placeholders = [
-        { 
-          id: 1, 
-          latitude: -41.320, 
-          longitude: -72.985, 
-          title: "Derrame de Combustible", 
+        {
+          id: 1,
+          latitude: -41.320,
+          longitude: -72.985,
           description: "Mancha aceitosa detectada cerca de la costanera de Puerto Varas.",
-          category: "Contaminacion"
+          category: "basura"
         },
-        { 
-          id: 2, 
-          latitude: -41.135, 
-          longitude: -73.025, 
-          title: "Acumulación de Plásticos", 
+        {
+          id: 2,
+          latitude: -41.135,
+          longitude: -73.025,
           description: "Escombros y botellas abandonadas en la playa de Frutillar Bajo.",
-          category: "Escombros"
+          category: "escombros"
         },
-        { 
-          id: 3, 
-          latitude: -41.255, 
-          longitude: -73.008, 
-          title: "Descarga de Aguas Servidas", 
+        {
+          id: 3,
+          latitude: -41.255,
+          longitude: -73.008,
           description: "Salida anómala de tubería directo al lago en la comuna de Llanquihue.",
-          category: "AguasServidas"
+          category: "aguas"
         },
-        { 
-          id: 4, 
-          latitude: -40.975, 
-          longitude: -72.885, 
-          title: "Microbasural en la Bahía", 
+        {
+          id: 4,
+          latitude: -40.975,
+          longitude: -72.885,
           description: "Reporte preventivo por desechos domésticos en el sector de Puerto Octay.",
-          category: "General"
+          category: "otro"
         }
       ];
 
@@ -118,9 +114,9 @@ export default function Maps({ navigation }) {
               latitude: parseFloat(report.latitude),
               longitude: parseFloat(report.longitude),
             }}
-            title={report.title}
-            description={report.description}
-            pinColor={CATEGORY_COLORS[report.category] || '#8E44AD'}
+            title={report.description}
+            description={`Categoría: ${report.category?.name || report.category}`}
+            pinColor={CATEGORY_COLORS[report.category?.name || report.category] || '#8E44AD'}
             onPress={() => navigation.navigate('DetalleReporte', { reportId: report.id })}
           />
         ))}
