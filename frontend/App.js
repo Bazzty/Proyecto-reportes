@@ -8,6 +8,7 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import MapScreen from './src/screens/MapScreen';
+import DetalleReporteScreen from './src/screens/DetalleReporteScreen';
 import NewReportScreen from './src/screens/NewReportScreen';
 import MyReportsScreen from './src/screens/MyReportsScreen';
 import { setAuthToken } from './src/services/api';
@@ -46,7 +47,8 @@ export default function App() {
         <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'Iniciar Sesión' }} />
         <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Registro' }} />
         <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Inicio' }} />
-        <Stack.Screen name="Map" component={MapScreen} options={{ title: 'Mapa' }} />
+        <Stack.Screen name="Map" component={MapScreen} options={{ title: 'Mapa', headerShown: false }} />
+        <Stack.Screen name="DetalleReporte" component={DetalleReporteScreen} options={{ title: 'Detalle del Reporte' }} />
         <Stack.Screen name="NewReport" component={NewReportScreen} options={{ title: 'Nuevo Reporte' }} />
         <Stack.Screen name="MyReports" component={MyReportsScreen} options={{ title: 'Mis Reportes' }} />
       </Stack.Navigator>
