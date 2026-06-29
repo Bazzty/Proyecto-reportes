@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, SafeAreaView, ActivityIndicator } from 'react-native';
-
-const API_URL = 'http://10.0.2.2:8000/api';
+import api from '../services/api';
 
 export default function DetalleReporteScreen({ route }) {
   // Obtener el ID enviado desde el marcador en Maps.js
@@ -12,11 +11,7 @@ export default function DetalleReporteScreen({ route }) {
   useEffect(() => {
     const fetchReportDetail = async () => {
       try {
-        // Tarea 6: Consumir GET /api/reports/{id}
-        const response = await fetch(`${API_URL}/reports/${reportId}`, {
-          headers: { 'Authorization': `Bearer ${USER_TOKEN}`, 'Accept': 'application/json' }
-        });
-        const data = await response.json();
+        const { data } = await api.get(`/reports/${reportId}`);
         setReport(data);
       } catch (error) {
         console.log("Error al obtener detalle, usando placeholder...", error);

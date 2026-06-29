@@ -5,7 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import MapScreen from './src/screens/MapScreen';
 import DetalleReporteScreen from './src/screens/DetalleReporteScreen';
-import ReportScreen from './src/services/reportService';
+import ReportScreen from './src/screens/ReportScreen';
 
 const Stack = createNativeStackNavigator();
 

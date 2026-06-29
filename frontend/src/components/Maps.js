@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import MapView, { Marker, Heatmap, PROVIDER_GOOGLE } from 'react-native-maps';
-
-const API_URL = 'http://10.0.2.2:8000/api';
-const USER_TOKEN = 'PLACEHOLDER_TOKEN';
+import api from '../services/api';
 
 export const LAGO_LLANQUIHUE_REGION = {
   latitude: -41.134,
@@ -31,32 +29,17 @@ export default function Maps({ navigation }) {
   const fetchData = async () => {
     try {
       setLoading(true);
-      
-      // Controlador para cancelar la petición en 3 segundos si la API no responde
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-      const reportsResponse = await fetch(`${API_URL}/reports`, {
-        headers: { 'Authorization': `Bearer ${USER_TOKEN}`, 'Accept': 'application/json' },
-        signal: controller.signal
-      });
-      const reportsData = await reportsResponse.json();
+      const reportsData = await api.get('/reports', { timeout: 3000 }).then(r => r.data);
       setReports(reportsData);
 
-      const heatmapResponse = await fetch(`${API_URL}/reports/heatmap`, {
-        headers: { 'Authorization': `Bearer ${USER_TOKEN}`, 'Accept': 'application/json' },
-        signal: controller.signal
-      });
-      const heatmapData = await heatmapResponse.json();
-      
+      const heatmapData = await api.get('/reports/heatmap', { timeout: 3000 }).then(r => r.data);
       const formattedHeatmap = heatmapData.map(point => ({
         latitude: parseFloat(point.latitude),
         longitude: parseFloat(point.longitude),
         weight: 1
       }));
       setHeatmapPoints(formattedHeatmap);
-
-      clearTimeout(timeoutId);
 
     } catch (error) {
       console.log("Error o Timeout cargando API, usando placeholders...", error.message);
