@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Platform } from 'react-native';
 import { Image } from 'expo-image';
-import MapView, { Marker, Callout } from 'react-native-maps';
+import MapView, { Marker, Callout, Heatmap } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
@@ -24,6 +24,7 @@ export default function HomeScreen({ navigation, route }) {
   const [myReports, setMyReports]       = useState([]);
   const [activeFilter, setActiveFilter] = useState(null);
   const [categories, setCategories]     = useState([]);
+  const [heatmapPoints, setHeatmapPoints] = useState([]);
 
   useEffect(() => {
     api.get('/categories')
@@ -64,9 +65,10 @@ export default function HomeScreen({ navigation, route }) {
       let active = true;
       const fetchReports = async () => {
         try {
-          const [allRes, myRes] = await Promise.all([
+          const [allRes, myRes, heatRes] = await Promise.all([
             api.get('/reports'),
             api.get('/user/reports'),
+            api.get('/reports/heatmap'),
           ]);
           if (!active) return;
           setReports(prev => {
@@ -77,6 +79,11 @@ export default function HomeScreen({ navigation, route }) {
             const next = myRes.data;
             return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
           });
+          setHeatmapPoints(heatRes.data.map(p => ({
+            latitude: parseFloat(p.latitude),
+            longitude: parseFloat(p.longitude),
+            weight: 1,
+          })));
         } catch {}
       };
 
@@ -124,6 +131,10 @@ export default function HomeScreen({ navigation, route }) {
           longitudeDelta: 0.08,
         }}
       >
+        {Platform.OS === 'android' && heatmapPoints.length > 0 && (
+          <Heatmap points={heatmapPoints} radius={40} opacity={0.6} />
+        )}
+
         {visibleReports.map(report => {
           const color = statusColor(report.status);
           return (
