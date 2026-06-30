@@ -42,6 +42,8 @@ class ReportApiTest extends TestCase
                 'status',
                 'category' => ['id', 'name'],
                 'user' => ['id', 'name'],
+                'confirmations_count',
+                'confirmed_by_me',
                 'created_at',
             ]);
 
@@ -124,6 +126,50 @@ class ReportApiTest extends TestCase
             ->assertJsonCount(1)
             ->assertJsonFragment(['description' => 'Mi reporte'])
             ->assertJsonMissing(['description' => 'Reporte de otro usuario']);
+    }
+
+    public function test_guest_can_list_reports_without_token()
+    {
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'otro']);
+
+        Report::create([
+            'user_id'     => $user->id,
+            'category_id' => $category->id,
+            'description' => 'Reporte público',
+            'latitude'    => -41.3198,
+            'longitude'   => -72.9833,
+            'photo_path'  => null,
+            'status'      => 'Pendiente',
+        ]);
+
+        $this->getJson('/api/reports')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonFragment([
+                'confirmations_count' => 0,
+                'confirmed_by_me'     => false,
+            ]);
+    }
+
+    public function test_guest_can_view_report_detail_without_token()
+    {
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+
+        $report = Report::create([
+            'user_id'     => $user->id,
+            'category_id' => $category->id,
+            'description' => 'Detalle público',
+            'latitude'    => -41.3198,
+            'longitude'   => -72.9833,
+            'photo_path'  => null,
+            'status'      => 'Pendiente',
+        ]);
+
+        $this->getJson("/api/reports/{$report->id}")
+            ->assertOk()
+            ->assertJsonFragment(['description' => 'Detalle público']);
     }
 
     public function test_heatmap_returns_only_coordinates()
