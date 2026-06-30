@@ -109,7 +109,6 @@ Prefijos: `feat:` `fix:` `docs:` `chore:` `refactor:`
 |--------|-----|
 | Bastian Contreras | Líder + Backend |
 | Mathias | Backend — Auth |
-| Sebastian | Backend — Reportes |
 | Alonso | Frontend — Login/Registro |
 | Catalina | Frontend — Mapa |
 | Oskar | Frontend — Nuevo Reporte |
