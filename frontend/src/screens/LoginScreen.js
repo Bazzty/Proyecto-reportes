@@ -23,10 +23,9 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
     try {
       const response = await api.post('/login', { email, password });
-      const { token } = response.data;
+      const { token, user } = response.data;
 
-      // Guardar token y activarlo para peticiones futuras
-      await AsyncStorage.setItem('token', token);
+      await AsyncStorage.multiSet([['token', token], ['userName', user.name], ['userId', String(user.id)]]);
       setAuthToken(token);
 
       // replace evita que al presionar "atrás" en Home se vuelva al Login
@@ -85,6 +84,10 @@ export default function LoginScreen({ navigation }) {
       <TouchableOpacity onPress={() => navigation.navigate('Register')}>
         <Text style={styles.link}>¿No tienes cuenta? Regístrate</Text>
       </TouchableOpacity>
+
+      <TouchableOpacity style={{ marginTop: 12 }} onPress={() => navigation.navigate('Home', { guest: true })}>
+        <Text style={styles.guestLink}>Continuar sin cuenta →</Text>
+      </TouchableOpacity>
     </View>
     </TouchableWithoutFeedback>
   );
@@ -108,4 +111,5 @@ const styles = StyleSheet.create({
   buttonDisabled: { backgroundColor: '#ccfbf1' },
   buttonText:     { color: '#0e7490', fontWeight: 'bold', fontSize: 16 },
   link:           { color: '#ccfbf1', textAlign: 'center', fontSize: 14 },
+  guestLink:      { color: 'rgba(255,255,255,0.5)', textAlign: 'center', fontSize: 13 },
 });

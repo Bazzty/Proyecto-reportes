@@ -25,4 +25,14 @@ class Report extends Model
     {
         return $this->belongsTo(Category::class);
     }
+
+    public function confirmations()
+    {
+        return $this->hasMany(Confirmation::class);
+    }
+
+    public function comments()
+    {
+        return $this->hasMany(Comment::class);
+    }
 }

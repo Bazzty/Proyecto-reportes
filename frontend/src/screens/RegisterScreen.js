@@ -34,9 +34,9 @@ export default function RegisterScreen({ navigation }) {
         password,
         password_confirmation: passwordConfirm,
       });
-      const { token } = response.data;
+      const { token, user } = response.data;
 
-      await AsyncStorage.setItem('token', token);
+      await AsyncStorage.multiSet([['token', token], ['userName', user.name], ['userId', String(user.id)]]);
       setAuthToken(token);
 
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });

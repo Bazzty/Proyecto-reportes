@@ -21,12 +21,13 @@ export default function NewReportScreen({ navigation }) {
   useEffect(() => {
     api.get('/categories')
       .then(res => setCategories(res.data))
-      .catch(() => setCategories([
-        { id: 1, name: 'basura' },
-        { id: 2, name: 'escombros' },
-        { id: 3, name: 'aguas' },
-        { id: 4, name: 'otro' },
-      ]));
+      .catch(() => {
+        Alert.alert(
+          'Error',
+          'No se pudieron cargar las categorías. Verifica tu conexión e intenta de nuevo.'
+        );
+        setCategories([]);
+      });
   }, []);
 
   const toJpeg = async (asset) => {

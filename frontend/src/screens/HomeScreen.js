@@ -18,15 +18,19 @@ const statusColor = (status) => {
 };
 
 export default function HomeScreen({ navigation, route }) {
+  const isGuest = route.params?.guest === true;
+
   const mapRef = useRef(null);
-  const [userLocation, setUserLocation] = useState(null);
-  const [reports, setReports]           = useState([]);
-  const [myReports, setMyReports]       = useState([]);
-  const [activeFilter, setActiveFilter] = useState(null);
-  const [categories, setCategories]     = useState([]);
+  const [userLocation, setUserLocation]   = useState(null);
+  const [userName, setUserName]           = useState('');
+  const [reports, setReports]             = useState([]);
+  const [myReports, setMyReports]         = useState([]);
+  const [activeFilter, setActiveFilter]   = useState(null);
+  const [categories, setCategories]       = useState([]);
   const [heatmapPoints, setHeatmapPoints] = useState([]);
 
   useEffect(() => {
+    AsyncStorage.getItem('userName').then(name => { if (name) setUserName(name); });
     api.get('/categories')
       .then(res => setCategories(res.data))
       .catch(() => setCategories([]));
@@ -65,18 +69,14 @@ export default function HomeScreen({ navigation, route }) {
       let active = true;
       const fetchReports = async () => {
         try {
-          const [allRes, myRes, heatRes] = await Promise.all([
-            api.get('/reports'),
-            api.get('/user/reports'),
-            api.get('/reports/heatmap'),
-          ]);
+          const requests = [api.get('/reports'), api.get('/reports/heatmap')];
+          if (!isGuest) requests.push(api.get('/user/reports'));
+
+          const [allRes, heatRes, myRes] = await Promise.all(requests);
           if (!active) return;
+
           setReports(prev => {
             const next = allRes.data;
-            return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
-          });
-          setMyReports(prev => {
-            const next = myRes.data;
             return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
           });
           setHeatmapPoints(heatRes.data.map(p => ({
@@ -84,16 +84,26 @@ export default function HomeScreen({ navigation, route }) {
             longitude: parseFloat(p.longitude),
             weight: 1,
           })));
+          if (!isGuest && myRes) {
+            setMyReports(prev => {
+              const next = myRes.data;
+              return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+            });
+          }
         } catch {}
       };
 
       fetchReports();
       const interval = setInterval(fetchReports, 5000);
       return () => { active = false; clearInterval(interval); };
-    }, [])
+    }, [isGuest])
   );
 
   const handleLogout = () => {
+    if (isGuest) {
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      return;
+    }
     Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
       { text: 'Cancelar', style: 'cancel' },
       {
@@ -101,12 +111,23 @@ export default function HomeScreen({ navigation, route }) {
         style: 'destructive',
         onPress: async () => {
           try { await api.post('/logout'); } catch {}
-          await AsyncStorage.removeItem('token');
+          await AsyncStorage.multiRemove(['token', 'userName', 'userId']);
           clearAuthToken();
           navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
         },
       },
     ]);
+  };
+
+  const handleGuestBlock = (action) => {
+    Alert.alert(
+      'Inicia sesión',
+      `Para ${action} necesitas una cuenta.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Iniciar sesión', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Login' }] }) },
+      ]
+    );
   };
 
   const pendientes = myReports.filter(r => r.status?.toLowerCase() === 'pendiente').length;
@@ -163,7 +184,7 @@ export default function HomeScreen({ navigation, route }) {
                 </View>
                 <View style={[styles.markerArrow, { borderTopColor: color }]} />
               </View>
-              <Callout tooltip>
+              <Callout tooltip onPress={() => navigation.navigate('DetalleReporte', { reportId: report.id })}>
                 <View style={styles.callout}>
                   {report.photo_url && (
                     <Image
@@ -184,6 +205,7 @@ export default function HomeScreen({ navigation, route }) {
                       {report.description}
                     </Text>
                     <Text style={styles.calloutUser}>📍 {report.user?.name}</Text>
+                    <Text style={styles.calloutLink}>Ver detalle →</Text>
                   </View>
                 </View>
               </Callout>
@@ -194,8 +216,14 @@ export default function HomeScreen({ navigation, route }) {
 
       {/* Greeting card */}
       <View style={styles.greetingCard}>
-        <Text style={styles.greetingTitle}>¡Bienvenido!</Text>
-        {myReports.length > 0 ? (
+        <Text style={styles.greetingTitle}>
+          {isGuest ? '¡Bienvenido!' : (userName ? `¡Bienvenido, ${userName.split(' ')[0]}!` : '¡Bienvenido!')}
+        </Text>
+        {isGuest ? (
+          <TouchableOpacity onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })}>
+            <Text style={styles.greetingGuestLink}>Inicia sesión para reportar →</Text>
+          </TouchableOpacity>
+        ) : myReports.length > 0 ? (
           <View style={styles.badgeRow}>
             <View style={styles.badge}>
               <View style={[styles.badgeDot, { backgroundColor: '#f59e0b' }]} />
@@ -252,16 +280,16 @@ export default function HomeScreen({ navigation, route }) {
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={styles.barButton}
-          onPress={() => navigation.navigate('MyReports')}
+          onPress={() => isGuest ? handleGuestBlock('ver tus reportes') : navigation.navigate('MyReports')}
         >
-          <Ionicons name="document-text-outline" size={24} color="#6b7280" />
-          <Text style={styles.barLabel}>Mis Reportes</Text>
+          <Ionicons name="document-text-outline" size={24} color={isGuest ? '#d1d5db' : '#6b7280'} />
+          <Text style={[styles.barLabel, isGuest && { color: '#d1d5db' }]}>Mis Reportes</Text>
         </TouchableOpacity>
 
         <View style={styles.fabWrapper}>
           <TouchableOpacity
             style={styles.fab}
-            onPress={() => navigation.navigate('NewReport')}
+            onPress={() => isGuest ? handleGuestBlock('crear un reporte') : navigation.navigate('NewReport')}
           >
             <Ionicons name="add" size={36} color="white" />
           </TouchableOpacity>
@@ -270,7 +298,7 @@ export default function HomeScreen({ navigation, route }) {
 
         <TouchableOpacity style={styles.barButton} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={24} color="#6b7280" />
-          <Text style={styles.barLabel}>Salir</Text>
+          <Text style={styles.barLabel}>{isGuest ? 'Ingresar' : 'Salir'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -293,8 +321,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  greetingTitle:    { fontSize: 16, fontWeight: 'bold', color: '#0e7490' },
-  greetingSubtitle: { fontSize: 12, color: '#6b7280', marginTop: 2 },
+  greetingTitle:     { fontSize: 16, fontWeight: 'bold', color: '#0e7490' },
+  greetingSubtitle:  { fontSize: 12, color: '#6b7280', marginTop: 2 },
+  greetingGuestLink: { fontSize: 12, color: '#0e7490', marginTop: 2, fontWeight: '500' },
   badgeRow:  { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 },
   badge:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
   badgeDot:  { width: 7, height: 7, borderRadius: 4 },
@@ -413,4 +442,5 @@ const styles = StyleSheet.create({
   statusDot:          { width: 8, height: 8, borderRadius: 4 },
   calloutDescription: { fontSize: 12, color: '#374151', lineHeight: 17 },
   calloutUser:        { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  calloutLink:        { fontSize: 11, color: '#0e7490', fontWeight: '600', marginTop: 6 },
 });

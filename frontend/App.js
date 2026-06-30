@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,15 +11,21 @@ import MapScreen from './src/screens/MapScreen';
 import DetalleReporteScreen from './src/screens/DetalleReporteScreen';
 import NewReportScreen from './src/screens/NewReportScreen';
 import MyReportsScreen from './src/screens/MyReportsScreen';
-import { setAuthToken } from './src/services/api';
+import { setAuthToken, setUnauthorizedHandler } from './src/services/api';
 
 const Stack = createStackNavigator();
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [initialRoute, setInitialRoute] = useState('Login');
+  const navigationRef = useRef(null);
 
   useEffect(() => {
+    // Force navigation to Login when token is expired/invalid (401 response)
+    setUnauthorizedHandler(() => {
+      navigationRef.current?.reset({ index: 0, routes: [{ name: 'Login' }] });
+    });
+
     const restoreSession = async () => {
       try {
         const [token] = await Promise.all([
@@ -45,7 +51,7 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator initialRouteName={initialRoute}>
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
