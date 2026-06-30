@@ -1,4 +1,4 @@
-# Suralis — Backend
+# Lago en Línea — Backend
 
 API REST construida con Laravel 12 y Sanctum. Ver el README raíz del monorepo para instrucciones de setup completo.
 

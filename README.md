@@ -1,4 +1,4 @@
-# Suralis — Sistema de Reportes Ambientales
+# Lago en Línea — Sistema de Reportes Ambientales
 
 App móvil para reportar incidencias ambientales (basura, escombros, contaminación) con foto y GPS. Incluye mapa interactivo con marcadores, filtros por categoría, confirmaciones de reportes entre usuarios y comentarios.
 
