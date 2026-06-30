@@ -44,6 +44,7 @@ cd backend && docker compose up -d --build
 docker compose exec app php artisan key:generate
 docker compose exec app php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
 docker compose exec app php artisan migrate
+docker compose exec app php artisan storage:link
 ```
 
 ### Daily commands
