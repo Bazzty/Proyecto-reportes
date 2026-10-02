@@ -14,20 +14,25 @@ App móvil para reportar incidencias ambientales (basura, escombros, contaminaci
 
 ---
 
-## Backend (Docker)
+## Primer paso: Backend (Docker)
+
+Para poder ejecutar la aplicacion, primero se debe levantar el servidor del backend.
 
 ```bash
 # 1. Configurar entorno
 cp backend/.env.example backend/.env
-# Completar DB_PASSWORD y DB_ROOT_PASSWORD en backend/.env
+# Debes completar el DB_PASSWORD y DB_ROOT_PASSWORD en backend/.env con una contraseña.
+# Puede ser cualquiera, solo deben estar y ser iguales
+# Si surgiera algun error (ej: no anotaste la contraseña al levantar el servidor), para hacer que el cambio afecte, ejecuta estos dos:
+
 
 # 2. Construir y levantar
 cd backend
 docker compose up -d --build
 
 # 3. Primera vez
+docker compose exec app composer install #Muy importante asegurarse de instalar las dependencias en el contenedor. Demora unos minutos.
 docker compose exec app php artisan key:generate
-docker compose exec app php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
 docker compose exec app php artisan migrate
 docker compose exec app php artisan storage:link
 
@@ -44,22 +49,28 @@ docker compose exec app php artisan db:seed
 
 ## Frontend (Expo)
 
+Ahora, con el backend corriendo, hay que ejecutar la aplicación. Usaremos la aplicación movil Expo Go para probar y ejecutar cambios en tiempo real.
+Expo Go nos permite verlo en nuestro telefono celular con solo escanear un qr y sincronizarse con nuestro entorno levantado.
+
 ```bash
 cd frontend
-npm install
-npx expo start
 ```
 
-Crear `frontend/.env` con la IP local de tu máquina:
+Antes de instalar, recomendamos crear un archivo `.env` en la carpeta de frontend con la IP local de tu máquina:
 
 ```env
 EXPO_PUBLIC_API_URL=http://192.168.X.X:8000/api
 ```
 
+```bash
+npm install
+npx expo start
+```
+
 Escanear el QR con **Expo Go**. El dispositivo y la computadora deben estar en la misma red WiFi.
 
 ---
-
+### 172.30.80.1
 ## Usuarios de prueba (seeder)
 
 | Email | Contraseña |
@@ -109,7 +120,6 @@ Prefijos: `feat:` `fix:` `docs:` `chore:` `refactor:`
 |--------|-----|
 | Bastian Contreras | Líder + Backend |
 | Mathias | Backend — Auth |
-| Sebastian | Backend — Reportes |
 | Alonso | Frontend — Login/Registro |
 | Catalina | Frontend — Mapa |
 | Oskar | Frontend — Nuevo Reporte |
