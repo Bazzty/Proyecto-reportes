@@ -23,7 +23,6 @@ Para poder ejecutar la aplicacion, primero se debe levantar el servidor del back
 cp backend/.env.example backend/.env
 # Debes completar el DB_PASSWORD y DB_ROOT_PASSWORD en backend/.env con una contraseña.
 # Puede ser cualquiera, solo deben estar y ser iguales
-# Si surgiera algun error (ej: no anotaste la contraseña al levantar el servidor), para hacer que el cambio afecte, ejecuta estos dos:
 
 
 # 2. Construir y levantar

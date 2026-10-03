@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
@@ -51,6 +51,7 @@ export default function App() {
   }
 
   return (
+    <SafeAreaProvider>
     <NavigationContainer ref={navigationRef}>
       <Stack.Navigator initialRouteName={initialRoute}>
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
@@ -62,5 +63,6 @@ export default function App() {
         <Stack.Screen name="MyReports" component={MyReportsScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
