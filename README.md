@@ -67,7 +67,37 @@ npm install
 npx expo start
 ```
 
-Escanear el QR con **Expo Go**. El dispositivo y la computadora deben estar en la misma red WiFi.
+Escanear el QR con **Expo Go**.
+
+Requisitos:
+- El celular y el PC deben estar en la misma red wifi.
+- La red no debe tener aislamiento de clientes (común en redes de universidades o lugares públicos). Si lo tiene, usa el hotspot del celular.
+
+
+### Expo Go: "Failed to download remote update"
+
+Ocurre cuando el celular no logra conectarse a Metro (puerto 8081) en el PC. En Windows, el firewall bloquea esa conexión entrante por defecto.
+
+**Solución:** abre PowerShell como administrador y ejecuta:
+
+```powershell
+New-NetFirewallRule -DisplayName "Expo Metro" -Direction Inbound -Protocol TCP -LocalPort 8081 -Action Allow -Profile Private,Public
+```
+
+Luego reinicia Metro:
+
+```bash
+npx expo start --clear
+```
+
+Para eliminar la regla cuando ya no la necesites:
+
+```powershell
+Remove-NetFirewallRule -DisplayName "Expo Metro"
+```
+
+> Si Expo usa otro puerto (por ejemplo 8082 porque el 8081 está ocupado), crea la regla con ese número.
+
 
 ---
 ### 172.30.80.1
