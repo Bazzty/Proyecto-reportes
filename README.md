@@ -32,6 +32,7 @@ docker compose up -d --build
 # 3. Primera vez
 docker compose exec app composer install #Muy importante asegurarse de instalar las dependencias en el contenedor. Demora unos minutos.
 docker compose exec app php artisan key:generate
+docker compose exec app php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
 docker compose exec app php artisan migrate
 docker compose exec app php artisan storage:link
 

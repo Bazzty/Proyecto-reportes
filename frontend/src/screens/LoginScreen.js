@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback,
-  StyleSheet, ActivityIndicator, Alert, Image, Dimensions
+  StyleSheet, ActivityIndicator, Alert, Image, KeyboardAvoidingView,
+  ScrollView, useWindowDimensions
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { setAuthToken } from '../services/api';
 
-const { height } = Dimensions.get('window');
-
 export default function LoginScreen({ navigation }) {
+  const { height } = useWindowDimensions();
+  const initialHeight = useRef(height).current;
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
@@ -40,11 +41,20 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-    <View style={styles.container}>
-      <View style={styles.imageWrapper}>
+    <KeyboardAvoidingView
+      style={styles.wrapper}
+      behavior="padding"
+    >
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.container}
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={[styles.imageWrapper, { height: Math.min(initialHeight * 0.42, 340) }]}>
         <Image source={require('../../assets/lake.png')} style={styles.image} />
         <LinearGradient
-          colors={['transparent', '#0e7490']}
+          colors={['transparent', '#0284c7']}
           style={styles.fade}
         />
       </View>
@@ -88,14 +98,17 @@ export default function LoginScreen({ navigation }) {
       <TouchableOpacity style={{ marginTop: 12 }} onPress={() => navigation.navigate('Home', { guest: true })}>
         <Text style={styles.guestLink}>Continuar sin cuenta →</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
+    </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: '#0e7490', paddingHorizontal: 24, paddingBottom: 40 },
-  imageWrapper: { height: height * 0.42, marginHorizontal: -24 },
+  wrapper:      { flex: 1, backgroundColor: '#0284c7' },
+  scrollView:   { backgroundColor: '#0284c7' },
+  container:    { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40, backgroundColor: '#0284c7' },
+  imageWrapper: { marginHorizontal: -24 },
   image:        { width: '100%', height: '100%', resizeMode: 'cover' },
   fade: {
     position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%',
@@ -103,7 +116,7 @@ const styles = StyleSheet.create({
   title:          { fontSize: 28, fontWeight: 'bold', marginTop: 24, marginBottom: 4, color: '#ffffff' },
   subtitle:       { fontSize: 15, color: '#ccfbf1', marginBottom: 32 },
   input: {
-    borderWidth: 1.5, borderColor: '#5eead4', borderRadius: 12,
+    borderWidth: 1.5, borderColor: '#7dd3fc', borderRadius: 12,
     padding: 14, marginBottom: 14, backgroundColor: 'rgba(255,255,255,0.15)',
     color: '#ffffff', fontSize: 15,
   },
