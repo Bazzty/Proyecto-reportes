@@ -14,18 +14,23 @@ App móvil para reportar incidencias ambientales (basura, escombros, contaminaci
 
 ---
 
-## Backend (Docker)
+## Primer paso: Backend (Docker)
+
+Para poder ejecutar la aplicacion, primero se debe levantar el servidor del backend.
 
 ```bash
 # 1. Configurar entorno
 cp backend/.env.example backend/.env
-# Completar DB_PASSWORD y DB_ROOT_PASSWORD en backend/.env
+# Debes completar el DB_PASSWORD y DB_ROOT_PASSWORD en backend/.env con una contraseña.
+# Puede ser cualquiera, solo deben estar y ser iguales
+
 
 # 2. Construir y levantar
 cd backend
 docker compose up -d --build
 
 # 3. Primera vez
+docker compose exec app composer install #Muy importante asegurarse de instalar las dependencias en el contenedor. Demora unos minutos.
 docker compose exec app php artisan key:generate
 docker compose exec app php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
 docker compose exec app php artisan migrate
@@ -44,22 +49,58 @@ docker compose exec app php artisan db:seed
 
 ## Frontend (Expo)
 
+Ahora, con el backend corriendo, hay que ejecutar la aplicación. Usaremos la aplicación movil Expo Go para probar y ejecutar cambios en tiempo real.
+Expo Go nos permite verlo en nuestro telefono celular con solo escanear un qr y sincronizarse con nuestro entorno levantado.
+
 ```bash
 cd frontend
-npm install
-npx expo start
 ```
 
-Crear `frontend/.env` con la IP local de tu máquina:
+Antes de instalar, recomendamos crear un archivo `.env` en la carpeta de frontend con la IP local de tu máquina:
 
 ```env
 EXPO_PUBLIC_API_URL=http://192.168.X.X:8000/api
 ```
 
-Escanear el QR con **Expo Go**. El dispositivo y la computadora deben estar en la misma red WiFi.
+```bash
+npm install
+npx expo start
+```
+
+Escanear el QR con **Expo Go**.
+
+Requisitos:
+- El celular y el PC deben estar en la misma red wifi.
+- La red no debe tener aislamiento de clientes (común en redes de universidades o lugares públicos). Si lo tiene, usa el hotspot del celular.
+
+
+### Expo Go: "Failed to download remote update"
+
+Ocurre cuando el celular no logra conectarse a Metro (puerto 8081) en el PC. En Windows, el firewall bloquea esa conexión entrante por defecto.
+
+**Solución:** abre PowerShell como administrador y ejecuta:
+
+```powershell
+New-NetFirewallRule -DisplayName "Expo Metro" -Direction Inbound -Protocol TCP -LocalPort 8081 -Action Allow -Profile Private,Public
+```
+
+Luego reinicia Metro:
+
+```bash
+npx expo start --clear
+```
+
+Para eliminar la regla cuando ya no la necesites:
+
+```powershell
+Remove-NetFirewallRule -DisplayName "Expo Metro"
+```
+
+> Si Expo usa otro puerto (por ejemplo 8082 porque el 8081 está ocupado), crea la regla con ese número.
+
 
 ---
-
+### 172.30.80.1
 ## Usuarios de prueba (seeder)
 
 | Email | Contraseña |
