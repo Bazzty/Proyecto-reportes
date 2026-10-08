@@ -16,22 +16,24 @@ class ConfirmationController extends Controller
 
         $confirmed = DB::transaction(function () use ($userId, $report) {
             $existing = Confirmation::where('user_id', $userId)
-                                    ->where('report_id', $report->id)
-                                    ->lockForUpdate()
-                                    ->first();
+                ->where('report_id', $report->id)
+                ->lockForUpdate()
+                ->first();
 
             if ($existing) {
                 $existing->delete();
+
                 return false;
             }
 
             Confirmation::create(['user_id' => $userId, 'report_id' => $report->id]);
+
             return true;
         });
 
         return response()->json([
             'confirmed' => $confirmed,
-            'count'     => $report->confirmations()->count(),
+            'count' => $report->confirmations()->count(),
         ]);
     }
 }

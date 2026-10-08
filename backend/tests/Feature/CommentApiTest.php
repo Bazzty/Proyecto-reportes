@@ -17,26 +17,27 @@ class CommentApiTest extends TestCase
     private function makeReport(User $user): Report
     {
         $category = Category::create(['name' => 'aguas']);
+
         return Report::create([
-            'user_id'     => $user->id,
+            'user_id' => $user->id,
             'category_id' => $category->id,
             'description' => 'Reporte de prueba',
-            'latitude'    => -41.3198,
-            'longitude'   => -72.9833,
-            'photo_path'  => 'photos/test.jpg',
-            'status'      => 'Pendiente',
+            'latitude' => -41.3198,
+            'longitude' => -72.9833,
+            'photo_path' => 'photos/test.jpg',
+            'status' => 'Pendiente',
         ]);
     }
 
     public function test_guest_can_list_comments()
     {
-        $user    = User::factory()->create();
-        $report  = $this->makeReport($user);
+        $user = User::factory()->create();
+        $report = $this->makeReport($user);
 
         Comment::create([
-            'user_id'   => $user->id,
+            'user_id' => $user->id,
             'report_id' => $report->id,
-            'body'      => 'Sigo viendo el mismo problema.',
+            'body' => 'Sigo viendo el mismo problema.',
         ]);
 
         $response = $this->getJson("/api/reports/{$report->id}/comments");
@@ -48,9 +49,9 @@ class CommentApiTest extends TestCase
 
     public function test_authenticated_user_can_post_comment()
     {
-        $owner    = User::factory()->create();
+        $owner = User::factory()->create();
         $reporter = User::factory()->create();
-        $report   = $this->makeReport($owner);
+        $report = $this->makeReport($owner);
 
         Sanctum::actingAs($reporter);
 
@@ -67,15 +68,15 @@ class CommentApiTest extends TestCase
             ->assertJsonFragment(['body' => 'Este problema persiste desde hace semanas.']);
 
         $this->assertDatabaseHas('comments', [
-            'user_id'   => $reporter->id,
+            'user_id' => $reporter->id,
             'report_id' => $report->id,
-            'body'      => 'Este problema persiste desde hace semanas.',
+            'body' => 'Este problema persiste desde hace semanas.',
         ]);
     }
 
     public function test_comment_body_is_required()
     {
-        $user   = User::factory()->create();
+        $user = User::factory()->create();
         $report = $this->makeReport($user);
 
         Sanctum::actingAs($user);
@@ -86,7 +87,7 @@ class CommentApiTest extends TestCase
 
     public function test_comment_body_max_length()
     {
-        $user   = User::factory()->create();
+        $user = User::factory()->create();
         $report = $this->makeReport($user);
 
         Sanctum::actingAs($user);
@@ -98,7 +99,7 @@ class CommentApiTest extends TestCase
 
     public function test_posting_comment_requires_authentication()
     {
-        $user   = User::factory()->create();
+        $user = User::factory()->create();
         $report = $this->makeReport($user);
 
         $this->postJson("/api/reports/{$report->id}/comments", ['body' => 'Test'])
@@ -107,7 +108,7 @@ class CommentApiTest extends TestCase
 
     public function test_comments_are_returned_newest_first()
     {
-        $user   = User::factory()->create();
+        $user = User::factory()->create();
         $report = $this->makeReport($user);
 
         $first = Comment::create(['user_id' => $user->id, 'report_id' => $report->id, 'body' => 'Primero']);

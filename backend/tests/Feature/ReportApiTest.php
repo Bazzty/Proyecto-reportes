@@ -134,13 +134,13 @@ class ReportApiTest extends TestCase
         $category = Category::create(['name' => 'otro']);
 
         Report::create([
-            'user_id'     => $user->id,
+            'user_id' => $user->id,
             'category_id' => $category->id,
             'description' => 'Reporte público',
-            'latitude'    => -41.3198,
-            'longitude'   => -72.9833,
-            'photo_path'  => null,
-            'status'      => 'Pendiente',
+            'latitude' => -41.3198,
+            'longitude' => -72.9833,
+            'photo_path' => null,
+            'status' => 'Pendiente',
         ]);
 
         $this->getJson('/api/reports')
@@ -148,7 +148,7 @@ class ReportApiTest extends TestCase
             ->assertJsonCount(1)
             ->assertJsonFragment([
                 'confirmations_count' => 0,
-                'confirmed_by_me'     => false,
+                'confirmed_by_me' => false,
             ]);
     }
 
@@ -158,13 +158,13 @@ class ReportApiTest extends TestCase
         $category = Category::create(['name' => 'basura']);
 
         $report = Report::create([
-            'user_id'     => $user->id,
+            'user_id' => $user->id,
             'category_id' => $category->id,
             'description' => 'Detalle público',
-            'latitude'    => -41.3198,
-            'longitude'   => -72.9833,
-            'photo_path'  => null,
-            'status'      => 'Pendiente',
+            'latitude' => -41.3198,
+            'longitude' => -72.9833,
+            'photo_path' => null,
+            'status' => 'Pendiente',
         ]);
 
         $this->getJson("/api/reports/{$report->id}")
