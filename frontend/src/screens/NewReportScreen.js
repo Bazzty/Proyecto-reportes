@@ -1,22 +1,29 @@
 import { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity,
+  View, Text, TextInput, TouchableOpacity, Linking,
   StyleSheet, ScrollView, Image, Alert, ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as Location from 'expo-location';
 import api from '../services/api';
+import useAutoLocation from '../hooks/useAutoLocation';
+
+const LOCATION_ERRORS = {
+  permission: 'Permiso de ubicación denegado. Actívalo para continuar.',
+  services: 'Activa el GPS de tu dispositivo para continuar.',
+  unavailable: 'No se pudo obtener tu ubicación.',
+};
 
 export default function NewReportScreen({ navigation }) {
   const [photo, setPhoto]             = useState(null);
-  const [location, setLocation]       = useState(null);
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId]   = useState(null);
   const [loading, setLoading]         = useState(false);
   const [categories, setCategories]   = useState([]);
+
+  const { location, locating, error: locationError, permanentlyDenied, refresh: refreshLocation } = useAutoLocation();
 
   useEffect(() => {
     api.get('/categories')
@@ -71,21 +78,9 @@ export default function NewReportScreen({ navigation }) {
     if (!result.canceled) setPhoto(await toJpeg(result.assets[0]));
   };
 
-  const handleGetLocation = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permiso denegado', 'Se necesita acceso a la ubicación.');
-      return;
-    }
-    const loc = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.High,
-    });
-    setLocation(loc.coords);
-  };
-
   const handleSubmit = async () => {
     if (!photo)             { Alert.alert('Falta foto', 'Debes adjuntar una foto.');         return; }
-    if (!location)          { Alert.alert('Falta ubicación', 'Obtén tu ubicación GPS.');     return; }
+    if (!location)          { Alert.alert('Falta ubicación', 'Espera a que se detecte tu ubicación.'); return; }
     if (!description.trim()){ Alert.alert('Falta descripción', 'Escribe una descripción.'); return; }
     if (!categoryId)        { Alert.alert('Falta categoría', 'Selecciona una categoría.');   return; }
 
@@ -155,15 +150,40 @@ export default function NewReportScreen({ navigation }) {
       {/* GPS */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Ubicación GPS</Text>
-        <TouchableOpacity style={styles.locationButton} onPress={handleGetLocation}>
-          <Ionicons name="location-outline" size={20} color="#0e7490" />
-          <Text style={styles.locationButtonText}>Obtener mi ubicación actual</Text>
-        </TouchableOpacity>
-        <Text style={styles.helperText}>
-          {location
-            ? `Lat: ${location.latitude.toFixed(5)}, Lng: ${location.longitude.toFixed(5)}`
-            : 'Coordenadas: Esperando...'}
-        </Text>
+
+        {locating && !location ? (
+          <View style={styles.locationLoading}>
+            <ActivityIndicator color="#0e7490" />
+            <Text style={styles.helperText}>Obteniendo ubicación…</Text>
+          </View>
+        ) : location ? (
+          <>
+            <TouchableOpacity style={styles.locationButton} onPress={refreshLocation} disabled={locating}>
+              <Ionicons name="refresh-outline" size={20} color="#0e7490" />
+              <Text style={styles.locationButtonText}>
+                {locating ? 'Actualizando…' : 'Actualizar ubicación'}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.helperText}>
+              Lat: {location.latitude.toFixed(5)}, Lng: {location.longitude.toFixed(5)}
+            </Text>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity style={styles.locationButton} onPress={refreshLocation} disabled={locating}>
+              <Ionicons name="location-outline" size={20} color="#0e7490" />
+              <Text style={styles.locationButtonText}>Reintentar</Text>
+            </TouchableOpacity>
+            <Text style={styles.helperText}>
+              {LOCATION_ERRORS[locationError] ?? LOCATION_ERRORS.unavailable}
+            </Text>
+            {permanentlyDenied && (
+              <TouchableOpacity style={styles.settingsLink} onPress={() => Linking.openSettings()}>
+                <Text style={styles.settingsLinkText}>Abrir Ajustes</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
       </View>
 
       {/* Categoría */}
@@ -246,6 +266,9 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#99f6e4', gap: 8,
   },
   locationButtonText:         { color: '#0e7490', fontWeight: '600' },
+  locationLoading:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12 },
+  settingsLink:               { alignSelf: 'flex-start', marginTop: 6 },
+  settingsLinkText:           { color: '#0e7490', fontWeight: '600', fontSize: 13, textDecorationLine: 'underline' },
   helperText:                 { fontSize: 12, color: '#6b7280', fontStyle: 'italic', marginTop: 4 },
   categoryContainer:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   categoryButton:             {
