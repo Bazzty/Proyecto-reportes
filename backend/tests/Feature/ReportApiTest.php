@@ -271,6 +271,32 @@ class ReportApiTest extends TestCase
             ->assertJsonValidationErrors('latitude');
     }
 
+    public function test_creating_report_rejects_out_of_range_coordinates()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['latitude' => 91]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('latitude');
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['longitude' => -181]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('longitude');
+    }
+
+    public function test_creating_report_rejects_description_over_1000_chars()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['description' => str_repeat('a', 1001)]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('description');
+    }
+
     public function test_creating_report_rejects_non_image_file()
     {
         Storage::fake('public');

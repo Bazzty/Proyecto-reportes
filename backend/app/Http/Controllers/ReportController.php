@@ -10,7 +10,7 @@ class ReportController extends Controller
     public function index(Request $request)
     {
         $reports = Report::with(['category', 'user', 'confirmations'])->get();
-        $uid     = $request->user()?->id;
+        $uid = $request->user()?->id;
 
         return response()->json($reports->map(fn (Report $report) => $this->formatReport($report, $uid)));
     }
@@ -25,9 +25,9 @@ class ReportController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'description' => 'required|string',
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
+            'description' => 'required|string|max:1000',
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
             'category_id' => 'required|integer|exists:categories,id',
             'photo' => 'required|file|mimes:jpeg,jpg,png,webp,gif|max:5120',
         ]);
@@ -52,7 +52,7 @@ class ReportController extends Controller
     public function userReports(Request $request)
     {
         $reports = $request->user()->reports()->with(['category', 'user', 'confirmations'])->get();
-        $uid     = $request->user()->id;
+        $uid = $request->user()->id;
 
         return response()->json($reports->map(fn (Report $report) => $this->formatReport($report, $uid)));
     }
@@ -70,22 +70,22 @@ class ReportController extends Controller
     private function formatReport(Report $report, ?int $authUserId = null): array
     {
         return [
-            'id'          => $report->id,
+            'id' => $report->id,
             'description' => $report->description,
-            'latitude'    => (float) $report->latitude,
-            'longitude'   => (float) $report->longitude,
-            'photo_url'   => $report->photo_path ? url('storage/' . $report->photo_path) : null,
-            'status'      => $report->status,
-            'category'    => $report->category ? [
-                'id'   => $report->category->id,
+            'latitude' => (float) $report->latitude,
+            'longitude' => (float) $report->longitude,
+            'photo_url' => $report->photo_path ? url('storage/'.$report->photo_path) : null,
+            'status' => $report->status,
+            'category' => $report->category ? [
+                'id' => $report->category->id,
                 'name' => $report->category->name,
             ] : null,
             'user' => $report->user ? [
-                'id'   => $report->user->id,
+                'id' => $report->user->id,
                 'name' => $report->user->name,
             ] : null,
             'confirmations_count' => $report->confirmations->count(),
-            'confirmed_by_me'     => $authUserId
+            'confirmed_by_me' => $authUserId
                 ? $report->confirmations->contains('user_id', $authUserId)
                 : false,
             'created_at' => $report->created_at?->toISOString(),
