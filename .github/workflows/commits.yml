@@ -1,0 +1,23 @@
+name: Commits
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  conventional:
+    name: Prefijos de commit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validar prefijos
+        run: |
+          bad=0
+          while IFS= read -r msg; do
+            if ! echo "$msg" | grep -qE '^(feat|fix|docs|chore|refactor|test)(\([^)]+\))?: .+|^Merge '; then
+              echo "::error::Commit sin prefijo válido: $msg"; bad=1
+            fi
+          done < <(git log --format=%s origin/${{ github.base_ref }}..HEAD)
+          exit $bad
