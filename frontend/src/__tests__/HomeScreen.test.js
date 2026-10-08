@@ -226,4 +226,56 @@ describe('HomeScreen', () => {
     expect(await screen.findByText('Recién creado')).toBeTruthy();
     expect(navigation.setParams).toHaveBeenCalledWith({ newReport: undefined });
   });
+
+  describe('refresco periódico', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    // Deja que termine la primera carga (y se programe el siguiente refresco)
+    const settle = () => jest.advanceTimersByTimeAsync(0);
+
+    const failReports = () => {
+      const ok = api.get.getMockImplementation();
+      api.get.mockImplementation((url) =>
+        url === '/reports' ? Promise.reject(new Error('network')) : ok(url)
+      );
+    };
+
+    it('un fallo aislado no muestra el aviso de conexión', async () => {
+      await setup();
+      await settle();
+      failReports();
+      await jest.advanceTimersByTimeAsync(5000);
+
+      expect(screen.queryByText(/Sin conexión/)).toBeNull();
+    });
+
+    it('dos fallos seguidos muestran el aviso y al recuperarse desaparece', async () => {
+      await setup();
+      await settle();
+      const ok = api.get.getMockImplementation();
+      failReports();
+      await jest.advanceTimersByTimeAsync(5000);
+      await jest.advanceTimersByTimeAsync(5000);
+
+      expect(await screen.findByText(/Sin conexión/)).toBeTruthy();
+
+      api.get.mockImplementation(ok);
+      await jest.advanceTimersByTimeAsync(5000);
+
+      await waitFor(() => expect(screen.queryByText(/Sin conexión/)).toBeNull());
+    });
+
+    it('no lanza una nueva petición mientras la anterior sigue en curso', async () => {
+      await setup();
+      await settle();
+      const ok = api.get.getMockImplementation();
+      api.get.mockImplementation((url) => (url === '/reports' ? new Promise(() => {}) : ok(url)));
+      await jest.advanceTimersByTimeAsync(5000);
+      const callsAfterHang = api.get.mock.calls.filter(([u]) => u === '/reports').length;
+      await jest.advanceTimersByTimeAsync(30000);
+
+      expect(api.get.mock.calls.filter(([u]) => u === '/reports').length).toBe(callsAfterHang);
+    });
+  });
 });

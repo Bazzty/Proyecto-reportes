@@ -69,9 +69,22 @@ describe('MyReportsScreen', () => {
     expect(navigation.navigate).toHaveBeenCalledWith('NewReport');
   });
 
-  it('si la API falla muestra el estado vacío', async () => {
+  it('si la API falla muestra el error y no el estado vacío', async () => {
     await setup(new Error('network'));
-    expect(await screen.findByText('Aún no has reportado incidencias.')).toBeTruthy();
+
+    expect(await screen.findByText('No se pudieron cargar tus reportes.')).toBeTruthy();
+    expect(screen.queryByText('Aún no has reportado incidencias.')).toBeNull();
+    expect(screen.queryByText('Sin reportes aún')).toBeNull();
+  });
+
+  it('Reintentar vuelve a pedir los reportes y los muestra', async () => {
+    await setup(new Error('network'));
+    api.get.mockResolvedValue({ data: [report()] });
+
+    await fireEvent.press(await screen.findByText('Reintentar'));
+
+    expect(await screen.findByText('Basura en la esquina')).toBeTruthy();
+    expect(screen.queryByText('No se pudieron cargar tus reportes.')).toBeNull();
   });
 
   it('tocar un reporte navega al detalle', async () => {

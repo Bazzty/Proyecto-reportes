@@ -28,17 +28,19 @@ const formatCoords = (lat, lng) =>
 export default function MyReportsScreen({ navigation }) {
   const [reports, setReports]       = useState([]);
   const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      setLoading(true);
-      api.get('/user/reports')
-        .then(res => setReports(res.data))
-        .catch(() => setReports([]))
-        .finally(() => setLoading(false));
-    }, [])
-  );
+  const loadReports = useCallback(() => {
+    setLoading(true);
+    setError(false);
+    api.get('/user/reports')
+      .then(res => setReports(res.data))
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useFocusEffect(loadReports);
 
   const renderReportCard = ({ item }) => {
     const statusColors = getStatusStyle(item.status);
@@ -108,7 +110,7 @@ export default function MyReportsScreen({ navigation }) {
       </TouchableOpacity>
 
       <Text style={styles.title}>Mis Reportes</Text>
-      {!loading && (
+      {!loading && !error && (
         <View style={styles.counter}>
           <Ionicons name="document-text-outline" size={14} color="#0e7490" />
           <Text style={styles.counterText}>
@@ -121,6 +123,14 @@ export default function MyReportsScreen({ navigation }) {
 
       {loading ? (
         <ActivityIndicator size="large" color="#0e7490" style={{ marginTop: 40 }} />
+      ) : error ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="cloud-offline-outline" size={48} color="#fca5a5" />
+          <Text style={styles.emptyStateText}>No se pudieron cargar tus reportes.</Text>
+          <TouchableOpacity onPress={loadReports}>
+            <Text style={styles.emptyStateLink}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           data={reports}
