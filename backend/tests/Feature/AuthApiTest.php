@@ -144,4 +144,16 @@ class AuthApiTest extends TestCase
 
         $this->postJson('/api/register', [])->assertStatus(429);
     }
+
+    public function test_token_expires_after_configured_minutes()
+    {
+        $token = User::factory()->create()->createToken('auth_token')->plainTextToken;
+
+        $this->withToken($token)->getJson('/api/user/reports')->assertOk();
+
+        $this->travel(31)->days();
+        $this->app['auth']->forgetGuards();
+
+        $this->withToken($token)->getJson('/api/user/reports')->assertUnauthorized();
+    }
 }
