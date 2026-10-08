@@ -17,20 +17,18 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_DATABASE: lagoenlinea
-          MYSQL_USER: lagoenlinea
-          MYSQL_PASSWORD: secret
-          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
         ports: ['3306:3306']
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -psecret"
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
           --health-interval=10s --health-timeout=5s --health-retries=10
     env:
       DB_CONNECTION: mysql
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
       DB_DATABASE: lagoenlinea
-      DB_USERNAME: lagoenlinea
-      DB_PASSWORD: secret
+      DB_USERNAME: root
+      DB_PASSWORD: ''
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
@@ -69,20 +67,18 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_DATABASE: lagoenlinea
-          MYSQL_USER: lagoenlinea
-          MYSQL_PASSWORD: secret
-          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
         ports: ['3306:3306']
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -psecret"
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
           --health-interval=10s --health-timeout=5s --health-retries=10
     env:
       DB_CONNECTION: mysql
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
       DB_DATABASE: lagoenlinea
-      DB_USERNAME: lagoenlinea
-      DB_PASSWORD: secret
+      DB_USERNAME: root
+      DB_PASSWORD: ''
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
@@ -97,7 +93,7 @@ jobs:
         working-directory: .
         run: |
           if [ -f backend/database/audit.sql ]; then
-            mysql -h 127.0.0.1 -ulagoenlinea -psecret lagoenlinea < backend/database/audit.sql
+            mysql -h 127.0.0.1 -uroot lagoenlinea < backend/database/audit.sql
           else
             echo "::warning::backend/database/audit.sql (REP-59) aún no existe; se omite la auditoría."
           fi
