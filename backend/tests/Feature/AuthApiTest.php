@@ -124,4 +124,24 @@ class AuthApiTest extends TestCase
     {
         $this->postJson('/api/logout')->assertUnauthorized();
     }
+
+    public function test_login_is_rate_limited_after_five_attempts()
+    {
+        for ($i = 0; $i < 5; $i++) {
+            $this->postJson('/api/login', ['email' => 'nadie@example.com', 'password' => 'incorrecta'])
+                ->assertUnauthorized();
+        }
+
+        $this->postJson('/api/login', ['email' => 'nadie@example.com', 'password' => 'incorrecta'])
+            ->assertStatus(429);
+    }
+
+    public function test_register_is_rate_limited_after_ten_attempts()
+    {
+        for ($i = 0; $i < 10; $i++) {
+            $this->postJson('/api/register', [])->assertUnprocessable();
+        }
+
+        $this->postJson('/api/register', [])->assertStatus(429);
+    }
 }
