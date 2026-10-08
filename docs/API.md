@@ -49,6 +49,8 @@ No requiere token.
 }
 ```
 
+**Response 429 — Demasiados intentos:** máximo 10 registros por minuto por IP.
+
 ---
 
 ### Iniciar sesión
@@ -83,6 +85,8 @@ No requiere token.
   "message": "Credenciales incorrectas."
 }
 ```
+
+**Response 429 — Demasiados intentos:** máximo 5 intentos de login por minuto por IP. Esperar el tiempo indicado en el header `Retry-After`.
 
 ---
 
@@ -348,3 +352,4 @@ Requiere token.
 | 401 | Unauthorized — token inválido o credenciales incorrectas |
 | 404 | Not Found — recurso no existe |
 | 422 | Unprocessable — datos de entrada inválidos |
+| 429 | Too Many Requests — límite de intentos en login/registro |
