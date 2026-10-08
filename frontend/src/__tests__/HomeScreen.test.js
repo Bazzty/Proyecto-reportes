@@ -1,5 +1,5 @@
 import { Alert } from 'react-native';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import HomeScreen from '../screens/HomeScreen';
@@ -232,7 +232,8 @@ describe('HomeScreen', () => {
     afterEach(() => jest.useRealTimers());
 
     // Deja que termine la primera carga (y se programe el siguiente refresco)
-    const settle = () => jest.advanceTimersByTimeAsync(0);
+    const advance = (ms) => act(() => jest.advanceTimersByTimeAsync(ms));
+    const settle = () => advance(0);
 
     const failReports = () => {
       const ok = api.get.getMockImplementation();
@@ -245,7 +246,7 @@ describe('HomeScreen', () => {
       await setup();
       await settle();
       failReports();
-      await jest.advanceTimersByTimeAsync(5000);
+      await advance(5000);
 
       expect(screen.queryByText(/Sin conexión/)).toBeNull();
     });
@@ -255,13 +256,13 @@ describe('HomeScreen', () => {
       await settle();
       const ok = api.get.getMockImplementation();
       failReports();
-      await jest.advanceTimersByTimeAsync(5000);
-      await jest.advanceTimersByTimeAsync(5000);
+      await advance(5000);
+      await advance(5000);
 
       expect(await screen.findByText(/Sin conexión/)).toBeTruthy();
 
       api.get.mockImplementation(ok);
-      await jest.advanceTimersByTimeAsync(5000);
+      await advance(5000);
 
       await waitFor(() => expect(screen.queryByText(/Sin conexión/)).toBeNull());
     });
@@ -271,9 +272,9 @@ describe('HomeScreen', () => {
       await settle();
       const ok = api.get.getMockImplementation();
       api.get.mockImplementation((url) => (url === '/reports' ? new Promise(() => {}) : ok(url)));
-      await jest.advanceTimersByTimeAsync(5000);
+      await advance(5000);
       const callsAfterHang = api.get.mock.calls.filter(([u]) => u === '/reports').length;
-      await jest.advanceTimersByTimeAsync(30000);
+      await advance(30000);
 
       expect(api.get.mock.calls.filter(([u]) => u === '/reports').length).toBe(callsAfterHang);
     });
