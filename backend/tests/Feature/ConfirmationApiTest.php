@@ -95,4 +95,26 @@ class ConfirmationApiTest extends TestCase
         $this->postJson("/api/reports/{$report->id}/confirm")
             ->assertUnauthorized();
     }
+
+    public function test_confirming_unknown_report_returns_404()
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postJson('/api/reports/9999/confirm')->assertNotFound();
+    }
+
+    public function test_confirming_twice_leaves_report_unconfirmed()
+    {
+        $owner    = User::factory()->create();
+        $reporter = User::factory()->create();
+        $report   = $this->makeReport($owner);
+        Sanctum::actingAs($reporter);
+
+        $this->postJson("/api/reports/{$report->id}/confirm")
+            ->assertJson(['confirmed' => true, 'count' => 1]);
+        $this->postJson("/api/reports/{$report->id}/confirm")
+            ->assertJson(['confirmed' => false, 'count' => 0]);
+
+        $this->assertDatabaseCount('confirmations', 0);
+    }
 }

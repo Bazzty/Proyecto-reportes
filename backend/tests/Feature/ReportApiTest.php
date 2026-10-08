@@ -213,4 +213,108 @@ class ReportApiTest extends TestCase
         $this->assertArrayNotHasKey('description', $first);
         $this->assertArrayNotHasKey('status', $first);
     }
+
+    private function validReportPayload(Category $category, array $overrides = []): array
+    {
+        return array_merge([
+            'description' => 'Basura en la vereda',
+            'latitude' => -33.4569,
+            'longitude' => -70.6483,
+            'category_id' => $category->id,
+            'photo' => UploadedFile::fake()->create('photo.jpg', 100, 'image/jpeg'),
+        ], $overrides);
+    }
+
+    public function test_creating_report_requires_authentication()
+    {
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category))
+            ->assertUnauthorized();
+    }
+
+    public function test_creating_report_requires_all_fields()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        foreach (['description', 'latitude', 'longitude', 'category_id', 'photo'] as $field) {
+            $payload = $this->validReportPayload($category);
+            unset($payload[$field]);
+
+            $this->postJson('/api/reports', $payload)
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors($field);
+        }
+    }
+
+    public function test_creating_report_rejects_unknown_category()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['category_id' => 9999]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('category_id');
+    }
+
+    public function test_creating_report_rejects_non_numeric_coordinates()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['latitude' => 'abc']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('latitude');
+    }
+
+    public function test_creating_report_rejects_non_image_file()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, [
+            'photo' => UploadedFile::fake()->create('doc.pdf', 100, 'application/pdf'),
+        ]))->assertUnprocessable()->assertJsonValidationErrors('photo');
+    }
+
+    public function test_creating_report_rejects_photo_over_5mb()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, [
+            'photo' => UploadedFile::fake()->create('big.jpg', 5121, 'image/jpeg'),
+        ]))->assertUnprocessable()->assertJsonValidationErrors('photo');
+    }
+
+    public function test_created_report_belongs_to_authenticated_user()
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        Sanctum::actingAs($user, ['*']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['user_id' => $other->id]))
+            ->assertCreated();
+
+        $this->assertDatabaseHas('reports', ['user_id' => $user->id, 'status' => 'Pendiente']);
+        $this->assertDatabaseMissing('reports', ['user_id' => $other->id]);
+    }
+
+    public function test_show_returns_404_for_unknown_report()
+    {
+        $this->getJson('/api/reports/9999')->assertNotFound();
+    }
+
+    public function test_user_reports_requires_authentication()
+    {
+        $this->getJson('/api/user/reports')->assertUnauthorized();
+    }
 }

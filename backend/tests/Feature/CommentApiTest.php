@@ -121,4 +121,12 @@ class CommentApiTest extends TestCase
         $this->assertEquals('Segundo', $response->json()[0]['body']);
         $this->assertEquals('Primero', $response->json()[1]['body']);
     }
+
+    public function test_commenting_on_unknown_report_returns_404()
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postJson('/api/reports/9999/comments', ['body' => 'Hola'])
+            ->assertNotFound();
+    }
 }

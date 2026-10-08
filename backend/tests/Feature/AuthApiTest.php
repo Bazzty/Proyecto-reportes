@@ -78,4 +78,50 @@ class AuthApiTest extends TestCase
 
         $this->assertDatabaseCount('personal_access_tokens', 0);
     }
+
+    public function test_register_rejects_duplicate_email()
+    {
+        User::factory()->create(['email' => 'dup@example.com']);
+
+        $this->postJson('/api/register', [
+            'name' => 'Otro',
+            'email' => 'dup@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertUnprocessable()->assertJsonValidationErrors('email');
+    }
+
+    public function test_register_rejects_short_or_unconfirmed_password()
+    {
+        $base = ['name' => 'Test', 'email' => 'new@example.com'];
+
+        $this->postJson('/api/register', $base + [
+            'password' => 'short',
+            'password_confirmation' => 'short',
+        ])->assertUnprocessable()->assertJsonValidationErrors('password');
+
+        $this->postJson('/api/register', $base + [
+            'password' => 'password123',
+            'password_confirmation' => 'distinta123',
+        ])->assertUnprocessable()->assertJsonValidationErrors('password');
+    }
+
+    public function test_register_requires_all_fields()
+    {
+        $this->postJson('/api/register', [])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['name', 'email', 'password']);
+    }
+
+    public function test_login_requires_all_fields()
+    {
+        $this->postJson('/api/login', [])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['email', 'password']);
+    }
+
+    public function test_logout_requires_authentication()
+    {
+        $this->postJson('/api/logout')->assertUnauthorized();
+    }
 }
