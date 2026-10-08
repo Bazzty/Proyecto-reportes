@@ -2,6 +2,8 @@
 
 Base URL: `http://localhost:8000/api`
 
+Los tokens expiran a los 30 días (configurable con `SANCTUM_EXPIRATION`, en minutos); después hay que volver a iniciar sesión (401).
+
 Los endpoints protegidos requieren este header en cada petición:
 ```
 Authorization: Bearer {token}
@@ -86,7 +88,7 @@ No requiere token.
 }
 ```
 
-**Response 429 — Demasiados intentos:** máximo 5 intentos de login por minuto por IP. Esperar el tiempo indicado en el header `Retry-After`.
+**Response 429 — Demasiados intentos:** máximo 5 intentos de login por minuto por combinación email + IP. Esperar el tiempo indicado en el header `Retry-After`.
 
 ---
 
@@ -131,6 +133,8 @@ No requiere token (si se envía, se calcula `confirmed_by_me`).
       "id": 1,
       "name": "Bastian Contreras"
     },
+    "confirmations_count": 2,
+    "confirmed_by_me": false,
     "created_at": "2026-06-05T12:00:00Z"
   }
 ]
@@ -170,6 +174,8 @@ Requiere token. Se envía como `multipart/form-data` porque incluye una foto.
     "id": 1,
     "name": "Bastian Contreras"
   },
+  "confirmations_count": 0,
+  "confirmed_by_me": false,
   "created_at": "2026-06-05T12:05:00Z"
 }
 ```
@@ -209,6 +215,8 @@ No requiere token (si se envía, se calcula `confirmed_by_me`).
     "id": 1,
     "name": "Bastian Contreras"
   },
+  "confirmations_count": 2,
+  "confirmed_by_me": false,
   "created_at": "2026-06-05T12:00:00Z"
 }
 ```

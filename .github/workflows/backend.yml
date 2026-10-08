@@ -48,7 +48,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: backend/vendor
-          key: composer-${{ hashFiles('backend/composer.lock') }}
+          key: composer-php8.3-${{ hashFiles('backend/composer.lock') }}
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: cp .env.example .env && php artisan key:generate
       - name: Migraciones contra MySQL

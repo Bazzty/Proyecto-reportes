@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Route;
 
 // Public routes
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
-Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/reports/heatmap', [ReportController::class, 'heatmap']);
