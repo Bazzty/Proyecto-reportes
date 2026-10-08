@@ -225,6 +225,58 @@ class ReportApiTest extends TestCase
         ], $overrides);
     }
 
+    public function test_reports_are_listed_newest_first()
+    {
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $make = fn (string $description) => Report::create([
+            'user_id' => $user->id,
+            'category_id' => $category->id,
+            'description' => $description,
+            'latitude' => -33.45,
+            'longitude' => -70.65,
+            'photo_path' => 'photos/test.jpg',
+            'status' => 'Pendiente',
+        ]);
+        $make('primero');
+        $make('segundo');
+        $make('tercero');
+
+        $this->getJson('/api/reports')
+            ->assertOk()
+            ->assertJsonPath('0.description', 'tercero')
+            ->assertJsonPath('2.description', 'primero');
+    }
+
+    public function test_confirmation_count_and_flag_are_computed_per_user()
+    {
+        $author = User::factory()->create();
+        $viewer = User::factory()->create();
+        $other = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $report = Report::create([
+            'user_id' => $author->id,
+            'category_id' => $category->id,
+            'description' => 'Con confirmaciones',
+            'latitude' => -33.45,
+            'longitude' => -70.65,
+            'photo_path' => 'photos/test.jpg',
+            'status' => 'Pendiente',
+        ]);
+        $report->confirmations()->create(['user_id' => $viewer->id]);
+        $report->confirmations()->create(['user_id' => $other->id]);
+
+        Sanctum::actingAs($viewer, ['*']);
+        $this->getJson('/api/reports')
+            ->assertJsonPath('0.confirmations_count', 2)
+            ->assertJsonPath('0.confirmed_by_me', true);
+
+        Sanctum::actingAs($author, ['*']);
+        $this->getJson("/api/reports/{$report->id}")
+            ->assertJsonPath('confirmations_count', 2)
+            ->assertJsonPath('confirmed_by_me', false);
+    }
+
     public function test_creating_report_requires_authentication()
     {
         $category = Category::create(['name' => 'basura']);
