@@ -115,7 +115,7 @@ Structure: `frontend/src/screens/`, `frontend/src/components/`, `frontend/src/se
 
 Every task needs an open GitHub Issue and a `feat/` branch before coding starts.
 
-Commit format: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:` prefixes are required.
+Commit format: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, `style:` prefixes are required.
 
 ## CI (GitHub Actions)
 
