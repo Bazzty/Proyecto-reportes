@@ -107,7 +107,7 @@ Requiere token.
 ```
 GET /reports
 ```
-Requiere token.
+No requiere token (si se envía, se calcula `confirmed_by_me`).
 
 **Response 200:**
 ```json
@@ -157,7 +157,7 @@ Requiere token. Se envía como `multipart/form-data` porque incluye una foto.
   "latitude": -33.4580,
   "longitude": -70.6500,
   "photo_url": "http://localhost:8000/storage/photos/reporte_2.jpg",
-  "status": "pendiente",
+  "status": "Pendiente",
   "category": {
     "id": 2,
     "name": "escombros"
@@ -186,7 +186,7 @@ Requiere token. Se envía como `multipart/form-data` porque incluye una foto.
 ```
 GET /reports/{id}
 ```
-Requiere token.
+No requiere token (si se envía, se calcula `confirmed_by_me`).
 
 **Response 200:**
 ```json
@@ -196,7 +196,7 @@ Requiere token.
   "latitude": -33.4569,
   "longitude": -70.6483,
   "photo_url": "http://localhost:8000/storage/photos/reporte_1.jpg",
-  "status": "pendiente",
+  "status": "Pendiente",
   "category": {
     "id": 1,
     "name": "basura"
@@ -222,7 +222,7 @@ Requiere token.
 ```
 GET /reports/heatmap
 ```
-Requiere token. Devuelve solo coordenadas — el frontend las usa para pintar el heatmap.
+No requiere token. Devuelve solo coordenadas — el frontend las usa para pintar el heatmap.
 
 **Response 200:**
 ```json
@@ -259,6 +259,71 @@ Requiere token. Devuelve solo los reportes del usuario que hace la petición.
   }
 ]
 ```
+
+---
+
+### Listar categorías
+```
+GET /categories
+```
+No requiere token.
+
+**Response 200:**
+```json
+[
+  { "id": 1, "name": "basura" },
+  { "id": 2, "name": "escombros" }
+]
+```
+
+---
+
+### Confirmar / quitar confirmación de un reporte
+```
+POST /reports/{id}/confirm
+```
+Requiere token. Alterna la confirmación del usuario.
+
+**Response 200:**
+```json
+{ "confirmed": true, "count": 3 }
+```
+
+---
+
+### Listar comentarios de un reporte
+```
+GET /reports/{id}/comments
+```
+No requiere token. Ordenados del más nuevo al más antiguo.
+
+**Response 200:**
+```json
+[
+  {
+    "id": 1,
+    "body": "Sigue ahí esta mañana",
+    "user": { "id": 1, "name": "Bastian Contreras" },
+    "created_at": "2026-06-05T12:10:00Z"
+  }
+]
+```
+
+---
+
+### Comentar un reporte
+```
+POST /reports/{id}/comments
+```
+Requiere token.
+
+**Request:**
+```json
+{ "body": "Sigue ahí esta mañana" }
+```
+`body`: requerido, máximo 500 caracteres.
+
+**Response 201:** mismo formato que un elemento del listado.
 
 ---
 
