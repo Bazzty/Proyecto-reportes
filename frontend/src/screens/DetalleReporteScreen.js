@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  StyleSheet, Text, View, SafeAreaView, ActivityIndicator,
+  StyleSheet, Text, View, ActivityIndicator,
   Alert, TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -49,7 +50,7 @@ export default function DetalleReporteScreen({ route }) {
 
     api.get(`/reports/${reportId}/comments`)
       .then(({ data }) => setComments(data))
-      .catch(() => {});
+      .catch(() => Alert.alert('Error', 'No se pudieron cargar los comentarios.'));
   }, [reportId]);
 
   const handleConfirm = async () => {
@@ -64,7 +65,9 @@ export default function DetalleReporteScreen({ route }) {
         confirmations_count: data.count,
         confirmed_by_me:     data.confirmed,
       }));
-    } catch {}
+    } catch {
+      Alert.alert('Error', 'No se pudo registrar tu confirmación.');
+    }
   };
 
   const handleSendComment = async () => {
@@ -167,7 +170,9 @@ export default function DetalleReporteScreen({ route }) {
           <View style={styles.ownerConfirmRow}>
             <Ionicons name="people-outline" size={16} color="#6b7280" />
             <Text style={styles.ownerConfirmText}>
-              {report.confirmations_count} persona{report.confirmations_count !== 1 ? 's' : ''} confirmaron este reporte
+              {report.confirmations_count === 1
+                ? '1 persona confirmó este reporte'
+                : `${report.confirmations_count} personas confirmaron este reporte`}
             </Text>
           </View>
         )}

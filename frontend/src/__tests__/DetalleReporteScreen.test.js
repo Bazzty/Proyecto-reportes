@@ -99,7 +99,35 @@ describe('DetalleReporteScreen', () => {
     await screen.findByText('Basura acumulada');
 
     expect(screen.queryByText('Lo confirmaste')).toBeNull();
-    expect(screen.getByText('1 persona confirmaron este reporte')).toBeTruthy();
+    expect(screen.getByText('1 persona confirmó este reporte')).toBeTruthy();
+  });
+
+  it('el resumen del dueño usa plural con más de una confirmación', async () => {
+    mockGet({ report: { ...REPORT, confirmations_count: 3 } });
+    await setup({ userId: '2' });
+
+    expect(await screen.findByText('3 personas confirmaron este reporte')).toBeTruthy();
+  });
+
+  it('si falla la confirmación avisa al usuario', async () => {
+    api.post.mockRejectedValue(new Error('fail'));
+    await setup();
+    await fireEvent.press(await screen.findByText('Yo también lo vi'));
+
+    await waitFor(() =>
+      expect(Alert.alert).toHaveBeenCalledWith('Error', 'No se pudo registrar tu confirmación.')
+    );
+  });
+
+  it('si fallan los comentarios avisa al usuario', async () => {
+    api.get.mockImplementation((url) =>
+      url === '/reports/5' ? Promise.resolve({ data: REPORT }) : Promise.reject(new Error('fail'))
+    );
+    await setup();
+
+    await waitFor(() =>
+      expect(Alert.alert).toHaveBeenCalledWith('Error', 'No se pudieron cargar los comentarios.')
+    );
   });
 
   it('un comentario vacío no se envía', async () => {
