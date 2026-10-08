@@ -3,31 +3,34 @@
 namespace App\Http\Controllers;
 
 use App\Models\Report;
+use Illuminate\Contracts\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
 {
     public function index(Request $request)
     {
-        $reports = Report::with(['category', 'user', 'confirmations'])->get();
-        $uid     = $request->user()?->id;
+        $uid = $request->user()?->id;
+        $reports = $this->withReportData(Report::query(), $uid)->latest()->latest('id')->get();
 
         return response()->json($reports->map(fn (Report $report) => $this->formatReport($report, $uid)));
     }
 
     public function show(Request $request, int $id)
     {
-        $report = Report::with(['category', 'user', 'confirmations'])->findOrFail($id);
+        $uid = $request->user()?->id;
+        $report = $this->withReportData(Report::query(), $uid)->findOrFail($id);
 
-        return response()->json($this->formatReport($report, $request->user()?->id));
+        return response()->json($this->formatReport($report, $uid));
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'description' => 'required|string',
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
+            'description' => 'required|string|max:1000',
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
             'category_id' => 'required|integer|exists:categories,id',
             'photo' => 'required|file|mimes:jpeg,jpg,png,webp,gif|max:5120',
         ]);
@@ -44,15 +47,16 @@ class ReportController extends Controller
             'status' => 'Pendiente',
         ]);
 
-        $report->load(['category', 'user', 'confirmations']);
+        $uid = $request->user()->id;
+        $report = $this->withReportData(Report::query(), $uid)->findOrFail($report->id);
 
-        return response()->json($this->formatReport($report, $request->user()->id), 201);
+        return response()->json($this->formatReport($report, $uid), 201);
     }
 
     public function userReports(Request $request)
     {
-        $reports = $request->user()->reports()->with(['category', 'user', 'confirmations'])->get();
-        $uid     = $request->user()->id;
+        $uid = $request->user()->id;
+        $reports = $this->withReportData($request->user()->reports(), $uid)->latest()->latest('id')->get();
 
         return response()->json($reports->map(fn (Report $report) => $this->formatReport($report, $uid)));
     }
@@ -67,27 +71,34 @@ class ReportController extends Controller
         return response()->json($points);
     }
 
+    private function withReportData(Builder|Relation $query, ?int $authUserId): Builder|Relation
+    {
+        $query->with(['category', 'user'])->withCount('confirmations');
+
+        return $authUserId === null
+            ? $query
+            : $query->withExists(['confirmations as confirmed_by_me' => fn ($q) => $q->where('user_id', $authUserId)]);
+    }
+
     private function formatReport(Report $report, ?int $authUserId = null): array
     {
         return [
-            'id'          => $report->id,
+            'id' => $report->id,
             'description' => $report->description,
-            'latitude'    => (float) $report->latitude,
-            'longitude'   => (float) $report->longitude,
-            'photo_url'   => $report->photo_path ? url('storage/' . $report->photo_path) : null,
-            'status'      => $report->status,
-            'category'    => $report->category ? [
-                'id'   => $report->category->id,
+            'latitude' => (float) $report->latitude,
+            'longitude' => (float) $report->longitude,
+            'photo_url' => $report->photo_path ? url('storage/'.$report->photo_path) : null,
+            'status' => $report->status,
+            'category' => $report->category ? [
+                'id' => $report->category->id,
                 'name' => $report->category->name,
             ] : null,
             'user' => $report->user ? [
-                'id'   => $report->user->id,
+                'id' => $report->user->id,
                 'name' => $report->user->name,
             ] : null,
-            'confirmations_count' => $report->confirmations->count(),
-            'confirmed_by_me'     => $authUserId
-                ? $report->confirmations->contains('user_id', $authUserId)
-                : false,
+            'confirmations_count' => $report->confirmations_count,
+            'confirmed_by_me' => (bool) $report->confirmed_by_me,
             'created_at' => $report->created_at?->toISOString(),
         ];
     }

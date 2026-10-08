@@ -134,13 +134,13 @@ class ReportApiTest extends TestCase
         $category = Category::create(['name' => 'otro']);
 
         Report::create([
-            'user_id'     => $user->id,
+            'user_id' => $user->id,
             'category_id' => $category->id,
             'description' => 'Reporte público',
-            'latitude'    => -41.3198,
-            'longitude'   => -72.9833,
-            'photo_path'  => null,
-            'status'      => 'Pendiente',
+            'latitude' => -41.3198,
+            'longitude' => -72.9833,
+            'photo_path' => null,
+            'status' => 'Pendiente',
         ]);
 
         $this->getJson('/api/reports')
@@ -148,7 +148,7 @@ class ReportApiTest extends TestCase
             ->assertJsonCount(1)
             ->assertJsonFragment([
                 'confirmations_count' => 0,
-                'confirmed_by_me'     => false,
+                'confirmed_by_me' => false,
             ]);
     }
 
@@ -158,13 +158,13 @@ class ReportApiTest extends TestCase
         $category = Category::create(['name' => 'basura']);
 
         $report = Report::create([
-            'user_id'     => $user->id,
+            'user_id' => $user->id,
             'category_id' => $category->id,
             'description' => 'Detalle público',
-            'latitude'    => -41.3198,
-            'longitude'   => -72.9833,
-            'photo_path'  => null,
-            'status'      => 'Pendiente',
+            'latitude' => -41.3198,
+            'longitude' => -72.9833,
+            'photo_path' => null,
+            'status' => 'Pendiente',
         ]);
 
         $this->getJson("/api/reports/{$report->id}")
@@ -212,5 +212,187 @@ class ReportApiTest extends TestCase
         $this->assertArrayHasKey('longitude', $first);
         $this->assertArrayNotHasKey('description', $first);
         $this->assertArrayNotHasKey('status', $first);
+    }
+
+    private function validReportPayload(Category $category, array $overrides = []): array
+    {
+        return array_merge([
+            'description' => 'Basura en la vereda',
+            'latitude' => -33.4569,
+            'longitude' => -70.6483,
+            'category_id' => $category->id,
+            'photo' => UploadedFile::fake()->create('photo.jpg', 100, 'image/jpeg'),
+        ], $overrides);
+    }
+
+    public function test_reports_are_listed_newest_first()
+    {
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $make = fn (string $description) => Report::create([
+            'user_id' => $user->id,
+            'category_id' => $category->id,
+            'description' => $description,
+            'latitude' => -33.45,
+            'longitude' => -70.65,
+            'photo_path' => 'photos/test.jpg',
+            'status' => 'Pendiente',
+        ]);
+        $make('primero');
+        $make('segundo');
+        $make('tercero');
+
+        $this->getJson('/api/reports')
+            ->assertOk()
+            ->assertJsonPath('0.description', 'tercero')
+            ->assertJsonPath('2.description', 'primero');
+    }
+
+    public function test_confirmation_count_and_flag_are_computed_per_user()
+    {
+        $author = User::factory()->create();
+        $viewer = User::factory()->create();
+        $other = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $report = Report::create([
+            'user_id' => $author->id,
+            'category_id' => $category->id,
+            'description' => 'Con confirmaciones',
+            'latitude' => -33.45,
+            'longitude' => -70.65,
+            'photo_path' => 'photos/test.jpg',
+            'status' => 'Pendiente',
+        ]);
+        $report->confirmations()->create(['user_id' => $viewer->id]);
+        $report->confirmations()->create(['user_id' => $other->id]);
+
+        Sanctum::actingAs($viewer, ['*']);
+        $this->getJson('/api/reports')
+            ->assertJsonPath('0.confirmations_count', 2)
+            ->assertJsonPath('0.confirmed_by_me', true);
+
+        Sanctum::actingAs($author, ['*']);
+        $this->getJson("/api/reports/{$report->id}")
+            ->assertJsonPath('confirmations_count', 2)
+            ->assertJsonPath('confirmed_by_me', false);
+    }
+
+    public function test_creating_report_requires_authentication()
+    {
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category))
+            ->assertUnauthorized();
+    }
+
+    public function test_creating_report_requires_all_fields()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        foreach (['description', 'latitude', 'longitude', 'category_id', 'photo'] as $field) {
+            $payload = $this->validReportPayload($category);
+            unset($payload[$field]);
+
+            $this->postJson('/api/reports', $payload)
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors($field);
+        }
+    }
+
+    public function test_creating_report_rejects_unknown_category()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['category_id' => 9999]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('category_id');
+    }
+
+    public function test_creating_report_rejects_non_numeric_coordinates()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['latitude' => 'abc']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('latitude');
+    }
+
+    public function test_creating_report_rejects_out_of_range_coordinates()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['latitude' => 91]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('latitude');
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['longitude' => -181]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('longitude');
+    }
+
+    public function test_creating_report_rejects_description_over_1000_chars()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['description' => str_repeat('a', 1001)]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('description');
+    }
+
+    public function test_creating_report_rejects_non_image_file()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, [
+            'photo' => UploadedFile::fake()->create('doc.pdf', 100, 'application/pdf'),
+        ]))->assertUnprocessable()->assertJsonValidationErrors('photo');
+    }
+
+    public function test_creating_report_rejects_photo_over_5mb()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, [
+            'photo' => UploadedFile::fake()->create('big.jpg', 5121, 'image/jpeg'),
+        ]))->assertUnprocessable()->assertJsonValidationErrors('photo');
+    }
+
+    public function test_created_report_belongs_to_authenticated_user()
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        Sanctum::actingAs($user, ['*']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['user_id' => $other->id]))
+            ->assertCreated();
+
+        $this->assertDatabaseHas('reports', ['user_id' => $user->id, 'status' => 'Pendiente']);
+        $this->assertDatabaseMissing('reports', ['user_id' => $other->id]);
+    }
+
+    public function test_show_returns_404_for_unknown_report()
+    {
+        $this->getJson('/api/reports/9999')->assertNotFound();
+    }
+
+    public function test_user_reports_requires_authentication()
+    {
+        $this->getJson('/api/user/reports')->assertUnauthorized();
     }
 }

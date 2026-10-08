@@ -28,7 +28,7 @@ class ReportSeeder extends Seeder
             );
         }
 
-        $categories = Category::all()->keyBy(fn($c) => strtolower($c->name));
+        $categories = Category::all()->keyBy(fn ($c) => strtolower($c->name));
 
         // Reportes distribuidos por el Lago Llanquihue y comunas aledañas
         $reports = [
@@ -70,18 +70,20 @@ class ReportSeeder extends Seeder
 
         foreach ($reports as $i => $r) {
             $cat = $categories->get($r['cat']);
-            if (!$cat) continue;
+            if (! $cat) {
+                continue;
+            }
 
             $user = $createdUsers[$i % count($createdUsers)];
 
             Report::create([
-                'user_id'     => $user->id,
+                'user_id' => $user->id,
                 'category_id' => $cat->id,
                 'description' => $r['desc'],
-                'latitude'    => $r['lat'],
-                'longitude'   => $r['lng'],
-                'photo_path'  => null,
-                'status'      => $r['status'],
+                'latitude' => $r['lat'],
+                'longitude' => $r['lng'],
+                'photo_path' => null,
+                'status' => $r['status'],
             ]);
         }
     }

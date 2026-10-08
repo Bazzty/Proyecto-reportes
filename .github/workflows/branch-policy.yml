@@ -1,0 +1,20 @@
+name: Branch policy
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  only-from-develop:
+    name: main solo recibe PR desde develop
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [ "$HEAD_REF" != "develop" ]; then
+            echo "::error::Los PR hacia main deben venir de develop (origen: $HEAD_REF)"; exit 1
+          fi

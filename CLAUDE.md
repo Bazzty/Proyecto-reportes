@@ -115,4 +115,22 @@ Structure: `frontend/src/screens/`, `frontend/src/components/`, `frontend/src/se
 
 Every task needs an open GitHub Issue and a `feat/` branch before coding starts.
 
-Commit format: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:` prefixes are required.
+Commit format: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, `style:`, `ci:` prefixes are required.
+
+## CI (GitHub Actions)
+
+Workflows en `.github/workflows/` se ejecutan en cada PR hacia `develop` y `main`. Para correr los mismos checks en local:
+
+```bash
+# Backend: tests y estilo
+docker compose exec app php artisan test
+docker compose exec app vendor/bin/pint --test      # sin --test aplica los arreglos
+
+# BD: migraciones + seed desde cero
+docker compose exec app php artisan migrate:fresh --seed
+
+# Frontend
+cd frontend && npm ci && npm run lint && npm test
+```
+
+Protección de ramas (manual, requiere admin del repo, GitHub → Settings → Branches): `develop` y `main` con PR obligatorio, checks requeridos (`PHPUnit`, `Laravel Pint`, `Validación de BD`, `ESLint + Jest`, `Prefijos de commit`), sin push directo. `main` solo recibe PR desde `develop` (check `main solo recibe PR desde develop`).

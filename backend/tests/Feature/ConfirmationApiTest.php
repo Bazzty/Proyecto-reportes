@@ -17,22 +17,23 @@ class ConfirmationApiTest extends TestCase
     private function makeReport(User $user): Report
     {
         $category = Category::create(['name' => 'basura']);
+
         return Report::create([
-            'user_id'     => $user->id,
+            'user_id' => $user->id,
             'category_id' => $category->id,
             'description' => 'Reporte de prueba',
-            'latitude'    => -41.3198,
-            'longitude'   => -72.9833,
-            'photo_path'  => 'photos/test.jpg',
-            'status'      => 'Pendiente',
+            'latitude' => -41.3198,
+            'longitude' => -72.9833,
+            'photo_path' => 'photos/test.jpg',
+            'status' => 'Pendiente',
         ]);
     }
 
     public function test_user_can_confirm_a_report()
     {
-        $owner    = User::factory()->create();
+        $owner = User::factory()->create();
         $reporter = User::factory()->create();
-        $report   = $this->makeReport($owner);
+        $report = $this->makeReport($owner);
 
         Sanctum::actingAs($reporter);
 
@@ -42,16 +43,16 @@ class ConfirmationApiTest extends TestCase
             ->assertJson(['confirmed' => true, 'count' => 1]);
 
         $this->assertDatabaseHas('confirmations', [
-            'user_id'   => $reporter->id,
+            'user_id' => $reporter->id,
             'report_id' => $report->id,
         ]);
     }
 
     public function test_user_can_unconfirm_a_report()
     {
-        $owner    = User::factory()->create();
+        $owner = User::factory()->create();
         $reporter = User::factory()->create();
-        $report   = $this->makeReport($owner);
+        $report = $this->makeReport($owner);
 
         Confirmation::create(['user_id' => $reporter->id, 'report_id' => $report->id]);
 
@@ -63,16 +64,16 @@ class ConfirmationApiTest extends TestCase
             ->assertJson(['confirmed' => false, 'count' => 0]);
 
         $this->assertDatabaseMissing('confirmations', [
-            'user_id'   => $reporter->id,
+            'user_id' => $reporter->id,
             'report_id' => $report->id,
         ]);
     }
 
     public function test_report_response_includes_confirmation_fields()
     {
-        $owner    = User::factory()->create();
+        $owner = User::factory()->create();
         $reporter = User::factory()->create();
-        $report   = $this->makeReport($owner);
+        $report = $this->makeReport($owner);
 
         Confirmation::create(['user_id' => $reporter->id, 'report_id' => $report->id]);
 
@@ -83,16 +84,38 @@ class ConfirmationApiTest extends TestCase
         $response->assertOk()
             ->assertJsonFragment([
                 'confirmations_count' => 1,
-                'confirmed_by_me'     => true,
+                'confirmed_by_me' => true,
             ]);
     }
 
     public function test_confirmation_requires_authentication()
     {
-        $user   = User::factory()->create();
+        $user = User::factory()->create();
         $report = $this->makeReport($user);
 
         $this->postJson("/api/reports/{$report->id}/confirm")
             ->assertUnauthorized();
+    }
+
+    public function test_confirming_unknown_report_returns_404()
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->postJson('/api/reports/9999/confirm')->assertNotFound();
+    }
+
+    public function test_confirming_twice_leaves_report_unconfirmed()
+    {
+        $owner = User::factory()->create();
+        $reporter = User::factory()->create();
+        $report = $this->makeReport($owner);
+        Sanctum::actingAs($reporter);
+
+        $this->postJson("/api/reports/{$report->id}/confirm")
+            ->assertJson(['confirmed' => true, 'count' => 1]);
+        $this->postJson("/api/reports/{$report->id}/confirm")
+            ->assertJson(['confirmed' => false, 'count' => 0]);
+
+        $this->assertDatabaseCount('confirmations', 0);
     }
 }
