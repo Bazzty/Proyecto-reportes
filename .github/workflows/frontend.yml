@@ -2,6 +2,7 @@ name: Frontend
 
 on:
   push:
+    branches: [develop, main]
   pull_request:
     branches: [develop, main]
 
@@ -29,8 +30,6 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - name: ESLint
-        run: |
-          if npm run | grep -q ' lint'; then npm run lint; else echo "::warning::script 'lint' no configurado en frontend/package.json"; fi
+        run: npm run lint
       - name: Jest
-        run: |
-          if npm run | grep -q ' test'; then npm test -- --ci; else echo "::warning::script 'test' (Jest) no configurado en frontend/package.json"; fi
+        run: npm test -- --ci

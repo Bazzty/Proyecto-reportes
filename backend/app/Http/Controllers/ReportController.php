@@ -73,10 +73,11 @@ class ReportController extends Controller
 
     private function withReportData(Builder|Relation $query, ?int $authUserId): Builder|Relation
     {
-        return $query
-            ->with(['category', 'user'])
-            ->withCount('confirmations')
-            ->withExists(['confirmations as confirmed_by_me' => fn ($q) => $q->where('user_id', $authUserId)]);
+        $query->with(['category', 'user'])->withCount('confirmations');
+
+        return $authUserId === null
+            ? $query
+            : $query->withExists(['confirmations as confirmed_by_me' => fn ($q) => $q->where('user_id', $authUserId)]);
     }
 
     private function formatReport(Report $report, ?int $authUserId = null): array

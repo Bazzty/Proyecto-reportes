@@ -16,11 +16,13 @@ jobs:
         with:
           fetch-depth: 0
       - name: Validar prefijos
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           bad=0
           while IFS= read -r msg; do
             if ! echo "$msg" | grep -qE '^(feat|fix|docs|chore|refactor|test|style|ci)(\([^)]+\))?: .+|^Merge '; then
               echo "::error::Commit sin prefijo válido: $msg"; bad=1
             fi
-          done < <(git log --format=%s origin/${{ github.base_ref }}..HEAD)
+          done < <(git log --format=%s origin/$BASE_REF..HEAD)
           exit $bad
