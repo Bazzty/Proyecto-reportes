@@ -45,6 +45,43 @@ class User extends Authenticatable
         return $this->hasMany(Report::class);
     }
 
+    public function confirmations()
+    {
+        return $this->hasMany(Confirmation::class);
+    }
+
+    public function comments()
+    {
+        return $this->hasMany(Comment::class);
+    }
+
+    public function roles()
+    {
+        return $this->belongsToMany(Role::class)->withTimestamps();
+    }
+
+    public function hasRole(string $name): bool
+    {
+        return $this->roles()->where('name', $name)->exists();
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->hasRole(Role::ADMIN);
+    }
+
+    protected static function booted(): void
+    {
+        // Todo usuario nuevo nace con el rol "user".
+        static::created(function (User $user) {
+            $roleId = Role::where('name', Role::USER)->value('id');
+
+            if ($roleId) {
+                $user->roles()->attach($roleId);
+            }
+        });
+    }
+
     protected function casts(): array
     {
         return [
