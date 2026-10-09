@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Report;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
@@ -33,21 +34,46 @@ class ReportController extends Controller
             'longitude' => 'required|numeric|between:-180,180',
             'category_id' => 'required|integer|exists:categories,id',
             'photo' => 'required|file|mimes:jpeg,jpg,png,webp,gif|max:5120',
-        ]);
-
-        $path = $request->file('photo')->store('photos', 'public');
-
-        $report = Report::create([
-            'user_id' => $request->user()->id,
-            'category_id' => $data['category_id'],
-            'description' => $data['description'],
-            'latitude' => $data['latitude'],
-            'longitude' => $data['longitude'],
-            'photo_path' => $path,
-            'status' => 'Pendiente',
+            'client_uuid' => 'nullable|uuid',
         ]);
 
         $uid = $request->user()->id;
+        $clientUuid = $data['client_uuid'] ?? null;
+
+        // Idempotencia: si el reporte ya fue creado con este client_uuid (reintento
+        // de la cola offline), devolvemos el existente en lugar de duplicarlo.
+        if ($clientUuid !== null) {
+            $existing = $this->withReportData(Report::query(), $uid)
+                ->where('client_uuid', $clientUuid)
+                ->first();
+
+            if ($existing) {
+                return response()->json($this->formatReport($existing, $uid), 200);
+            }
+        }
+
+        $path = $request->file('photo')->store('photos', 'public');
+
+        try {
+            $report = Report::create([
+                'user_id' => $request->user()->id,
+                'client_uuid' => $clientUuid,
+                'category_id' => $data['category_id'],
+                'description' => $data['description'],
+                'latitude' => $data['latitude'],
+                'longitude' => $data['longitude'],
+                'photo_path' => $path,
+                'status' => 'Pendiente',
+            ]);
+        } catch (QueryException $exception) {
+            if ($clientUuid === null) {
+                throw $exception;
+            }
+
+            // Carrera: otro request con el mismo client_uuid lo creó primero.
+            $report = Report::where('client_uuid', $clientUuid)->firstOrFail();
+        }
+
         $report = $this->withReportData(Report::query(), $uid)->findOrFail($report->id);
 
         return response()->json($this->formatReport($report, $uid), 201);

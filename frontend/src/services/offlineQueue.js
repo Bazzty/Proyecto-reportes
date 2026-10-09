@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
+import { randomUUID } from 'expo-crypto';
 import api from './api';
 
 const STORAGE_KEY = 'offlineReports';
@@ -57,11 +58,13 @@ export const getPendingCount = async () => (await readQueue()).length;
 
 export const enqueue = async ({ description, latitude, longitude, categoryId, photoUri }) => {
   const localId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const clientUuid = randomUUID();
   const storedPhotoUri = await persistPhoto(localId, photoUri);
 
   const queue = await readQueue();
   queue.push({
     localId,
+    clientUuid,
     description,
     latitude,
     longitude,
@@ -90,6 +93,9 @@ export const syncPending = async () => {
         form.append('latitude', String(item.latitude));
         form.append('longitude', String(item.longitude));
         form.append('category_id', String(item.categoryId));
+        if (item.clientUuid) {
+          form.append('client_uuid', item.clientUuid);
+        }
         if (item.photoUri) {
           form.append('photo', { uri: item.photoUri, type: 'image/jpeg', name: 'reporte.jpg' });
         }

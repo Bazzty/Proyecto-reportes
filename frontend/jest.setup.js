@@ -20,3 +20,8 @@ jest.mock('expo-file-system/legacy', () => ({
   copyAsync: jest.fn(async () => {}),
   deleteAsync: jest.fn(async () => {}),
 }));
+
+let mockUuidCounter = 0;
+jest.mock('expo-crypto', () => ({
+  randomUUID: jest.fn(() => `00000000-0000-4000-8000-${String(++mockUuidCounter).padStart(12, '0')}`),
+}));

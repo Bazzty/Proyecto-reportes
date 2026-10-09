@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -223,6 +224,39 @@ class ReportApiTest extends TestCase
             'category_id' => $category->id,
             'photo' => UploadedFile::fake()->create('photo.jpg', 100, 'image/jpeg'),
         ], $overrides);
+    }
+
+    public function test_creating_report_is_idempotent_with_client_uuid()
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        Sanctum::actingAs($user, ['*']);
+
+        $payload = $this->validReportPayload($category, ['client_uuid' => (string) Str::uuid()]);
+
+        $first = $this->postJson('/api/reports', $payload);
+        $first->assertCreated();
+
+        $second = $this->postJson('/api/reports', $payload);
+        $second->assertOk()->assertJsonPath('id', $first->json('id'));
+
+        $this->assertDatabaseCount('reports', 1);
+        $this->assertDatabaseHas('reports', [
+            'id' => $first->json('id'),
+            'client_uuid' => $payload['client_uuid'],
+        ]);
+    }
+
+    public function test_creating_report_rejects_invalid_client_uuid()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['client_uuid' => 'no-es-uuid']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('client_uuid');
     }
 
     public function test_reports_are_listed_newest_first()

@@ -39,6 +39,7 @@ describe('offlineQueue', () => {
     const pending = await getPending();
     expect(pending).toHaveLength(1);
     expect(pending[0]).toMatchObject({ description: 'Basura en la vereda', categoryId: 1 });
+    expect(pending[0].clientUuid).toBeTruthy();
     expect(await getPendingCount()).toBe(1);
   });
 
@@ -53,6 +54,7 @@ describe('offlineQueue', () => {
     expect(url).toBe('/reports');
     expect(form.get('description')).toBe('Basura en la vereda');
     expect(form.get('category_id')).toBe('1');
+    expect(form.get('client_uuid')).toBeTruthy();
     expect(result).toEqual({ synced: 1, remaining: 0 });
     expect(await getPendingCount()).toBe(0);
     expect(FileSystem.deleteAsync).toHaveBeenCalled();
