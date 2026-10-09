@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
@@ -6,6 +6,7 @@ import HomeScreen from '../screens/HomeScreen';
 import api, { clearAuthToken } from '../services/api';
 
 const mockAnimateToRegion = jest.fn();
+let mockHeatmapProps = null;
 
 jest.mock('../services/api', () => ({
   __esModule: true,
@@ -42,7 +43,7 @@ jest.mock('react-native-maps', () => {
     default: MapView,
     Marker: ({ children }) => <View>{children}</View>,
     Callout: ({ children, onPress }) => <Pressable onPress={onPress}>{children}</Pressable>,
-    Heatmap: () => null,
+    Heatmap: (props) => { mockHeatmapProps = props; return null; },
   };
 });
 
@@ -56,7 +57,7 @@ const mockApi = ({ mine = [] } = {}) => {
   api.get.mockImplementation((url) => {
     if (url === '/categories') return Promise.resolve({ data: CATEGORIES });
     if (url === '/reports') return Promise.resolve({ data: REPORTS });
-    if (url === '/reports/heatmap') return Promise.resolve({ data: [{ latitude: '-41.31', longitude: '-72.98' }] });
+    if (url === '/reports/heatmap') return Promise.resolve({ data: [{ latitude: '-41.31', longitude: '-72.98', count: 3 }] });
     if (url === '/user/reports') return Promise.resolve({ data: mine });
     return Promise.reject(new Error(`unexpected ${url}`));
   });
@@ -87,6 +88,22 @@ describe('HomeScreen', () => {
     expect(screen.getByText('Todos')).toBeTruthy();
     expect(screen.getByText('Basura')).toBeTruthy();
     expect(screen.getByText('Aguas')).toBeTruthy();
+  });
+
+  it('usa el conteo por zona como peso del heatmap (Android)', async () => {
+    const original = Platform.OS;
+    Platform.OS = 'android';
+    mockHeatmapProps = null;
+
+    await setup();
+
+    await waitFor(() => expect(mockHeatmapProps).toBeTruthy());
+    expect(api.get).toHaveBeenCalledWith('/reports/heatmap');
+    expect(mockHeatmapProps.points).toEqual([
+      { latitude: -41.31, longitude: -72.98, weight: 3 },
+    ]);
+
+    Platform.OS = original;
   });
 
   it('el filtro por categoría oculta las demás y se desactiva al tocarlo otra vez', async () => {

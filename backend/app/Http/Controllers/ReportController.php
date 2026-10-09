@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Report;
+use App\Services\ZoneResolver;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\QueryException;
@@ -27,7 +28,7 @@ class ReportController extends Controller
         return response()->json($this->formatReport($report, $uid));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ZoneResolver $zones)
     {
         $data = $request->validate([
             'description' => 'required|string|max:1000',
@@ -60,6 +61,7 @@ class ReportController extends Controller
                 'user_id' => $request->user()->id,
                 'client_uuid' => $clientUuid,
                 'category_id' => $data['category_id'],
+                'zone_id' => $zones->resolve((float) $data['latitude'], (float) $data['longitude'])?->id,
                 'description' => $data['description'],
                 'latitude' => $data['latitude'],
                 'longitude' => $data['longitude'],
@@ -106,12 +108,24 @@ class ReportController extends Controller
 
     public function heatmap()
     {
-        $points = Report::select('latitude', 'longitude')->get()->map(fn (Report $report) => [
-            'latitude' => (float) $report->latitude,
-            'longitude' => (float) $report->longitude,
-        ]);
+        $reports = Report::with('zone')->get(['id', 'zone_id', 'latitude', 'longitude']);
 
-        return response()->json($points);
+        $grouped = $reports->groupBy(fn (Report $report) => $report->zone_id ?? 'none');
+
+        $zones = $grouped->map(function ($items) {
+            $zone = $items->first()->zone;
+
+            return [
+                'zone' => $zone
+                    ? ['id' => $zone->id, 'name' => $zone->name]
+                    : ['id' => null, 'name' => 'Sin zona'],
+                'latitude' => round((float) $items->avg('latitude'), 6),
+                'longitude' => round((float) $items->avg('longitude'), 6),
+                'count' => $items->count(),
+            ];
+        })->values();
+
+        return response()->json($zones);
     }
 
     private function withReportData(Builder|Relation $query, ?int $authUserId): Builder|Relation

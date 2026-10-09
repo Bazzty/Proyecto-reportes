@@ -232,20 +232,21 @@ No requiere token (si se envía, se calcula `confirmed_by_me`).
 
 ---
 
-### Puntos para el mapa de calor
+### Mapa de calor agrupado por zona
 ```
 GET /reports/heatmap
 ```
-No requiere token. Devuelve solo coordenadas — el frontend las usa para pintar el heatmap.
+No requiere token. Agrupa los focos por **zona** (comuna o sector) y devuelve, por cada zona con reportes, un centroide y el conteo. Los reportes fuera de toda zona se agrupan como **"Sin zona"**.
 
 **Response 200:**
 ```json
 [
-  { "latitude": -33.4569, "longitude": -70.6483 },
-  { "latitude": -33.4580, "longitude": -70.6500 },
-  { "latitude": -33.4601, "longitude": -70.6512 }
+  { "zone": { "id": 1, "name": "Puerto Varas" }, "latitude": -41.3198, "longitude": -72.9833, "count": 3 },
+  { "zone": { "id": 7, "name": "Ensenada" },     "latitude": -41.2030, "longitude": -72.5700, "count": 1 },
+  { "zone": { "id": null, "name": "Sin zona" },  "latitude": -33.4569, "longitude": -70.6483, "count": 2 }
 ]
 ```
+> El heatmap visual del cliente (densidad) es **Android-only**; `count` se usa como peso de cada zona.
 
 ---
 

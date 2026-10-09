@@ -107,7 +107,7 @@ export default function HomeScreen({ navigation, route }) {
           setHeatmapPoints(heatRes.data.map(p => ({
             latitude: parseFloat(p.latitude),
             longitude: parseFloat(p.longitude),
-            weight: 1,
+            weight: p.count ?? 1,
           })));
           if (!isGuest && myRes) {
             setMyReports(prev => {
