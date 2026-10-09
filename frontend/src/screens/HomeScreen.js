@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Platform, Modal, FlatList } from 'react-native';
 import { Image } from 'expo-image';
 import MapView, { Marker, Callout, Heatmap } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,7 +8,9 @@ import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { clearAuthToken } from '../services/api';
 import useOfflineSync from '../hooks/useOfflineSync';
+import useNotifications from '../hooks/useNotifications';
 import { subscribe as subscribeQueue, getPendingCount, isSyncing } from '../services/offlineQueue';
+import { syncStatusNotifications, markAllRead } from '../services/notifications';
 
 
 const statusColor = (status) => {
@@ -33,8 +35,10 @@ export default function HomeScreen({ navigation, route }) {
   const [offline, setOffline]           = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing]           = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const { isConnected } = useOfflineSync();
+  const { notifications, unreadCount } = useNotifications();
 
   useEffect(() => {
     AsyncStorage.getItem('userName').then(name => { if (name) setUserName(name); });
@@ -110,6 +114,7 @@ export default function HomeScreen({ navigation, route }) {
               const next = myRes.data;
               return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
             });
+            syncStatusNotifications(myRes.data).catch(() => {});
           }
           failures = 0;
           setOffline(false);
@@ -259,28 +264,42 @@ export default function HomeScreen({ navigation, route }) {
 
       {/* Greeting card */}
       <View style={styles.greetingCard}>
-        <Text style={styles.greetingTitle}>
-          {isGuest ? '¡Bienvenido!' : (userName ? `¡Bienvenido, ${userName.split(' ')[0]}!` : '¡Bienvenido!')}
-        </Text>
-        {isGuest ? (
-          <TouchableOpacity onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })}>
-            <Text style={styles.greetingGuestLink}>Inicia sesión para reportar →</Text>
-          </TouchableOpacity>
-        ) : myReports.length > 0 ? (
-          <View style={styles.badgeRow}>
-            <View style={styles.badge}>
-              <View style={[styles.badgeDot, { backgroundColor: '#f59e0b' }]} />
-              <Text style={styles.badgeText}>{pendientes} pendiente{pendientes !== 1 ? 's' : ''}</Text>
+        <View style={styles.greetingBody}>
+          <Text style={styles.greetingTitle}>
+            {isGuest ? '¡Bienvenido!' : (userName ? `¡Bienvenido, ${userName.split(' ')[0]}!` : '¡Bienvenido!')}
+          </Text>
+          {isGuest ? (
+            <TouchableOpacity onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })}>
+              <Text style={styles.greetingGuestLink}>Inicia sesión para reportar →</Text>
+            </TouchableOpacity>
+          ) : myReports.length > 0 ? (
+            <View style={styles.badgeRow}>
+              <View style={styles.badge}>
+                <View style={[styles.badgeDot, { backgroundColor: '#f59e0b' }]} />
+                <Text style={styles.badgeText}>{pendientes} pendiente{pendientes !== 1 ? 's' : ''}</Text>
+              </View>
+              <Text style={styles.badgeSep}>·</Text>
+              <View style={styles.badge}>
+                <View style={[styles.badgeDot, { backgroundColor: '#16a34a' }]} />
+                <Text style={styles.badgeText}>{resueltos} resuelto{resueltos !== 1 ? 's' : ''}</Text>
+              </View>
             </View>
-            <Text style={styles.badgeSep}>·</Text>
-            <View style={styles.badge}>
-              <View style={[styles.badgeDot, { backgroundColor: '#16a34a' }]} />
-              <Text style={styles.badgeText}>{resueltos} resuelto{resueltos !== 1 ? 's' : ''}</Text>
+          ) : (
+            <Text style={styles.greetingSubtitle}>Reporta incidencias ambientales en tu zona</Text>
+          )}
+        </View>
+        <TouchableOpacity
+          style={styles.bell}
+          testID="notifications-button"
+          onPress={() => { markAllRead(); setShowNotifications(true); }}
+        >
+          <Ionicons name="notifications-outline" size={22} color="#0e7490" />
+          {unreadCount > 0 && (
+            <View style={styles.bellBadge} testID="notifications-badge">
+              <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
             </View>
-          </View>
-        ) : (
-          <Text style={styles.greetingSubtitle}>Reporta incidencias ambientales en tu zona</Text>
-        )}
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* Filtros de categoría */}
@@ -344,6 +363,34 @@ export default function HomeScreen({ navigation, route }) {
           <Text style={styles.barLabel}>{isGuest ? 'Ingresar' : 'Salir'}</Text>
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={showNotifications}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowNotifications(false)}
+      >
+        <View style={styles.notifBackdrop}>
+          <View style={styles.notifPanel}>
+            <Text style={styles.notifPanelTitle}>Novedades</Text>
+            <FlatList
+              data={notifications}
+              keyExtractor={(item) => item.id}
+              style={styles.notifList}
+              renderItem={({ item }) => (
+                <View style={styles.notifItem}>
+                  <Ionicons name="notifications-outline" size={16} color="#0e7490" />
+                  <Text style={styles.notifText}>{item.message}</Text>
+                </View>
+              )}
+              ListEmptyComponent={<Text style={styles.notifEmpty}>No tienes novedades.</Text>}
+            />
+            <TouchableOpacity style={styles.notifClose} onPress={() => setShowNotifications(false)}>
+              <Text style={styles.notifCloseText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -361,6 +408,9 @@ const styles = StyleSheet.create({
   greetingCard: {
     position: 'absolute',
     top: 56, left: 16, right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     backgroundColor: 'rgba(255,255,255,0.93)',
     borderRadius: 16,
     paddingHorizontal: 16,
@@ -371,9 +421,16 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  greetingBody:      { flex: 1 },
   greetingTitle:     { fontSize: 16, fontWeight: 'bold', color: '#0e7490' },
   greetingSubtitle:  { fontSize: 12, color: '#6b7280', marginTop: 2 },
   greetingGuestLink: { fontSize: 12, color: '#0e7490', marginTop: 2, fontWeight: '500' },
+  bell:              { padding: 6 },
+  bellBadge: {
+    position: 'absolute', top: 0, right: 0, minWidth: 16, height: 16, borderRadius: 8,
+    backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+  },
+  bellBadgeText:     { color: '#ffffff', fontSize: 10, fontWeight: 'bold' },
   badgeRow:  { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 },
   badge:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
   badgeDot:  { width: 7, height: 7, borderRadius: 4 },
@@ -493,4 +550,22 @@ const styles = StyleSheet.create({
   calloutDescription: { fontSize: 12, color: '#374151', lineHeight: 17 },
   calloutUser:        { fontSize: 11, color: '#9ca3af', marginTop: 2 },
   calloutLink:        { fontSize: 11, color: '#0e7490', fontWeight: '600', marginTop: 6 },
+
+  notifBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
+  notifPanel: {
+    backgroundColor: '#ffffff', borderRadius: 16, padding: 16, maxHeight: '70%',
+  },
+  notifPanelTitle: { fontSize: 18, fontWeight: 'bold', color: '#0e7490', marginBottom: 12 },
+  notifList:       { flexGrow: 0 },
+  notifItem: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
+  },
+  notifText:       { flex: 1, fontSize: 13, color: '#374151', lineHeight: 18 },
+  notifEmpty:      { fontSize: 13, color: '#9ca3af', textAlign: 'center', paddingVertical: 16 },
+  notifClose: {
+    marginTop: 12, alignSelf: 'center',
+    backgroundColor: '#0e7490', borderRadius: 20, paddingHorizontal: 24, paddingVertical: 10,
+  },
+  notifCloseText:  { color: '#ffffff', fontWeight: '600' },
 });

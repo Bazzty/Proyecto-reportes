@@ -308,4 +308,25 @@ describe('HomeScreen', () => {
       expect(await screen.findByText('2 reportes pendientes de sincronizar')).toBeTruthy();
     });
   });
+
+  describe('novedades', () => {
+    it('muestra la campana con no leídas y abre la lista', async () => {
+      await AsyncStorage.setItem('notifications', JSON.stringify([
+        {
+          id: 'n1',
+          type: 'status',
+          reportId: 1,
+          message: 'Tu reporte pasó a "Resuelto".',
+          createdAt: '2026-10-06T12:00:00.000Z',
+          read: false,
+        },
+      ]));
+
+      await setup();
+
+      expect(await screen.findByTestId('notifications-badge')).toBeTruthy();
+      await fireEvent.press(screen.getByTestId('notifications-button'));
+      expect(await screen.findByText('Tu reporte pasó a "Resuelto".')).toBeTruthy();
+    });
+  });
 });
