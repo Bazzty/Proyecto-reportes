@@ -90,6 +90,7 @@ Escanear el QR con **Expo Go**. El dispositivo y la computadora deben estar en l
 - Filtros por categoría (basura, escombros, aguas, otro)
 - Heatmap de densidad en Android
 - Crear reporte con foto (cámara o galería), GPS y categoría
+- Modo sin conexión: los reportes se guardan localmente y se sincronizan al recuperar la conexión
 - Mis Reportes con foto, estado y lightbox de imagen
 - Detalle de reporte con botón "Yo también lo vi" y comentarios
 - Polling automático cada 5 segundos para mantener el mapa actualizado

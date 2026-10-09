@@ -7,6 +7,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { clearAuthToken } from '../services/api';
+import useOfflineSync from '../hooks/useOfflineSync';
+import { subscribe as subscribeQueue, getPendingCount, isSyncing } from '../services/offlineQueue';
 
 
 const statusColor = (status) => {
@@ -29,12 +31,28 @@ export default function HomeScreen({ navigation, route }) {
   const [categories, setCategories]       = useState([]);
   const [heatmapPoints, setHeatmapPoints] = useState([]);
   const [offline, setOffline]           = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [syncing, setSyncing]           = useState(false);
+
+  const { isConnected } = useOfflineSync();
 
   useEffect(() => {
     AsyncStorage.getItem('userName').then(name => { if (name) setUserName(name); });
     api.get('/categories')
       .then(res => setCategories(res.data))
       .catch(() => setCategories([]));
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      if (!active) return;
+      setPendingCount(await getPendingCount());
+      setSyncing(isSyncing());
+    };
+    refresh();
+    const unsubscribe = subscribeQueue(refresh);
+    return () => { active = false; unsubscribe(); };
   }, []);
 
   useEffect(() => {
@@ -146,12 +164,22 @@ export default function HomeScreen({ navigation, route }) {
     ? reports.filter(r => r.category?.name === activeFilter)
     : reports;
 
+  const offlineBanner = !isConnected
+    ? { icon: 'cloud-offline-outline', text: 'Sin conexión: los datos pueden estar desactualizados' }
+    : syncing
+      ? { icon: 'cloud-upload-outline', text: 'Sincronizando reportes pendientes…' }
+      : pendingCount > 0
+        ? { icon: 'cloud-upload-outline', text: `${pendingCount} reporte${pendingCount !== 1 ? 's' : ''} pendiente${pendingCount !== 1 ? 's' : ''} de sincronizar` }
+        : offline
+          ? { icon: 'cloud-offline-outline', text: 'Sin conexión: los datos pueden estar desactualizados' }
+          : null;
+
   return (
     <View style={styles.container}>
-      {offline && (
+      {offlineBanner && (
         <View style={styles.offlineBanner}>
-          <Ionicons name="cloud-offline-outline" size={16} color="#fff" />
-          <Text style={styles.offlineText}>Sin conexión: los datos pueden estar desactualizados</Text>
+          <Ionicons name={offlineBanner.icon} size={16} color="#fff" />
+          <Text style={styles.offlineText}>{offlineBanner.text}</Text>
         </View>
       )}
       <MapView

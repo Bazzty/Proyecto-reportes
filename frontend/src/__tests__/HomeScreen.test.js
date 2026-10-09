@@ -20,6 +20,16 @@ jest.mock('expo-location', () => ({
   requestForegroundPermissionsAsync: jest.fn(),
   getCurrentPositionAsync: jest.fn(),
 }));
+let mockIsConnected = true;
+jest.mock('../hooks/useOfflineSync', () => ({
+  __esModule: true,
+  default: () => ({ isConnected: mockIsConnected }),
+}));
+jest.mock('../services/offlineQueue', () => ({
+  subscribe: jest.fn(() => jest.fn()),
+  getPendingCount: jest.fn(async () => 0),
+  isSyncing: jest.fn(() => false),
+}));
 jest.mock('react-native-maps', () => {
   const React = require('react');
   const { View, Pressable } = require('react-native');
@@ -65,6 +75,7 @@ describe('HomeScreen', () => {
     jest.clearAllMocks();
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'denied' });
+    mockIsConnected = true;
     await AsyncStorage.clear();
     mockApi();
   });
@@ -277,6 +288,24 @@ describe('HomeScreen', () => {
       await advance(30000);
 
       expect(api.get.mock.calls.filter(([u]) => u === '/reports').length).toBe(callsAfterHang);
+    });
+  });
+
+  describe('modo offline', () => {
+    it('muestra el aviso sin conexión', async () => {
+      mockIsConnected = false;
+      await setup();
+
+      expect(await screen.findByText('Sin conexión: los datos pueden estar desactualizados')).toBeTruthy();
+    });
+
+    it('muestra la cantidad de reportes pendientes de sincronizar', async () => {
+      const { getPendingCount } = require('../services/offlineQueue');
+      getPendingCount.mockResolvedValue(2);
+
+      await setup();
+
+      expect(await screen.findByText('2 reportes pendientes de sincronizar')).toBeTruthy();
     });
   });
 });
