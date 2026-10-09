@@ -90,6 +90,8 @@ Protected routes use `middleware('auth:sanctum')`. Public routes are `register` 
 | `users`      | id, name, email, password |
 | `reports`    | id, user_id, category_id, description, latitude, longitude, photo_path, status (Pendiente/En Progreso/Resuelto) |
 | `categories` | id, name (basura, escombros, aguas, otro) |
+| `roles` | id, name (`user`, `admin`; únicos, sembrados en la migración) |
+| `role_user` | user_id, role_id (PK compuesta; todo usuario nuevo recibe `user`) |
 
 ### Current state
 
@@ -128,6 +130,12 @@ docker compose exec app vendor/bin/pint --test      # sin --test aplica los arre
 
 # BD: migraciones + seed desde cero
 docker compose exec app php artisan migrate:fresh --seed
+
+# Tests contra MySQL (BD aparte "reportes_test"; ejercita enum/decimal que SQLite no aplica). Desde backend/
+bin/test-mysql.sh
+
+# Auditoría de integridad de datos (falla con exit 1 si hay hallazgos). Desde backend/
+docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" reportes_db' < database/audit.sql
 
 # Frontend
 cd frontend && npm ci && npm run lint && npm test
