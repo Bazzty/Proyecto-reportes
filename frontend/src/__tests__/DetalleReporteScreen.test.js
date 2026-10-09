@@ -6,7 +6,7 @@ import api from '../services/api';
 
 jest.mock('../services/api', () => ({
   __esModule: true,
-  default: { get: jest.fn(), post: jest.fn() },
+  default: { get: jest.fn(), post: jest.fn(), patch: jest.fn() },
 }));
 
 const REPORT = {
@@ -30,9 +30,11 @@ const mockGet = ({ report = REPORT, comments = COMMENTS } = {}) => {
   });
 };
 
-const setup = async ({ session = true, userId = '9' } = {}) => {
+const setup = async ({ session = true, userId = '9', admin = false } = {}) => {
   await AsyncStorage.clear();
-  if (session) await AsyncStorage.multiSet([['token', 'tok'], ['userId', userId]]);
+  if (session) {
+    await AsyncStorage.multiSet([['token', 'tok'], ['userId', userId], ['isAdmin', admin ? '1' : '0']]);
+  }
   await render(<DetalleReporteScreen route={{ params: { reportId: 5 } }} />);
 };
 
@@ -163,5 +165,27 @@ describe('DetalleReporteScreen', () => {
     await fireEvent.press(screen.getByText('icon:send'));
 
     await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Error', 'No se pudo enviar el comentario.'));
+  });
+
+  it('un administrador ve los controles de estado y puede cambiarlo', async () => {
+    api.patch.mockResolvedValue({ data: { status: 'Resuelto' } });
+    await setup({ admin: true });
+    await screen.findByText('Basura acumulada');
+
+    expect(screen.getByText('Estado del reporte (admin)')).toBeTruthy();
+
+    await fireEvent.press(screen.getByText('Resuelto'));
+
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith('/reports/5/status', { status: 'Resuelto' })
+    );
+  });
+
+  it('un usuario normal no ve los controles de estado', async () => {
+    await setup();
+    await screen.findByText('Basura acumulada');
+
+    expect(screen.queryByText('Estado del reporte (admin)')).toBeNull();
+    expect(api.patch).not.toHaveBeenCalled();
   });
 });

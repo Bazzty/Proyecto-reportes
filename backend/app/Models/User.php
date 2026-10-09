@@ -45,11 +45,17 @@ class User extends Authenticatable
         return $this->hasMany(Report::class);
     }
 
+    public function isAdmin(): bool
+    {
+        return (bool) $this->is_admin;
+    }
+
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_admin' => 'boolean',
         ];
     }
 }

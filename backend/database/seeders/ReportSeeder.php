@@ -28,6 +28,9 @@ class ReportSeeder extends Seeder
             );
         }
 
+        // Un usuario administrador de ejemplo (investigador de "Más Azul").
+        User::where('email', 'bastian@demo.cl')->update(['is_admin' => true]);
+
         $categories = Category::all()->keyBy(fn ($c) => strtolower($c->name));
 
         // Reportes distribuidos por el Lago Llanquihue y comunas aledañas

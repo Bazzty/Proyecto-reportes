@@ -35,7 +35,8 @@ No requiere token.
   "user": {
     "id": 1,
     "name": "Bastian Contreras",
-    "email": "bastian@example.com"
+    "email": "bastian@example.com",
+    "is_admin": false
   },
   "token": "1|abc123..."
 }
@@ -75,7 +76,8 @@ No requiere token.
   "user": {
     "id": 1,
     "name": "Bastian Contreras",
-    "email": "bastian@example.com"
+    "email": "bastian@example.com",
+    "is_admin": false
   },
   "token": "2|xyz789..."
 }
@@ -271,6 +273,24 @@ Requiere token. Devuelve solo los reportes del usuario que hace la petición.
   }
 ]
 ```
+
+---
+
+### Actualizar estado de un reporte (solo administradores)
+```
+PATCH /reports/{id}/status
+```
+Requiere token de un **usuario administrador** (investigadores de "Más Azul"). Un usuario normal recibe `403`.
+
+**Request:**
+```json
+{ "status": "En Progreso" }
+```
+`status`: uno de `Pendiente`, `En Progreso`, `Resuelto`.
+
+**Response 200:** mismo formato que el detalle de un reporte, con el `status` actualizado.
+
+**Response 403:** el usuario no es administrador.
 
 ---
 

@@ -33,12 +33,14 @@ export default function DetalleReporteScreen({ route }) {
   const [sending, setSending]       = useState(false);
   const [isGuest, setIsGuest]       = useState(false);
   const [myUserId, setMyUserId]     = useState(null);
+  const [isAdmin, setIsAdmin]       = useState(false);
   const listRef = useRef(null);
 
   useEffect(() => {
-    AsyncStorage.multiGet(['token', 'userId']).then(([[, token], [, uid]]) => {
+    AsyncStorage.multiGet(['token', 'userId', 'isAdmin']).then(([[, token], [, uid], [, admin]]) => {
       setIsGuest(!token);
       setMyUserId(uid ? Number(uid) : null);
+      setIsAdmin(admin === '1');
     });
   }, []);
 
@@ -87,6 +89,16 @@ export default function DetalleReporteScreen({ route }) {
       Alert.alert('Error', 'No se pudo enviar el comentario.');
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleStatusChange = async (status) => {
+    if (status === report.status) return;
+    try {
+      const { data } = await api.patch(`/reports/${reportId}/status`, { status });
+      setReport(prev => ({ ...prev, status: data.status }));
+    } catch {
+      Alert.alert('Error', 'No se pudo actualizar el estado del reporte.');
     }
   };
 
@@ -142,6 +154,29 @@ export default function DetalleReporteScreen({ route }) {
           <Ionicons name="calendar-outline" size={14} color="#9ca3af" style={{ marginLeft: 12 }} />
           <Text style={styles.infoText}>{formatDate(report.created_at)}</Text>
         </View>
+
+        {/* Cambio de estado — solo administradores */}
+        {isAdmin && (
+          <View style={styles.adminBlock}>
+            <Text style={styles.adminTitle}>Estado del reporte (admin)</Text>
+            <View style={styles.statusOptions}>
+              {['Pendiente', 'En Progreso', 'Resuelto'].map(status => {
+                const active = report.status === status;
+                return (
+                  <TouchableOpacity
+                    key={status}
+                    style={[styles.statusOption, active && { backgroundColor: statusColor(status), borderColor: statusColor(status) }]}
+                    onPress={() => handleStatusChange(status)}
+                  >
+                    <Text style={[styles.statusOptionText, active && styles.statusOptionTextActive]}>
+                      {status}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         {/* Confirmaciones — oculto si es tu propio reporte */}
         {!isOwner && <TouchableOpacity
@@ -265,6 +300,16 @@ const styles = StyleSheet.create({
   description: { fontSize: 15, color: '#374151', lineHeight: 23, marginBottom: 10 },
   infoRow:     { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   infoText:    { fontSize: 12, color: '#9ca3af', marginLeft: 4 },
+
+  adminBlock:          { marginBottom: 20 },
+  adminTitle:          { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 8 },
+  statusOptions:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  statusOption:        {
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    borderWidth: 1, borderColor: '#d1d5db', backgroundColor: '#f9fafb',
+  },
+  statusOptionText:    { fontSize: 13, color: '#374151', fontWeight: '500' },
+  statusOptionTextActive: { color: '#ffffff' },
 
   confirmBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

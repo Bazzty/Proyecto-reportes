@@ -25,7 +25,12 @@ export default function LoginScreen({ navigation }) {
       const response = await api.post('/login', { email, password });
       const { token, user } = response.data;
 
-      await AsyncStorage.multiSet([['token', token], ['userName', user.name], ['userId', String(user.id)]]);
+      await AsyncStorage.multiSet([
+        ['token', token],
+        ['userName', user.name],
+        ['userId', String(user.id)],
+        ['isAdmin', user.is_admin ? '1' : '0'],
+      ]);
       setAuthToken(token);
 
       // replace evita que al presionar "atrás" en Home se vuelva al Login

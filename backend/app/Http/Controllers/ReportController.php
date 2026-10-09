@@ -7,6 +7,7 @@ use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ReportController extends Controller
 {
@@ -85,6 +86,22 @@ class ReportController extends Controller
         $reports = $this->withReportData($request->user()->reports(), $uid)->latest()->latest('id')->get();
 
         return response()->json($reports->map(fn (Report $report) => $this->formatReport($report, $uid)));
+    }
+
+    public function updateStatus(Request $request, int $id)
+    {
+        $data = $request->validate([
+            'status' => ['required', Rule::in(['Pendiente', 'En Progreso', 'Resuelto'])],
+        ]);
+
+        $report = Report::findOrFail($id);
+        $report->status = $data['status'];
+        $report->save();
+
+        $uid = $request->user()->id;
+        $report = $this->withReportData(Report::query(), $uid)->findOrFail($report->id);
+
+        return response()->json($this->formatReport($report, $uid));
     }
 
     public function heatmap()

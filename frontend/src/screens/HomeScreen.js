@@ -138,7 +138,7 @@ export default function HomeScreen({ navigation, route }) {
         style: 'destructive',
         onPress: async () => {
           try { await api.post('/logout'); } catch {}
-          await AsyncStorage.multiRemove(['token', 'userName', 'userId']);
+          await AsyncStorage.multiRemove(['token', 'userName', 'userId', 'isAdmin']);
           clearAuthToken();
           navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
         },

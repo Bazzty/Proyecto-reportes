@@ -429,4 +429,78 @@ class ReportApiTest extends TestCase
     {
         $this->getJson('/api/user/reports')->assertUnauthorized();
     }
+
+    private function makeAdmin(): User
+    {
+        $admin = User::factory()->create();
+        $admin->is_admin = true;
+        $admin->save();
+
+        return $admin;
+    }
+
+    private function sampleReport(Category $category, User $user): Report
+    {
+        return Report::create([
+            'user_id' => $user->id,
+            'category_id' => $category->id,
+            'description' => 'Reporte de prueba',
+            'latitude' => -33.45,
+            'longitude' => -70.65,
+            'photo_path' => 'photos/test.jpg',
+            'status' => 'Pendiente',
+        ]);
+    }
+
+    public function test_admin_can_update_report_status()
+    {
+        $admin = $this->makeAdmin();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->sampleReport($category, $admin);
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson("/api/reports/{$report->id}/status", ['status' => 'Resuelto'])
+            ->assertOk()
+            ->assertJsonPath('status', 'Resuelto');
+
+        $this->assertDatabaseHas('reports', ['id' => $report->id, 'status' => 'Resuelto']);
+    }
+
+    public function test_non_admin_cannot_update_report_status()
+    {
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->sampleReport($category, $user);
+        Sanctum::actingAs($user, ['*']);
+
+        $this->patchJson("/api/reports/{$report->id}/status", ['status' => 'Resuelto'])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('reports', ['id' => $report->id, 'status' => 'Pendiente']);
+    }
+
+    public function test_update_status_rejects_invalid_value()
+    {
+        $admin = $this->makeAdmin();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->sampleReport($category, $admin);
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson("/api/reports/{$report->id}/status", ['status' => 'Invalido'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('status');
+    }
+
+    public function test_update_status_requires_authentication()
+    {
+        $this->patchJson('/api/reports/1/status', ['status' => 'Resuelto'])->assertUnauthorized();
+    }
+
+    public function test_update_status_returns_404_for_unknown_report()
+    {
+        $admin = $this->makeAdmin();
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson('/api/reports/9999/status', ['status' => 'Resuelto'])->assertNotFound();
+    }
 }
