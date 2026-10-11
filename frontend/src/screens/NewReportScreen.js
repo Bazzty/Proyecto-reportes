@@ -25,6 +25,8 @@ export default function NewReportScreen({ navigation }) {
 
   const { location, locating, error: locationError, permanentlyDenied, refresh: refreshLocation } = useAutoLocation();
 
+  const selectedCategory = categories.find((cat) => cat.id === categoryId) ?? null;
+
   useEffect(() => {
     api.get('/categories')
       .then(res => setCategories(res.data))
@@ -190,24 +192,32 @@ export default function NewReportScreen({ navigation }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Categoría</Text>
         <View style={styles.categoryContainer}>
-          {categories.map((cat) => (
-            <TouchableOpacity
-              key={cat.id}
-              style={[
-                styles.categoryButton,
-                categoryId === cat.id && styles.categoryButtonSelected,
-              ]}
-              onPress={() => setCategoryId(cat.id)}
-            >
-              <Text style={[
-                styles.categoryButtonText,
-                categoryId === cat.id && styles.categoryButtonTextSelected,
-              ]}>
-                {cat.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {categories.map((cat) => {
+            const selected = categoryId === cat.id;
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                style={[styles.categoryButton, selected && styles.categoryButtonSelected]}
+                onPress={() => setCategoryId(cat.id)}
+              >
+                <Ionicons
+                  name={cat.icon || 'pricetag-outline'}
+                  size={16}
+                  color={selected ? '#ffffff' : '#0e7490'}
+                />
+                <Text style={[styles.categoryButtonText, selected && styles.categoryButtonTextSelected]}>
+                  {cat.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
+        {selectedCategory?.description ? (
+          <View style={styles.categoryHint}>
+            <Ionicons name="information-circle-outline" size={16} color="#0e7490" />
+            <Text style={styles.categoryHintText}>{selectedCategory.description}</Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Descripción */}
@@ -272,12 +282,19 @@ const styles = StyleSheet.create({
   helperText:                 { fontSize: 12, color: '#6b7280', fontStyle: 'italic', marginTop: 4 },
   categoryContainer:          { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   categoryButton:             {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
     borderWidth: 1, borderColor: '#d1d5db', backgroundColor: '#f9fafb',
   },
   categoryButtonSelected:     { backgroundColor: '#0e7490', borderColor: '#0e7490' },
   categoryButtonText:         { color: '#374151', fontWeight: '500' },
   categoryButtonTextSelected: { color: 'white' },
+  categoryHint:               {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10,
+    backgroundColor: '#f0fdfa', borderRadius: 8, padding: 10,
+    borderWidth: 1, borderColor: '#99f6e4',
+  },
+  categoryHintText:           { flex: 1, fontSize: 12, color: '#0f766e', lineHeight: 17 },
   input:                      {
     borderWidth: 1, borderColor: '#d1d5db',
     borderRadius: 8, padding: 12, backgroundColor: '#f9fafb',

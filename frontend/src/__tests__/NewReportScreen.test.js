@@ -28,8 +28,8 @@ jest.mock('expo-location', () => ({
 }));
 
 const CATEGORIES = [
-  { id: 1, name: 'basura' },
-  { id: 2, name: 'aguas' },
+  { id: 1, name: 'basura', description: 'Residuos sólidos', icon: 'trash-outline' },
+  { id: 2, name: 'aguas', description: 'Vertidos líquidos', icon: 'water-outline' },
 ];
 
 const COORDS_TEXT = 'Lat: -41.31980, Lng: -72.98330';
@@ -73,6 +73,30 @@ describe('NewReportScreen', () => {
     await setup();
     expect(await screen.findByText(COORDS_TEXT)).toBeTruthy();
     expect(Location.getCurrentPositionAsync).toHaveBeenCalled();
+  });
+
+  it('muestra el ícono de cada categoría', async () => {
+    await setup();
+    expect(screen.getByText('icon:trash-outline')).toBeTruthy();
+    expect(screen.getByText('icon:water-outline')).toBeTruthy();
+  });
+
+  it('al seleccionar una categoría muestra su descripción', async () => {
+    await setup();
+    expect(screen.queryByText('Residuos sólidos')).toBeNull();
+
+    await fireEvent.press(screen.getByText('basura'));
+    expect(screen.getByText('Residuos sólidos')).toBeTruthy();
+  });
+
+  it('sin descripción no muestra la guía y usa un ícono por defecto', async () => {
+    api.get.mockResolvedValue({ data: [{ id: 3, name: 'otro', description: null, icon: null }] });
+    await render(<NewReportScreen navigation={{ navigate: jest.fn() }} />);
+    await screen.findByText('otro');
+
+    await fireEvent.press(screen.getByText('otro'));
+    expect(screen.getByText('icon:pricetag-outline')).toBeTruthy();
+    expect(screen.queryByText('Residuos sólidos')).toBeNull();
   });
 
   it('si falla la carga de categorías muestra el error', async () => {

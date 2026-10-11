@@ -283,10 +283,21 @@ No requiere token.
 **Response 200:**
 ```json
 [
-  { "id": 1, "name": "basura" },
-  { "id": 2, "name": "escombros" }
+  {
+    "id": 1,
+    "name": "Basura",
+    "description": "Residuos sólidos domésticos o de consumo: bolsas, plásticos, envases y similares.",
+    "icon": "trash-outline"
+  },
+  {
+    "id": 2,
+    "name": "Escombros",
+    "description": "Restos de construcción o demolición: hormigón, maderas, cerámicas y escombros en general.",
+    "icon": "construct-outline"
+  }
 ]
 ```
+`description` e `icon` son opcionales (pueden venir en `null`). `icon` es el nombre de un ícono de Ionicons.
 
 ---
 
