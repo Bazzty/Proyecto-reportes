@@ -246,7 +246,7 @@ No requiere token. Agrupa los focos por **zona** (comuna o sector) y devuelve, p
   { "zone": { "id": null, "name": "Sin zona" },  "latitude": -33.4569, "longitude": -70.6483, "count": 2 }
 ]
 ```
-> El heatmap visual del cliente (densidad) es **Android-only**; `count` se usa como peso de cada zona.
+> El cliente dibuja el mapa con **Leaflet + OpenStreetMap** (sin Google Maps) y usa `count` como peso de cada zona. Funciona en Android e iOS dentro de Expo Go.
 
 ---
 

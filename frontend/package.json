@@ -32,7 +32,8 @@
     "react-native-gesture-handler": "~2.32.0",
     "react-native-maps": "1.27.2",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-screens": "~4.26.0"
+    "react-native-screens": "~4.26.0",
+    "react-native-webview": "13.16.1"
   },
   "private": true,
   "devDependencies": {

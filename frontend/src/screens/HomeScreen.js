@@ -1,30 +1,21 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Platform, Modal, FlatList } from 'react-native';
-import { Image } from 'expo-image';
-import MapView, { Marker, Callout, Heatmap } from 'react-native-maps';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Modal, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { clearAuthToken } from '../services/api';
+import LeafletMap from '../components/LeafletMap';
 import useOfflineSync from '../hooks/useOfflineSync';
 import useNotifications from '../hooks/useNotifications';
 import { subscribe as subscribeQueue, getPendingCount, isSyncing } from '../services/offlineQueue';
 import { syncStatusNotifications, markAllRead } from '../services/notifications';
 
 
-const statusColor = (status) => {
-  if (!status) return '#0e7490';
-  const s = status.toLowerCase();
-  if (s === 'resuelto') return '#16a34a';
-  if (s === 'pendiente') return '#f59e0b';
-  return '#0e7490';
-};
-
 export default function HomeScreen({ navigation, route }) {
   const isGuest = route.params?.guest === true;
 
-  const mapRef = useRef(null);
+  const leafletRef = useRef(null);
   const [userLocation, setUserLocation]   = useState(null);
   const [userName, setUserName]           = useState('');
   const [isAdmin, setIsAdmin]             = useState(false);
@@ -69,12 +60,7 @@ export default function HomeScreen({ navigation, route }) {
       if (status !== 'granted') return;
       const loc = await Location.getCurrentPositionAsync({});
       setUserLocation(loc.coords);
-      mapRef.current?.animateToRegion({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      }, 1000);
+      leafletRef.current?.centerOn(loc.coords.latitude, loc.coords.longitude, 14);
     })();
   }, []);
 
@@ -191,80 +177,13 @@ export default function HomeScreen({ navigation, route }) {
           <Text style={styles.offlineText}>{offlineBanner.text}</Text>
         </View>
       )}
-      <MapView
-        ref={mapRef}
-        style={StyleSheet.absoluteFillObject}
-        showsUserLocation
-        showsMyLocationButton={false}
-        showsCompass={false}
-        initialRegion={{
-          latitude: -41.31946,
-          longitude: -72.98356,
-          latitudeDelta: 0.08,
-          longitudeDelta: 0.08,
-        }}
-      >
-        {Platform.OS === 'android' && heatmapPoints.length > 0 && (
-          <Heatmap points={heatmapPoints} radius={40} opacity={0.6} />
-        )}
-
-        {visibleReports.map(report => {
-          const color = statusColor(report.status);
-          return (
-            <Marker
-              key={report.id}
-              identifier={String(report.id)}
-              coordinate={{ latitude: report.latitude, longitude: report.longitude }}
-              anchor={{ x: 0.5, y: 1 }}
-              recyclingKey={`report-${report.id}`}
-            >
-              <View style={styles.markerWrapper}>
-                <View style={[styles.markerBubble, { borderColor: color }]}>
-                  {report.photo_url ? (
-                    <Image
-                      source={report.photo_url}
-                      style={styles.markerImage}
-                      contentFit="cover"
-                      cachePolicy="disk"
-                      transition={150}
-                    />
-                  ) : (
-                    <View style={[styles.markerPlaceholder, { backgroundColor: color }]}>
-                      <Ionicons name="leaf" size={16} color="white" />
-                    </View>
-                  )}
-                </View>
-                <View style={[styles.markerArrow, { borderTopColor: color }]} />
-              </View>
-              <Callout tooltip onPress={() => navigation.navigate('DetalleReporte', { reportId: report.id })}>
-                <View style={styles.callout}>
-                  {report.photo_url && (
-                    <Image
-                      source={report.photo_url}
-                      style={styles.calloutImage}
-                      contentFit="cover"
-                      cachePolicy="disk"
-                    />
-                  )}
-                  <View style={styles.calloutBody}>
-                    <View style={styles.calloutHeader}>
-                      <Text style={styles.calloutCategory}>
-                        {report.category?.name ?? 'Sin categoría'}
-                      </Text>
-                      <View style={[styles.statusDot, { backgroundColor: color }]} />
-                    </View>
-                    <Text style={styles.calloutDescription} numberOfLines={2}>
-                      {report.description}
-                    </Text>
-                    <Text style={styles.calloutUser}>📍 {report.user?.name}</Text>
-                    <Text style={styles.calloutLink}>Ver detalle →</Text>
-                  </View>
-                </View>
-              </Callout>
-            </Marker>
-          );
-        })}
-      </MapView>
+      <LeafletMap
+        ref={leafletRef}
+        reports={visibleReports}
+        heat={heatmapPoints}
+        userLocation={userLocation}
+        onSelectReport={(reportId) => navigation.navigate('DetalleReporte', { reportId })}
+      />
 
       {/* Greeting card */}
       <View style={styles.greetingCard}>
@@ -341,12 +260,7 @@ export default function HomeScreen({ navigation, route }) {
       {userLocation && (
         <TouchableOpacity
           style={styles.locationButton}
-          onPress={() => mapRef.current?.animateToRegion({
-            latitude: userLocation.latitude,
-            longitude: userLocation.longitude,
-            latitudeDelta: 0.02,
-            longitudeDelta: 0.02,
-          }, 800)}
+          onPress={() => leafletRef.current?.centerOn(userLocation.latitude, userLocation.longitude, 15)}
         >
           <Ionicons name="locate" size={22} color="#0e7490" />
         </TouchableOpacity>
