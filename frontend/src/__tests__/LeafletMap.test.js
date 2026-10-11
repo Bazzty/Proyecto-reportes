@@ -40,7 +40,7 @@ describe('LeafletMap', () => {
     await render(<LeafletMap reports={REPORTS} heat={HEAT} />);
 
     expect(mockWebViewProps.source.html).toContain('leaflet');
-    expect(mockWebViewProps.source.html).toContain('cartocdn.com');
+    expect(mockWebViewProps.source.html).toContain('arcgisonline.com');
   });
 
   it('al recibir "ready" envía los reportes y el heat', async () => {
