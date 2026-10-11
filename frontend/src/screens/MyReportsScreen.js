@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Modal, StatusBar } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Modal, StatusBar, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
+import { subscribe as subscribeQueue, getPending } from '../services/offlineQueue';
 
 const getStatusStyle = (status) => {
   const s = (status ?? '').toLowerCase();
@@ -27,9 +28,15 @@ const formatCoords = (lat, lng) =>
 
 export default function MyReportsScreen({ navigation }) {
   const [reports, setReports]       = useState([]);
+  const [pending, setPending]       = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
+
+  const loadPending = useCallback(async () => {
+    setPending(await getPending());
+  }, []);
 
   const loadReports = useCallback(() => {
     setLoading(true);
@@ -40,15 +47,56 @@ export default function MyReportsScreen({ navigation }) {
       .finally(() => setLoading(false));
   }, []);
 
-  useFocusEffect(loadReports);
+  useFocusEffect(useCallback(() => {
+    loadReports();
+    loadPending();
+  }, [loadReports, loadPending]));
+
+  useEffect(() => {
+    api.get('/categories')
+      .then(res => setCategories(res.data))
+      .catch(() => setCategories([]));
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeQueue(() => {
+      loadPending();
+      loadReports();
+    });
+    return unsubscribe;
+  }, [loadPending, loadReports]);
+
+  const categoryName = (categoryId) => {
+    const match = categories.find(cat => cat.id === categoryId);
+    return match ? match.name.charAt(0).toUpperCase() + match.name.slice(1) : 'Sin categoría';
+  };
+
+  const pendingItems = pending.map(item => ({
+    id: `pending-${item.localId}`,
+    isPending: true,
+    description: item.description,
+    latitude: item.latitude,
+    longitude: item.longitude,
+    photo_url: item.photoUri,
+    status: 'Sin sincronizar',
+    category: { name: categoryName(item.categoryId) },
+    created_at: item.createdAt,
+  }));
+
+  const combined = [...pendingItems, ...reports];
 
   const renderReportCard = ({ item }) => {
-    const statusColors = getStatusStyle(item.status);
+    const statusColors = item.isPending
+      ? { bg: '#e5e7eb', text: '#374151', accent: '#6b7280' }
+      : getStatusStyle(item.status);
+    const onPress = item.isPending
+      ? () => Alert.alert('Pendiente de envío', 'Este reporte se enviará automáticamente cuando recuperes la conexión.')
+      : () => navigation.navigate('DetalleReporte', { reportId: item.id });
     return (
       <TouchableOpacity
         style={[styles.card, { borderLeftColor: statusColors.accent }]}
         activeOpacity={0.75}
-        onPress={() => navigation.navigate('DetalleReporte', { reportId: item.id })}
+        onPress={onPress}
       >
         {item.photo_url ? (
           <TouchableOpacity activeOpacity={0.9} onPress={() => setLightboxUrl(item.photo_url)}>
@@ -114,9 +162,9 @@ export default function MyReportsScreen({ navigation }) {
         <View style={styles.counter}>
           <Ionicons name="document-text-outline" size={14} color="#0e7490" />
           <Text style={styles.counterText}>
-            {reports.length === 0
+            {combined.length === 0
               ? 'Sin reportes aún'
-              : `${reports.length} reporte${reports.length !== 1 ? 's' : ''} encontrado${reports.length !== 1 ? 's' : ''}`}
+              : `${combined.length} reporte${combined.length !== 1 ? 's' : ''} encontrado${combined.length !== 1 ? 's' : ''}`}
           </Text>
         </View>
       )}
@@ -133,7 +181,7 @@ export default function MyReportsScreen({ navigation }) {
         </View>
       ) : (
         <FlatList
-          data={reports}
+          data={combined}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderReportCard}
           contentContainerStyle={styles.listContent}

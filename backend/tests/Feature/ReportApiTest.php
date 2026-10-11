@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -172,48 +173,6 @@ class ReportApiTest extends TestCase
             ->assertJsonFragment(['description' => 'Detalle público']);
     }
 
-    public function test_heatmap_returns_only_coordinates()
-    {
-        $user = User::factory()->create();
-        $category = Category::create(['name' => 'basura']);
-
-        Report::create([
-            'user_id' => $user->id,
-            'category_id' => $category->id,
-            'description' => 'Punto 1',
-            'latitude' => -33.4489,
-            'longitude' => -70.6693,
-            'photo_path' => 'photos/a.jpg',
-            'status' => 'Pendiente',
-        ]);
-
-        Report::create([
-            'user_id' => $user->id,
-            'category_id' => $category->id,
-            'description' => 'Punto 2',
-            'latitude' => -33.4600,
-            'longitude' => -70.6800,
-            'photo_path' => 'photos/b.jpg',
-            'status' => 'Resuelto',
-        ]);
-
-        Sanctum::actingAs($user, ['*']);
-
-        $response = $this->getJson('/api/reports/heatmap');
-
-        $response->assertStatus(200)
-            ->assertJsonCount(2)
-            ->assertJsonFragment(['latitude' => -33.4489, 'longitude' => -70.6693])
-            ->assertJsonFragment(['latitude' => -33.4600, 'longitude' => -70.6800]);
-
-        // Solo coordenadas, sin description ni status
-        $first = $response->json()[0];
-        $this->assertArrayHasKey('latitude', $first);
-        $this->assertArrayHasKey('longitude', $first);
-        $this->assertArrayNotHasKey('description', $first);
-        $this->assertArrayNotHasKey('status', $first);
-    }
-
     private function validReportPayload(Category $category, array $overrides = []): array
     {
         return array_merge([
@@ -223,6 +182,39 @@ class ReportApiTest extends TestCase
             'category_id' => $category->id,
             'photo' => UploadedFile::fake()->create('photo.jpg', 100, 'image/jpeg'),
         ], $overrides);
+    }
+
+    public function test_creating_report_is_idempotent_with_client_uuid()
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        Sanctum::actingAs($user, ['*']);
+
+        $payload = $this->validReportPayload($category, ['client_uuid' => (string) Str::uuid()]);
+
+        $first = $this->postJson('/api/reports', $payload);
+        $first->assertCreated();
+
+        $second = $this->postJson('/api/reports', $payload);
+        $second->assertOk()->assertJsonPath('id', $first->json('id'));
+
+        $this->assertDatabaseCount('reports', 1);
+        $this->assertDatabaseHas('reports', [
+            'id' => $first->json('id'),
+            'client_uuid' => $payload['client_uuid'],
+        ]);
+    }
+
+    public function test_creating_report_rejects_invalid_client_uuid()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['client_uuid' => 'no-es-uuid']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('client_uuid');
     }
 
     public function test_reports_are_listed_newest_first()
@@ -394,5 +386,79 @@ class ReportApiTest extends TestCase
     public function test_user_reports_requires_authentication()
     {
         $this->getJson('/api/user/reports')->assertUnauthorized();
+    }
+
+    private function makeAdmin(): User
+    {
+        $admin = User::factory()->create();
+        $admin->is_admin = true;
+        $admin->save();
+
+        return $admin;
+    }
+
+    private function sampleReport(Category $category, User $user): Report
+    {
+        return Report::create([
+            'user_id' => $user->id,
+            'category_id' => $category->id,
+            'description' => 'Reporte de prueba',
+            'latitude' => -33.45,
+            'longitude' => -70.65,
+            'photo_path' => 'photos/test.jpg',
+            'status' => 'Pendiente',
+        ]);
+    }
+
+    public function test_admin_can_update_report_status()
+    {
+        $admin = $this->makeAdmin();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->sampleReport($category, $admin);
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson("/api/reports/{$report->id}/status", ['status' => 'Resuelto'])
+            ->assertOk()
+            ->assertJsonPath('status', 'Resuelto');
+
+        $this->assertDatabaseHas('reports', ['id' => $report->id, 'status' => 'Resuelto']);
+    }
+
+    public function test_non_admin_cannot_update_report_status()
+    {
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->sampleReport($category, $user);
+        Sanctum::actingAs($user, ['*']);
+
+        $this->patchJson("/api/reports/{$report->id}/status", ['status' => 'Resuelto'])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('reports', ['id' => $report->id, 'status' => 'Pendiente']);
+    }
+
+    public function test_update_status_rejects_invalid_value()
+    {
+        $admin = $this->makeAdmin();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->sampleReport($category, $admin);
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson("/api/reports/{$report->id}/status", ['status' => 'Invalido'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('status');
+    }
+
+    public function test_update_status_requires_authentication()
+    {
+        $this->patchJson('/api/reports/1/status', ['status' => 'Resuelto'])->assertUnauthorized();
+    }
+
+    public function test_update_status_returns_404_for_unknown_report()
+    {
+        $admin = $this->makeAdmin();
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson('/api/reports/9999/status', ['status' => 'Resuelto'])->assertNotFound();
     }
 }

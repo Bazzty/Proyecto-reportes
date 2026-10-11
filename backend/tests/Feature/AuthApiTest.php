@@ -49,6 +49,22 @@ class AuthApiTest extends TestCase
             ]);
     }
 
+    public function test_login_returns_admin_flag()
+    {
+        $admin = User::factory()->create([
+            'password' => Hash::make('password123'),
+        ]);
+        $admin->is_admin = true;
+        $admin->save();
+
+        $this->postJson('/api/login', [
+            'email' => $admin->email,
+            'password' => 'password123',
+        ])
+            ->assertOk()
+            ->assertJsonPath('user.is_admin', true);
+    }
+
     public function test_login_fails_with_wrong_credentials()
     {
         $user = User::factory()->create([

@@ -9,6 +9,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import api from '../services/api';
 import useAutoLocation from '../hooks/useAutoLocation';
+import useNetworkStatus from '../hooks/useNetworkStatus';
+import { enqueue } from '../services/offlineQueue';
 
 const LOCATION_ERRORS = {
   permission: 'Permiso de ubicación denegado. Actívalo para continuar.',
@@ -24,6 +26,7 @@ export default function NewReportScreen({ navigation }) {
   const [categories, setCategories]   = useState([]);
 
   const { location, locating, error: locationError, permanentlyDenied, refresh: refreshLocation } = useAutoLocation();
+  const { isConnected } = useNetworkStatus();
 
   const selectedCategory = categories.find((cat) => cat.id === categoryId) ?? null;
 
@@ -80,11 +83,35 @@ export default function NewReportScreen({ navigation }) {
     if (!result.canceled) setPhoto(await toJpeg(result.assets[0]));
   };
 
+  const saveOffline = async () => {
+    try {
+      await enqueue({
+        description,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        categoryId,
+        photoUri: photo.uri,
+      });
+      Alert.alert(
+        'Guardado sin conexión',
+        'Tu reporte se enviará automáticamente cuando recuperes la conexión.',
+        [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
+      );
+    } catch {
+      Alert.alert('Error', 'No se pudo guardar el reporte sin conexión.');
+    }
+  };
+
   const handleSubmit = async () => {
     if (!photo)             { Alert.alert('Falta foto', 'Debes adjuntar una foto.');         return; }
     if (!location)          { Alert.alert('Falta ubicación', 'Espera a que se detecte tu ubicación.'); return; }
     if (!description.trim()){ Alert.alert('Falta descripción', 'Escribe una descripción.'); return; }
     if (!categoryId)        { Alert.alert('Falta categoría', 'Selecciona una categoría.');   return; }
+
+    if (!isConnected) {
+      await saveOffline();
+      return;
+    }
 
     setLoading(true);
     try {
@@ -107,6 +134,11 @@ export default function NewReportScreen({ navigation }) {
         { text: 'OK', onPress: () => navigation.navigate('Home', { newReport }) },
       ]);
     } catch (error) {
+      // Sin respuesta del servidor: probablemente falla de red -> guardar sin conexión.
+      if (!error.response) {
+        await saveOffline();
+        return;
+      }
       const message = error.response?.data?.message
         || (error.response?.data?.errors
             ? Object.values(error.response.data.errors).flat()[0]

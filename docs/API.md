@@ -35,7 +35,8 @@ No requiere token.
   "user": {
     "id": 1,
     "name": "Bastian Contreras",
-    "email": "bastian@example.com"
+    "email": "bastian@example.com",
+    "is_admin": false
   },
   "token": "1|abc123..."
 }
@@ -75,7 +76,8 @@ No requiere token.
   "user": {
     "id": 1,
     "name": "Bastian Contreras",
-    "email": "bastian@example.com"
+    "email": "bastian@example.com",
+    "is_admin": false
   },
   "token": "2|xyz789..."
 }
@@ -230,20 +232,21 @@ No requiere token (si se envía, se calcula `confirmed_by_me`).
 
 ---
 
-### Puntos para el mapa de calor
+### Mapa de calor agrupado por zona
 ```
 GET /reports/heatmap
 ```
-No requiere token. Devuelve solo coordenadas — el frontend las usa para pintar el heatmap.
+No requiere token. Agrupa los focos por **zona** (comuna o sector) y devuelve, por cada zona con reportes, un centroide y el conteo. Los reportes fuera de toda zona se agrupan como **"Sin zona"**.
 
 **Response 200:**
 ```json
 [
-  { "latitude": -33.4569, "longitude": -70.6483 },
-  { "latitude": -33.4580, "longitude": -70.6500 },
-  { "latitude": -33.4601, "longitude": -70.6512 }
+  { "zone": { "id": 1, "name": "Puerto Varas" }, "latitude": -41.3198, "longitude": -72.9833, "count": 3 },
+  { "zone": { "id": 7, "name": "Ensenada" },     "latitude": -41.2030, "longitude": -72.5700, "count": 1 },
+  { "zone": { "id": null, "name": "Sin zona" },  "latitude": -33.4569, "longitude": -70.6483, "count": 2 }
 ]
 ```
+> El heatmap visual del cliente (densidad) es **Android-only**; `count` se usa como peso de cada zona.
 
 ---
 
@@ -271,6 +274,24 @@ Requiere token. Devuelve solo los reportes del usuario que hace la petición.
   }
 ]
 ```
+
+---
+
+### Actualizar estado de un reporte (solo administradores)
+```
+PATCH /reports/{id}/status
+```
+Requiere token de un **usuario administrador** (investigadores de "Más Azul"). Un usuario normal recibe `403`.
+
+**Request:**
+```json
+{ "status": "En Progreso" }
+```
+`status`: uno de `Pendiente`, `En Progreso`, `Resuelto`.
+
+**Response 200:** mismo formato que el detalle de un reporte, con el `status` actualizado.
+
+**Response 403:** el usuario no es administrador.
 
 ---
 

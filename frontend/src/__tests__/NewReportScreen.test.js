@@ -2,12 +2,17 @@ import { Alert } from 'react-native';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import * as Network from 'expo-network';
 import NewReportScreen from '../screens/NewReportScreen';
 import api from '../services/api';
+import { enqueue } from '../services/offlineQueue';
 
 jest.mock('../services/api', () => ({
   __esModule: true,
   default: { get: jest.fn(), post: jest.fn() },
+}));
+jest.mock('../services/offlineQueue', () => ({
+  enqueue: jest.fn(),
 }));
 jest.mock('expo-image-picker', () => ({
   requestCameraPermissionsAsync: jest.fn(),
@@ -61,7 +66,15 @@ describe('NewReportScreen', () => {
     jest.clearAllMocks();
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     grantLocation();
+    Network.getNetworkStateAsync.mockResolvedValue({ isConnected: true, isInternetReachable: true });
   });
+
+  const fillForm = async () => {
+    await takePhoto();
+    await screen.findByText(COORDS_TEXT);
+    await fireEvent.changeText(screen.getByPlaceholderText('Ej. Basura acumulada en la esquina...'), 'Basura en la vereda');
+    await fireEvent.press(screen.getByText('aguas'));
+  };
 
   it('carga y muestra las categorías', async () => {
     await setup();
@@ -206,5 +219,35 @@ describe('NewReportScreen', () => {
     await fireEvent.press(screen.getByText('Enviar Reporte'));
 
     await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Error', 'La foto es muy pesada.'));
+  });
+
+  it('sin conexión guarda el reporte en la cola y navega a Home', async () => {
+    Network.getNetworkStateAsync.mockResolvedValue({ isConnected: false, isInternetReachable: false });
+    const navigation = await setup();
+    await fillForm();
+    await fireEvent.press(screen.getByText('Enviar Reporte'));
+
+    await waitFor(() => expect(enqueue).toHaveBeenCalledTimes(1));
+    expect(api.post).not.toHaveBeenCalled();
+    expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({
+      description: 'Basura en la vereda',
+      categoryId: 2,
+      photoUri: 'file:///resized.jpg',
+    }));
+
+    const [title, , buttons] = Alert.alert.mock.calls.at(-1);
+    expect(title).toBe('Guardado sin conexión');
+    buttons[0].onPress();
+    expect(navigation.navigate).toHaveBeenCalledWith('Home');
+  });
+
+  it('si el envío falla por red guarda el reporte en la cola', async () => {
+    api.post.mockRejectedValue(new Error('Network Error'));
+    await setup();
+    await fillForm();
+    await fireEvent.press(screen.getByText('Enviar Reporte'));
+
+    await waitFor(() => expect(enqueue).toHaveBeenCalledTimes(1));
+    expect(Alert.alert).toHaveBeenCalledWith('Guardado sin conexión', expect.any(String), expect.any(Array));
   });
 });

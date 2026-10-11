@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
@@ -6,6 +6,7 @@ import HomeScreen from '../screens/HomeScreen';
 import api, { clearAuthToken } from '../services/api';
 
 const mockAnimateToRegion = jest.fn();
+let mockHeatmapProps = null;
 
 jest.mock('../services/api', () => ({
   __esModule: true,
@@ -20,6 +21,16 @@ jest.mock('expo-location', () => ({
   requestForegroundPermissionsAsync: jest.fn(),
   getCurrentPositionAsync: jest.fn(),
 }));
+let mockIsConnected = true;
+jest.mock('../hooks/useOfflineSync', () => ({
+  __esModule: true,
+  default: () => ({ isConnected: mockIsConnected }),
+}));
+jest.mock('../services/offlineQueue', () => ({
+  subscribe: jest.fn(() => jest.fn()),
+  getPendingCount: jest.fn(async () => 0),
+  isSyncing: jest.fn(() => false),
+}));
 jest.mock('react-native-maps', () => {
   const React = require('react');
   const { View, Pressable } = require('react-native');
@@ -32,7 +43,7 @@ jest.mock('react-native-maps', () => {
     default: MapView,
     Marker: ({ children }) => <View>{children}</View>,
     Callout: ({ children, onPress }) => <Pressable onPress={onPress}>{children}</Pressable>,
-    Heatmap: () => null,
+    Heatmap: (props) => { mockHeatmapProps = props; return null; },
   };
 });
 
@@ -46,7 +57,7 @@ const mockApi = ({ mine = [] } = {}) => {
   api.get.mockImplementation((url) => {
     if (url === '/categories') return Promise.resolve({ data: CATEGORIES });
     if (url === '/reports') return Promise.resolve({ data: REPORTS });
-    if (url === '/reports/heatmap') return Promise.resolve({ data: [{ latitude: '-41.31', longitude: '-72.98' }] });
+    if (url === '/reports/heatmap') return Promise.resolve({ data: [{ latitude: '-41.31', longitude: '-72.98', count: 3 }] });
     if (url === '/user/reports') return Promise.resolve({ data: mine });
     return Promise.reject(new Error(`unexpected ${url}`));
   });
@@ -65,6 +76,7 @@ describe('HomeScreen', () => {
     jest.clearAllMocks();
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'denied' });
+    mockIsConnected = true;
     await AsyncStorage.clear();
     mockApi();
   });
@@ -76,6 +88,22 @@ describe('HomeScreen', () => {
     expect(screen.getByText('Todos')).toBeTruthy();
     expect(screen.getByText('Basura')).toBeTruthy();
     expect(screen.getByText('Aguas')).toBeTruthy();
+  });
+
+  it('usa el conteo por zona como peso del heatmap (Android)', async () => {
+    const original = Platform.OS;
+    Platform.OS = 'android';
+    mockHeatmapProps = null;
+
+    await setup();
+
+    await waitFor(() => expect(mockHeatmapProps).toBeTruthy());
+    expect(api.get).toHaveBeenCalledWith('/reports/heatmap');
+    expect(mockHeatmapProps.points).toEqual([
+      { latitude: -41.31, longitude: -72.98, weight: 3 },
+    ]);
+
+    Platform.OS = original;
   });
 
   it('el filtro por categoría oculta las demás y se desactiva al tocarlo otra vez', async () => {
@@ -277,6 +305,45 @@ describe('HomeScreen', () => {
       await advance(30000);
 
       expect(api.get.mock.calls.filter(([u]) => u === '/reports').length).toBe(callsAfterHang);
+    });
+  });
+
+  describe('modo offline', () => {
+    it('muestra el aviso sin conexión', async () => {
+      mockIsConnected = false;
+      await setup();
+
+      expect(await screen.findByText('Sin conexión: los datos pueden estar desactualizados')).toBeTruthy();
+    });
+
+    it('muestra la cantidad de reportes pendientes de sincronizar', async () => {
+      const { getPendingCount } = require('../services/offlineQueue');
+      getPendingCount.mockResolvedValue(2);
+
+      await setup();
+
+      expect(await screen.findByText('2 reportes pendientes de sincronizar')).toBeTruthy();
+    });
+  });
+
+  describe('novedades', () => {
+    it('muestra la campana con no leídas y abre la lista', async () => {
+      await AsyncStorage.setItem('notifications', JSON.stringify([
+        {
+          id: 'n1',
+          type: 'status',
+          reportId: 1,
+          message: 'Tu reporte pasó a "Resuelto".',
+          createdAt: '2026-10-06T12:00:00.000Z',
+          read: false,
+        },
+      ]));
+
+      await setup();
+
+      expect(await screen.findByTestId('notifications-badge')).toBeTruthy();
+      await fireEvent.press(screen.getByTestId('notifications-button'));
+      expect(await screen.findByText('Tu reporte pasó a "Resuelto".')).toBeTruthy();
     });
   });
 });
