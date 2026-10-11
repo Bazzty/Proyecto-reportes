@@ -21,6 +21,8 @@ jest.mock('expo-image-manipulator', () => ({
 }));
 jest.mock('expo-location', () => ({
   requestForegroundPermissionsAsync: jest.fn(),
+  hasServicesEnabledAsync: jest.fn(),
+  getLastKnownPositionAsync: jest.fn(),
   getCurrentPositionAsync: jest.fn(),
   Accuracy: { High: 4 },
 }));
@@ -29,6 +31,15 @@ const CATEGORIES = [
   { id: 1, name: 'basura' },
   { id: 2, name: 'aguas' },
 ];
+
+const COORDS_TEXT = 'Lat: -41.31980, Lng: -72.98330';
+
+const grantLocation = () => {
+  Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'granted', canAskAgain: true });
+  Location.hasServicesEnabledAsync.mockResolvedValue(true);
+  Location.getLastKnownPositionAsync.mockResolvedValue(null);
+  Location.getCurrentPositionAsync.mockResolvedValue({ coords: { latitude: -41.3198, longitude: -72.9833 } });
+};
 
 const setup = async () => {
   api.get.mockResolvedValue({ data: CATEGORIES });
@@ -45,23 +56,23 @@ const takePhoto = async () => {
   await waitFor(() => expect(screen.queryByText('Ninguna imagen seleccionada')).toBeNull());
 };
 
-const getLocation = async () => {
-  Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'granted' });
-  Location.getCurrentPositionAsync.mockResolvedValue({ coords: { latitude: -41.3198, longitude: -72.9833 } });
-  await fireEvent.press(screen.getByText('Obtener mi ubicación actual'));
-  await screen.findByText('Lat: -41.31980, Lng: -72.98330');
-};
-
 describe('NewReportScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    grantLocation();
   });
 
   it('carga y muestra las categorías', async () => {
     await setup();
     expect(api.get).toHaveBeenCalledWith('/categories');
     expect(screen.getByText('aguas')).toBeTruthy();
+  });
+
+  it('captura la ubicación automáticamente al montar', async () => {
+    await setup();
+    expect(await screen.findByText(COORDS_TEXT)).toBeTruthy();
+    expect(Location.getCurrentPositionAsync).toHaveBeenCalled();
   });
 
   it('si falla la carga de categorías muestra el error', async () => {
@@ -73,7 +84,7 @@ describe('NewReportScreen', () => {
     );
   });
 
-  it('valida en orden: foto, ubicación, descripción y categoría', async () => {
+  it('valida en orden: foto, descripción y categoría', async () => {
     await setup();
     const submit = () => fireEvent.press(screen.getByText('Enviar Reporte'));
 
@@ -82,10 +93,6 @@ describe('NewReportScreen', () => {
 
     await takePhoto();
     await submit();
-    expect(Alert.alert).toHaveBeenLastCalledWith('Falta ubicación', 'Obtén tu ubicación GPS.');
-
-    await getLocation();
-    await submit();
     expect(Alert.alert).toHaveBeenLastCalledWith('Falta descripción', 'Escribe una descripción.');
 
     await fireEvent.changeText(screen.getByPlaceholderText('Ej. Basura acumulada en la esquina...'), 'Basura');
@@ -93,6 +100,38 @@ describe('NewReportScreen', () => {
     expect(Alert.alert).toHaveBeenLastCalledWith('Falta categoría', 'Selecciona una categoría.');
 
     expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('bloquea el envío si no hay ubicación', async () => {
+    Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'denied', canAskAgain: true });
+    await setup();
+    await takePhoto();
+    await fireEvent.press(screen.getByText('Enviar Reporte'));
+
+    expect(Alert.alert).toHaveBeenLastCalledWith('Falta ubicación', 'Espera a que se detecte tu ubicación.');
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('si el permiso de ubicación se deniega muestra el mensaje y permite reintentar', async () => {
+    Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'denied', canAskAgain: true });
+    await setup();
+
+    expect(await screen.findByText('Permiso de ubicación denegado. Actívalo para continuar.')).toBeTruthy();
+    expect(screen.getByText('Reintentar')).toBeTruthy();
+  });
+
+  it('si el permiso está denegado permanentemente ofrece abrir Ajustes', async () => {
+    Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'denied', canAskAgain: false });
+    await setup();
+
+    expect(await screen.findByText('Abrir Ajustes')).toBeTruthy();
+  });
+
+  it('si el GPS está apagado muestra el mensaje correspondiente', async () => {
+    Location.hasServicesEnabledAsync.mockResolvedValue(false);
+    await setup();
+
+    expect(await screen.findByText('Activa el GPS de tu dispositivo para continuar.')).toBeTruthy();
   });
 
   it('permiso de cámara denegado muestra la alerta y no abre la cámara', async () => {
@@ -106,22 +145,11 @@ describe('NewReportScreen', () => {
     expect(ImagePicker.launchCameraAsync).not.toHaveBeenCalled();
   });
 
-  it('permiso de ubicación denegado muestra la alerta', async () => {
-    await setup();
-    Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'denied' });
-    await fireEvent.press(screen.getByText('Obtener mi ubicación actual'));
-
-    await waitFor(() =>
-      expect(Alert.alert).toHaveBeenCalledWith('Permiso denegado', 'Se necesita acceso a la ubicación.')
-    );
-    expect(Location.getCurrentPositionAsync).not.toHaveBeenCalled();
-  });
-
   it('con todo completo envía el reporte como multipart y navega a Home', async () => {
     api.post.mockResolvedValue({ data: { id: 10 } });
     const navigation = await setup();
     await takePhoto();
-    await getLocation();
+    await screen.findByText(COORDS_TEXT);
     await fireEvent.changeText(screen.getByPlaceholderText('Ej. Basura acumulada en la esquina...'), 'Basura en la vereda');
     await fireEvent.press(screen.getByText('aguas'));
     await fireEvent.press(screen.getByText('Enviar Reporte'));
@@ -148,7 +176,7 @@ describe('NewReportScreen', () => {
     api.post.mockRejectedValue({ response: { data: { errors: { photo: ['La foto es muy pesada.'] } } } });
     await setup();
     await takePhoto();
-    await getLocation();
+    await screen.findByText(COORDS_TEXT);
     await fireEvent.changeText(screen.getByPlaceholderText('Ej. Basura acumulada en la esquina...'), 'Algo');
     await fireEvent.press(screen.getByText('basura'));
     await fireEvent.press(screen.getByText('Enviar Reporte'));
