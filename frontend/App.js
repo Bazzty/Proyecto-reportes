@@ -11,6 +11,7 @@ import MapScreen from './src/screens/MapScreen';
 import DetalleReporteScreen from './src/screens/DetalleReporteScreen';
 import NewReportScreen from './src/screens/NewReportScreen';
 import MyReportsScreen from './src/screens/MyReportsScreen';
+import AdminReportsScreen from './src/screens/AdminReportsScreen';
 import { setAuthToken, setUnauthorizedHandler } from './src/services/api';
 
 const Stack = createStackNavigator();
@@ -60,6 +61,7 @@ export default function App() {
         <Stack.Screen name="DetalleReporte" component={DetalleReporteScreen} options={{ title: 'Detalle del Reporte' }} />
         <Stack.Screen name="NewReport" component={NewReportScreen} options={{ title: 'Nuevo Reporte', headerTintColor: '#0e7490' }} />
         <Stack.Screen name="MyReports" component={MyReportsScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="AdminReports" component={AdminReportsScreen} options={{ title: 'Revisión de Reportes', headerTintColor: '#0e7490' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

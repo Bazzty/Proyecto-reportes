@@ -346,4 +346,19 @@ describe('HomeScreen', () => {
       expect(await screen.findByText('Tu reporte pasó a "Resuelto".')).toBeTruthy();
     });
   });
+
+  describe('admin', () => {
+    it('muestra el botón de admin solo para administradores', async () => {
+      await AsyncStorage.setItem('isAdmin', '1');
+      await setup();
+
+      expect(screen.getByTestId('admin-button')).toBeTruthy();
+    });
+
+    it('no muestra el botón de admin para usuarios normales', async () => {
+      await setup();
+
+      expect(screen.queryByTestId('admin-button')).toBeNull();
+    });
+  });
 });

@@ -27,6 +27,7 @@ export default function HomeScreen({ navigation, route }) {
   const mapRef = useRef(null);
   const [userLocation, setUserLocation]   = useState(null);
   const [userName, setUserName]           = useState('');
+  const [isAdmin, setIsAdmin]             = useState(false);
   const [reports, setReports]             = useState([]);
   const [myReports, setMyReports]         = useState([]);
   const [activeFilter, setActiveFilter]   = useState(null);
@@ -41,7 +42,10 @@ export default function HomeScreen({ navigation, route }) {
   const { notifications, unreadCount } = useNotifications();
 
   useEffect(() => {
-    AsyncStorage.getItem('userName').then(name => { if (name) setUserName(name); });
+    AsyncStorage.multiGet(['userName', 'isAdmin']).then(([[, name], [, admin]]) => {
+      if (name) setUserName(name);
+      setIsAdmin(admin === '1');
+    });
     api.get('/categories')
       .then(res => setCategories(res.data))
       .catch(() => setCategories([]));
@@ -288,6 +292,15 @@ export default function HomeScreen({ navigation, route }) {
             <Text style={styles.greetingSubtitle}>Reporta incidencias ambientales en tu zona</Text>
           )}
         </View>
+        {isAdmin && (
+          <TouchableOpacity
+            style={styles.bell}
+            testID="admin-button"
+            onPress={() => navigation.navigate('AdminReports')}
+          >
+            <Ionicons name="shield-checkmark-outline" size={22} color="#0e7490" />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={styles.bell}
           testID="notifications-button"

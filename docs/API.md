@@ -295,6 +295,46 @@ Requiere token de un **usuario administrador** (investigadores de "Más Azul"). 
 
 ---
 
+### Panel de administración — listar reportes
+```
+GET /admin/reports
+```
+Requiere token de **administrador**. Lista los reportes paginados (20 por página), incluyendo `validation_status`, `zone` y el validador. Filtros opcionales por query string: `validation_status` (`pendiente`|`valido`|`rechazado`), `zone_id`, `category_id`.
+
+**Response 200:**
+```json
+{
+  "data": [
+    { "id": 1, "validation_status": "pendiente", "zone": { "id": 5, "name": "Puerto Varas" } }
+  ],
+  "meta": { "current_page": 1, "last_page": 1, "per_page": 20, "total": 21 }
+}
+```
+
+---
+
+### Panel de administración — validar / rechazar un reporte
+```
+PATCH /admin/reports/{id}/validation
+```
+Requiere token de **administrador**.
+
+**Request (validar):**
+```json
+{ "validation_status": "valido" }
+```
+**Request (rechazar):**
+```json
+{ "validation_status": "rechazado", "rejection_reason": "No corresponde a contaminación." }
+```
+`rejection_reason` es obligatorio al rechazar.
+
+**Response 200:** el reporte actualizado (incluye `validation_status`, `rejection_reason`, `validated_at` y `validated_by`).
+
+> Los reportes con `validation_status = "rechazado"` **no** aparecen en `GET /reports` ni en el heatmap, y su detalle (`GET /reports/{id}`) devuelve `404` salvo para el autor o un administrador.
+
+---
+
 ### Listar categorías
 ```
 GET /categories

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet, Text, View, ActivityIndicator,
   Alert, TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView,
-  Platform,
+  Platform, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -23,6 +23,14 @@ const formatDate = (iso) => {
   return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
+const validationInfo = (status) => {
+  switch (status) {
+    case 'valido':    return { bg: '#dcfce7', text: '#166534', label: 'Válido' };
+    case 'rechazado': return { bg: '#fee2e2', text: '#991b1b', label: 'Rechazado' };
+    default:          return { bg: '#fef9c3', text: '#854d0e', label: 'Pendiente de revisión' };
+  }
+};
+
 export default function DetalleReporteScreen({ route }) {
   const { reportId } = route.params;
 
@@ -34,6 +42,9 @@ export default function DetalleReporteScreen({ route }) {
   const [isGuest, setIsGuest]       = useState(false);
   const [myUserId, setMyUserId]     = useState(null);
   const [isAdmin, setIsAdmin]       = useState(false);
+  const [rejecting, setRejecting]   = useState(false);
+  const [reason, setReason]         = useState('');
+  const [savingValidation, setSavingValidation] = useState(false);
   const listRef = useRef(null);
 
   useEffect(() => {
@@ -102,6 +113,38 @@ export default function DetalleReporteScreen({ route }) {
     }
   };
 
+  const handleValidation = async (validationStatus, rejectionReason) => {
+    try {
+      const { data } = await api.patch(`/admin/reports/${reportId}/validation`, {
+        validation_status: validationStatus,
+        rejection_reason: rejectionReason,
+      });
+      setReport(prev => ({
+        ...prev,
+        validation_status: data.validation_status,
+        rejection_reason: data.rejection_reason,
+      }));
+    } catch {
+      Alert.alert('Error', 'No se pudo actualizar la validación del reporte.');
+    }
+  };
+
+  const handleReject = async () => {
+    const trimmed = reason.trim();
+    if (!trimmed) {
+      Alert.alert('Falta motivo', 'Escribe el motivo del rechazo.');
+      return;
+    }
+    setSavingValidation(true);
+    try {
+      await handleValidation('rechazado', trimmed);
+      setRejecting(false);
+      setReason('');
+    } finally {
+      setSavingValidation(false);
+    }
+  };
+
   if (loading) {
     return <ActivityIndicator size="large" color="#0e7490" style={styles.loader} />;
   }
@@ -146,6 +189,13 @@ export default function DetalleReporteScreen({ route }) {
           </View>
         </View>
 
+        <View style={[styles.validationBadge, { backgroundColor: validationInfo(report.validation_status).bg }]}>
+          <Ionicons name="shield-checkmark-outline" size={13} color={validationInfo(report.validation_status).text} />
+          <Text style={[styles.validationText, { color: validationInfo(report.validation_status).text }]}>
+            {validationInfo(report.validation_status).label}
+          </Text>
+        </View>
+
         <Text style={styles.description}>{report.description}</Text>
 
         <View style={styles.infoRow}>
@@ -174,6 +224,23 @@ export default function DetalleReporteScreen({ route }) {
                   </TouchableOpacity>
                 );
               })}
+            </View>
+          </View>
+        )}
+
+        {/* Validación — solo administradores */}
+        {isAdmin && (
+          <View style={styles.adminBlock}>
+            <Text style={styles.adminTitle}>Validación (admin)</Text>
+            <View style={styles.validationActions}>
+              <TouchableOpacity style={[styles.validationAction, styles.validateBtn]} onPress={() => handleValidation('valido')}>
+                <Ionicons name="checkmark-circle-outline" size={18} color="#166534" />
+                <Text style={styles.validateText}>Validar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.validationAction, styles.rejectBtn]} onPress={() => { setRejecting(true); setReason(''); }}>
+                <Ionicons name="close-circle-outline" size={18} color="#991b1b" />
+                <Text style={styles.rejectText}>Rechazar</Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}
@@ -276,6 +343,36 @@ export default function DetalleReporteScreen({ route }) {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={rejecting}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRejecting(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalPanel}>
+            <Text style={styles.modalTitle}>Motivo del rechazo</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Ej. No corresponde a contaminación"
+              placeholderTextColor="#9ca3af"
+              value={reason}
+              onChangeText={setReason}
+              multiline
+              maxLength={500}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setRejecting(false)}>
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirm} onPress={handleReject} disabled={savingValidation}>
+                {savingValidation ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalConfirmText}>Rechazar</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -310,6 +407,34 @@ const styles = StyleSheet.create({
   },
   statusOptionText:    { fontSize: 13, color: '#374151', fontWeight: '500' },
   statusOptionTextActive: { color: '#ffffff' },
+
+  validationBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginBottom: 12,
+  },
+  validationText:  { fontSize: 12, fontWeight: '700' },
+  validationActions: { flexDirection: 'row', gap: 10 },
+  validationAction: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1,
+  },
+  validateBtn:  { backgroundColor: '#f0fdf4', borderColor: '#86efac' },
+  rejectBtn:    { backgroundColor: '#fef2f2', borderColor: '#fca5a5' },
+  validateText: { color: '#166534', fontWeight: '600' },
+  rejectText:   { color: '#991b1b', fontWeight: '600' },
+
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
+  modalPanel:    { backgroundColor: '#fff', borderRadius: 16, padding: 18 },
+  modalTitle:    { fontSize: 17, fontWeight: 'bold', color: '#111827', marginBottom: 12 },
+  modalInput: {
+    borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, padding: 12,
+    minHeight: 80, textAlignVertical: 'top', color: '#111827', backgroundColor: '#f9fafb',
+  },
+  modalActions:     { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 14 },
+  modalCancel:      { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#d1d5db' },
+  modalCancelText:  { color: '#374151', fontWeight: '600' },
+  modalConfirm:     { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, backgroundColor: '#b91c1c', minWidth: 96, alignItems: 'center' },
+  modalConfirmText: { color: '#fff', fontWeight: '600' },
 
   confirmBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

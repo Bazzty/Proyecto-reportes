@@ -188,4 +188,28 @@ describe('DetalleReporteScreen', () => {
     expect(screen.queryByText('Estado del reporte (admin)')).toBeNull();
     expect(api.patch).not.toHaveBeenCalled();
   });
+
+  it('muestra el estado de validación del reporte', async () => {
+    await setup();
+    expect(await screen.findByText('Pendiente de revisión')).toBeTruthy();
+  });
+
+  it('un administrador puede validar el reporte', async () => {
+    api.patch.mockResolvedValue({ data: { validation_status: 'valido', rejection_reason: null } });
+    await setup({ admin: true });
+    await screen.findByText('Basura acumulada');
+
+    await fireEvent.press(screen.getByText('Validar'));
+
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith('/admin/reports/5/validation', expect.objectContaining({ validation_status: 'valido' }))
+    );
+  });
+
+  it('un usuario normal no ve los controles de validación', async () => {
+    await setup();
+    await screen.findByText('Basura acumulada');
+
+    expect(screen.queryByText('Validación (admin)')).toBeNull();
+  });
 });
