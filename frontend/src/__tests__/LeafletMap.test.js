@@ -36,11 +36,11 @@ describe('LeafletMap', () => {
     mockWebViewProps = {};
   });
 
-  it('carga el HTML con Leaflet y tiles de OpenStreetMap', async () => {
+  it('carga el HTML con Leaflet y tiles del proveedor', async () => {
     await render(<LeafletMap reports={REPORTS} heat={HEAT} />);
 
     expect(mockWebViewProps.source.html).toContain('leaflet');
-    expect(mockWebViewProps.source.html).toContain('tile.openstreetmap.org');
+    expect(mockWebViewProps.source.html).toContain('cartocdn.com');
   });
 
   it('al recibir "ready" envía los reportes y el heat', async () => {

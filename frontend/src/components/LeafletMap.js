@@ -24,7 +24,7 @@ const HTML = `<!DOCTYPE html>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script>
   var map = L.map('map', { zoomControl: false }).setView([-41.31946, -72.98356], 10);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19, subdomains: 'abcd', attribution: '&copy; OpenStreetMap &copy; CARTO' }).addTo(map);
   var heat = null;
   var markersLayer = L.layerGroup().addTo(map);
   var userMarker = null;
