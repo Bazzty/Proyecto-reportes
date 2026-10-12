@@ -38,6 +38,7 @@ describe('leafletMapHtml', () => {
       color: statusColor('Pendiente'),
       photo_url: null,
       user: 'Ana',
+      iconCode: null,
     });
     expect(payload.heat).toHaveLength(1);
     expect(payload.userLocation).toEqual({ latitude: -41.3, longitude: -72.9 });
@@ -62,6 +63,21 @@ describe('leafletMapHtml', () => {
   it('el HTML permite elegir un punto en el mapa', () => {
     expect(HTML).toContain("map.on('click'");
     expect(HTML).toContain("type: 'pick'");
+  });
+
+  it('buildPayload incluye el iconCode del reporte', () => {
+    const payload = buildPayload([{
+      id: 1, latitude: -41, longitude: -72, description: 'x',
+      category: { name: 'basura' }, status: 'Pendiente', photo_url: null, user: { name: 'A' }, iconCode: 'f5f6',
+    }]);
+
+    expect(payload.reports[0].iconCode).toBe('f5f6');
+  });
+
+  it('el HTML carga la fuente Ionicons y agrega popups clicleables al heat', () => {
+    expect(HTML).toContain("font-family:'Ionicons'");
+    expect(HTML).toContain('Ionicons.ttf');
+    expect(HTML).toContain('heatClickLayer');
   });
 
   it('statusColor mapea los estados', () => {

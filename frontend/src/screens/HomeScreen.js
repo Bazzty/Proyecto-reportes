@@ -112,6 +112,8 @@ export default function HomeScreen({ navigation, route }) {
             latitude: parseFloat(p.latitude),
             longitude: parseFloat(p.longitude),
             weight: p.count ?? 1,
+            zoneName: p.zone?.name ?? 'Sin zona',
+            count: p.count ?? 0,
           })));
           if (!isGuest && myRes) {
             setMyReports(prev => {
@@ -173,10 +175,22 @@ export default function HomeScreen({ navigation, route }) {
     ? reports.filter(r => r.category?.name === activeFilter)
     : reports;
 
+  const iconCodeFor = (categoryName) => {
+    const cat = categories.find(c => c.name === categoryName);
+    const code = Ionicons.glyphMap?.[cat?.icon || 'ellipsis-horizontal'];
+    return code ? code.toString(16) : null;
+  };
+  const mapReports = visibleReports.map(r => ({ ...r, iconCode: iconCodeFor(r.category?.name) }));
+
   const focusHeatPoints = visibleReports.map(r => ({
     latitude: r.latitude,
     longitude: r.longitude,
     weight: 1,
+    reportId: r.id,
+    description: r.description,
+    category: r.category?.name ?? null,
+    user: r.user?.name ?? null,
+    photo_url: r.photo_url ?? null,
   }));
   const heatPoints = heatMode === 'foco' ? focusHeatPoints : zoneHeatPoints;
   const showMarkers = mapView !== 'calor';
@@ -202,7 +216,7 @@ export default function HomeScreen({ navigation, route }) {
       )}
       <LeafletMap
         ref={leafletRef}
-        reports={visibleReports}
+        reports={mapReports}
         heat={heatPoints}
         userLocation={userLocation}
         showMarkers={showMarkers}

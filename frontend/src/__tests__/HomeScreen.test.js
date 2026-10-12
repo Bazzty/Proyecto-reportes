@@ -42,7 +42,10 @@ jest.mock('../components/LeafletMap', () => {
   return { __esModule: true, default: LeafletMap };
 });
 
-const CATEGORIES = [{ id: 1, name: 'basura' }, { id: 2, name: 'aguas' }];
+const CATEGORIES = [
+  { id: 1, name: 'basura', icon: 'trash-outline' },
+  { id: 2, name: 'aguas', icon: 'water-outline' },
+];
 const REPORTS = [
   { id: 1, description: 'Basura en la plaza', status: 'Pendiente', latitude: -41.31, longitude: -72.98, photo_url: null, category: { id: 1, name: 'basura' }, user: { name: 'Ana' } },
   { id: 2, description: 'Agua contaminada', status: 'Resuelto', latitude: -41.32, longitude: -72.99, photo_url: null, category: { id: 2, name: 'aguas' }, user: { name: 'Beto' } },
@@ -86,11 +89,18 @@ describe('HomeScreen', () => {
     expect(screen.getByText('Aguas')).toBeTruthy();
   });
 
+  it('incluye el ícono (Ionicons) de la categoría en cada reporte', async () => {
+    await setup();
+
+    expect(mockLeafletProps.reports[0].iconCode).toBe((62966).toString(16));
+    expect(mockLeafletProps.reports[1].iconCode).toBe((63023).toString(16));
+  });
+
   it('pasa los puntos del heatmap (con conteo como peso) al mapa', async () => {
     await setup();
 
     await waitFor(() => expect(mockLeafletProps.heat).toEqual([
-      { latitude: -41.31, longitude: -72.98, weight: 3 },
+      expect.objectContaining({ latitude: -41.31, longitude: -72.98, weight: 3 }),
     ]));
     expect(api.get).toHaveBeenCalledWith('/reports/heatmap');
   });
@@ -100,10 +110,9 @@ describe('HomeScreen', () => {
 
     await fireEvent.press(screen.getByText('Foco'));
 
-    await waitFor(() => expect(mockLeafletProps.heat).toEqual([
-      { latitude: -41.31, longitude: -72.98, weight: 1 },
-      { latitude: -41.32, longitude: -72.99, weight: 1 },
-    ]));
+    await waitFor(() => expect(mockLeafletProps.heat).toHaveLength(2));
+    expect(mockLeafletProps.heat[0]).toEqual(expect.objectContaining({ reportId: 1, weight: 1 }));
+    expect(mockLeafletProps.heat[1]).toEqual(expect.objectContaining({ reportId: 2, weight: 1 }));
   });
 
   it('el modo "Zona" vuelve a usar los centroides por zona', async () => {
@@ -112,7 +121,7 @@ describe('HomeScreen', () => {
     await fireEvent.press(screen.getByText('Zona'));
 
     await waitFor(() => expect(mockLeafletProps.heat).toEqual([
-      { latitude: -41.31, longitude: -72.98, weight: 3 },
+      expect.objectContaining({ latitude: -41.31, longitude: -72.98, weight: 3 }),
     ]));
   });
 

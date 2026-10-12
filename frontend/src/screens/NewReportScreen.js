@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Linking,
-  StyleSheet, ScrollView, Image, Alert, ActivityIndicator, Modal
+  StyleSheet, ScrollView, Image, Alert, ActivityIndicator, Modal,
+  KeyboardAvoidingView, Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -167,6 +168,11 @@ export default function NewReportScreen({ navigation }) {
 
   return (
     <>
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
     <ScrollView contentContainerStyle={styles.container} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
       <LinearGradient colors={['#0e7490', '#0891b2']} style={styles.header}>
         <Text style={styles.title}>Reportar Incidencia</Text>
@@ -308,6 +314,7 @@ export default function NewReportScreen({ navigation }) {
       </TouchableOpacity>
       </View>
     </ScrollView>
+    </KeyboardAvoidingView>
 
     <Modal
       visible={showPicker}
@@ -348,6 +355,7 @@ export default function NewReportScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  flex:       { flex: 1 },
   container:  { flexGrow: 1, backgroundColor: '#fff' },
   header:     { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 28 },
   formBody:   { padding: 24 },

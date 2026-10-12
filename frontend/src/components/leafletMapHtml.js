@@ -25,6 +25,7 @@ export const buildPayload = (
     color: statusColor(r.status),
     photo_url: r.photo_url ?? null,
     user: r.user?.name ?? null,
+    iconCode: r.iconCode ?? null,
   })),
   heat,
   userLocation,
@@ -40,7 +41,8 @@ export const HTML = `<!DOCTYPE html>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
+<style>@font-face{font-family:'Ionicons';src:url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.1.1/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf');}
+html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
 #fallback{display:none;align-items:center;justify-content:center;height:100%;font:14px sans-serif;color:#6b7280;text-align:center;padding:0 24px;}</style>
 </head>
 <body>
@@ -64,6 +66,7 @@ export const HTML = `<!DOCTYPE html>
 
     var heat = null;
     var markersLayer = L.layerGroup().addTo(map);
+    var heatClickLayer = L.layerGroup().addTo(map);
     var userMarker = null;
     var pickable = false;
     var pickMarker = null;
@@ -83,21 +86,41 @@ export const HTML = `<!DOCTYPE html>
 
     function render(data) {
       if (heat) { map.removeLayer(heat); heat = null; }
-      if (data.showHeat !== false && data.heat && data.heat.length && L.heatLayer) {
-        heat = L.heatLayer(data.heat.map(function (p) { return [p.latitude, p.longitude, p.weight || 1]; }), { radius: 35, blur: 25, maxZoom: 12 });
-        heat.addTo(map);
+      heatClickLayer.clearLayers();
+      if (data.showHeat !== false && data.heat && data.heat.length) {
+        if (L.heatLayer) {
+          heat = L.heatLayer(data.heat.map(function (p) { return [p.latitude, p.longitude, p.weight || 1]; }), { radius: 35, blur: 25, maxZoom: 12 });
+          heat.addTo(map);
+        }
+        data.heat.forEach(function (p) {
+          var popup;
+          if (p.reportId != null) {
+            popup = '<div style="min-width:150px">'
+              + (p.photo_url ? '<img src="' + p.photo_url + '" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:6px;" />' : '')
+              + '<div style="font-weight:bold;color:#0e7490">' + (p.category || 'Sin categoría') + '</div>'
+              + '<div style="font-size:12px;color:#374151;margin:4px 0">' + (p.description || '') + '</div>'
+              + '<div style="font-size:11px;color:#9ca3af">' + (p.user || '') + '</div>'
+              + '<a href="#" onclick="select(' + p.reportId + ');return false;" style="color:#0e7490;font-weight:600;font-size:12px">Ver detalle &rarr;</a></div>';
+          } else {
+            var n = p.count || 0;
+            popup = '<div style="min-width:120px">'
+              + '<div style="font-weight:bold;color:#0e7490">' + (p.zoneName || 'Sin zona') + '</div>'
+              + '<div style="font-size:12px;color:#374151;margin-top:4px">' + n + ' reporte' + (n === 1 ? '' : 's') + '</div></div>';
+          }
+          L.circleMarker([p.latitude, p.longitude], { radius: 14, opacity: 0, fillOpacity: 0 }).bindPopup(popup).addTo(heatClickLayer);
+        });
       }
 
       markersLayer.clearLayers();
       if (data.showMarkers !== false) {
         (data.reports || []).forEach(function (r) {
           var color = r.color || '#0e7490';
-          var img = r.photo_url
-            ? '<img src="' + r.photo_url + '" style="width:100%;height:100%;object-fit:cover;" />'
-            : '<div style="width:100%;height:100%;background:' + color + '"></div>';
+          var glyph = r.iconCode
+            ? '<span style="font-family:Ionicons;font-size:20px;color:#fff;line-height:1;">&#x' + r.iconCode + ';</span>'
+            : '<span style="font-size:16px;line-height:1;">&#x1F4CD;</span>';
           var icon = L.divIcon({
             className: '',
-            html: '<div style="width:36px;height:36px;border:2px solid ' + color + ';border-radius:8px;overflow:hidden;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">' + img + '</div>',
+            html: '<div style="width:36px;height:36px;border:2px solid ' + color + ';border-radius:8px;background:' + color + ';display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)">' + glyph + '</div>',
             iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -36],
           });
           var popup = '<div style="min-width:150px">'

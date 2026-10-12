@@ -5,7 +5,14 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 // Los iconos se renderizan como texto con su nombre ("icon:send") para poder encontrarlos en los tests
 jest.mock('@expo/vector-icons', () => {
   const { Text } = require('react-native');
-  return { Ionicons: ({ name }) => <Text>{`icon:${name}`}</Text> };
+  const Ionicons = ({ name }) => <Text>{`icon:${name}`}</Text>;
+  Ionicons.glyphMap = {
+    'trash-outline': 62966,
+    'construct-outline': 62087,
+    'water-outline': 63023,
+    'ellipsis-horizontal': 62158,
+  };
+  return { Ionicons };
 });
 
 jest.mock('expo-network', () => ({
