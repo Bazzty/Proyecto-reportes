@@ -2,20 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\FormatsReports;
 use App\Models\Report;
 use App\Services\ZoneResolver;
-use Illuminate\Contracts\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ReportController extends Controller
 {
+    use FormatsReports;
+
     public function index(Request $request)
     {
         $uid = $request->user()?->id;
-        $reports = $this->withReportData(Report::query(), $uid)->latest()->latest('id')->get();
+        $reports = $this->withReportData(Report::query(), $uid)
+            ->where('validation_status', '!=', 'rechazado')
+            ->latest()->latest('id')->get();
 
         return response()->json($reports->map(fn (Report $report) => $this->formatReport($report, $uid)));
     }
@@ -24,6 +27,13 @@ class ReportController extends Controller
     {
         $uid = $request->user()?->id;
         $report = $this->withReportData(Report::query(), $uid)->findOrFail($id);
+
+        // Los reportes rechazados no son visibles públicamente (sí para el dueño o un admin).
+        if ($report->validation_status === 'rechazado'
+            && ! $request->user()?->isAdmin()
+            && $report->user_id !== $uid) {
+            abort(404);
+        }
 
         return response()->json($this->formatReport($report, $uid));
     }
@@ -108,7 +118,9 @@ class ReportController extends Controller
 
     public function heatmap()
     {
-        $reports = Report::with('zone')->get(['id', 'zone_id', 'latitude', 'longitude']);
+        $reports = Report::with('zone')
+            ->where('validation_status', '!=', 'rechazado')
+            ->get(['id', 'zone_id', 'latitude', 'longitude']);
 
         $grouped = $reports->groupBy(fn (Report $report) => $report->zone_id ?? 'none');
 
@@ -126,37 +138,5 @@ class ReportController extends Controller
         })->values();
 
         return response()->json($zones);
-    }
-
-    private function withReportData(Builder|Relation $query, ?int $authUserId): Builder|Relation
-    {
-        $query->with(['category', 'user'])->withCount('confirmations');
-
-        return $authUserId === null
-            ? $query
-            : $query->withExists(['confirmations as confirmed_by_me' => fn ($q) => $q->where('user_id', $authUserId)]);
-    }
-
-    private function formatReport(Report $report, ?int $authUserId = null): array
-    {
-        return [
-            'id' => $report->id,
-            'description' => $report->description,
-            'latitude' => (float) $report->latitude,
-            'longitude' => (float) $report->longitude,
-            'photo_url' => $report->photo_path ? url('storage/'.$report->photo_path) : null,
-            'status' => $report->status,
-            'category' => $report->category ? [
-                'id' => $report->category->id,
-                'name' => $report->category->name,
-            ] : null,
-            'user' => $report->user ? [
-                'id' => $report->user->id,
-                'name' => $report->user->name,
-            ] : null,
-            'confirmations_count' => $report->confirmations_count,
-            'confirmed_by_me' => (bool) $report->confirmed_by_me,
-            'created_at' => $report->created_at?->toISOString(),
-        ];
     }
 }

@@ -16,7 +16,18 @@ class Report extends Model
         'longitude',
         'photo_path',
         'status',
+        'validation_status',
+        'validated_by',
+        'validated_at',
+        'rejection_reason',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'validated_at' => 'datetime',
+        ];
+    }
 
     public function user()
     {
@@ -31,6 +42,11 @@ class Report extends Model
     public function zone()
     {
         return $this->belongsTo(Zone::class);
+    }
+
+    public function validatedBy()
+    {
+        return $this->belongsTo(User::class, 'validated_by');
     }
 
     public function confirmations()

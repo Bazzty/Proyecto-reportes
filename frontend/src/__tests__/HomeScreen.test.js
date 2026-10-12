@@ -1,12 +1,12 @@
-import { Alert, Platform } from 'react-native';
+import { Alert } from 'react-native';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import HomeScreen from '../screens/HomeScreen';
 import api, { clearAuthToken } from '../services/api';
 
-const mockAnimateToRegion = jest.fn();
-let mockHeatmapProps = null;
+let mockLeafletProps = {};
+const mockCenterOn = jest.fn();
 
 jest.mock('../services/api', () => ({
   __esModule: true,
@@ -31,20 +31,15 @@ jest.mock('../services/offlineQueue', () => ({
   getPendingCount: jest.fn(async () => 0),
   isSyncing: jest.fn(() => false),
 }));
-jest.mock('react-native-maps', () => {
+jest.mock('../components/LeafletMap', () => {
   const React = require('react');
-  const { View, Pressable } = require('react-native');
-  const MapView = React.forwardRef(function MapView({ children }, ref) {
-    React.useImperativeHandle(ref, () => ({ animateToRegion: mockAnimateToRegion }));
-    return <View>{children}</View>;
+  const { View } = require('react-native');
+  const LeafletMap = React.forwardRef(function LeafletMap(props, ref) {
+    mockLeafletProps = props;
+    React.useImperativeHandle(ref, () => ({ centerOn: mockCenterOn }));
+    return <View testID="leaflet-map" />;
   });
-  return {
-    __esModule: true,
-    default: MapView,
-    Marker: ({ children }) => <View>{children}</View>,
-    Callout: ({ children, onPress }) => <Pressable onPress={onPress}>{children}</Pressable>,
-    Heatmap: (props) => { mockHeatmapProps = props; return null; },
-  };
+  return { __esModule: true, default: LeafletMap };
 });
 
 const CATEGORIES = [{ id: 1, name: 'basura' }, { id: 2, name: 'aguas' }];
@@ -67,7 +62,7 @@ const setup = async ({ guest = false, params = {} } = {}) => {
   const navigation = { navigate: jest.fn(), reset: jest.fn(), setParams: jest.fn() };
   const route = { params: { ...(guest ? { guest: true } : {}), ...params } };
   await render(<HomeScreen navigation={navigation} route={route} />);
-  await screen.findByText('Basura en la plaza');
+  await waitFor(() => expect(mockLeafletProps.reports?.length).toBeGreaterThan(0));
   return navigation;
 };
 
@@ -77,6 +72,7 @@ describe('HomeScreen', () => {
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'denied' });
     mockIsConnected = true;
+    mockLeafletProps = {};
     await AsyncStorage.clear();
     mockApi();
   });
@@ -84,50 +80,80 @@ describe('HomeScreen', () => {
   it('carga reportes y categorías', async () => {
     await setup();
 
-    expect(screen.getByText('Agua contaminada')).toBeTruthy();
+    expect(mockLeafletProps.reports.map(r => r.id)).toEqual(expect.arrayContaining([1, 2]));
     expect(screen.getByText('Todos')).toBeTruthy();
     expect(screen.getByText('Basura')).toBeTruthy();
     expect(screen.getByText('Aguas')).toBeTruthy();
   });
 
-  it('usa el conteo por zona como peso del heatmap (Android)', async () => {
-    const original = Platform.OS;
-    Platform.OS = 'android';
-    mockHeatmapProps = null;
-
+  it('pasa los puntos del heatmap (con conteo como peso) al mapa', async () => {
     await setup();
 
-    await waitFor(() => expect(mockHeatmapProps).toBeTruthy());
-    expect(api.get).toHaveBeenCalledWith('/reports/heatmap');
-    expect(mockHeatmapProps.points).toEqual([
+    await waitFor(() => expect(mockLeafletProps.heat).toEqual([
       { latitude: -41.31, longitude: -72.98, weight: 3 },
-    ]);
-
-    Platform.OS = original;
+    ]));
+    expect(api.get).toHaveBeenCalledWith('/reports/heatmap');
   });
 
-  it('el filtro por categoría oculta las demás y se desactiva al tocarlo otra vez', async () => {
+  it('el modo "Foco" usa los reportes individuales como heatmap', async () => {
+    await setup();
+
+    await fireEvent.press(screen.getByText('Foco'));
+
+    await waitFor(() => expect(mockLeafletProps.heat).toEqual([
+      { latitude: -41.31, longitude: -72.98, weight: 1 },
+      { latitude: -41.32, longitude: -72.99, weight: 1 },
+    ]));
+  });
+
+  it('el modo "Zona" vuelve a usar los centroides por zona', async () => {
+    await setup();
+    await fireEvent.press(screen.getByText('Foco'));
+    await fireEvent.press(screen.getByText('Zona'));
+
+    await waitFor(() => expect(mockLeafletProps.heat).toEqual([
+      { latitude: -41.31, longitude: -72.98, weight: 3 },
+    ]));
+  });
+
+  it('el control "Ver" cambia qué capas muestra el mapa', async () => {
+    await setup();
+    expect(mockLeafletProps.showMarkers).toBe(true);
+    expect(mockLeafletProps.showHeat).toBe(true);
+
+    await fireEvent.press(screen.getByText('Calor'));
+    await waitFor(() => expect(mockLeafletProps.showMarkers).toBe(false));
+    expect(mockLeafletProps.showHeat).toBe(true);
+
+    await fireEvent.press(screen.getByText('Marcadores'));
+    await waitFor(() => expect(mockLeafletProps.showMarkers).toBe(true));
+    expect(mockLeafletProps.showHeat).toBe(false);
+  });
+
+  it('el filtro por categoría limita los reportes del mapa', async () => {
     await setup();
 
     await fireEvent.press(screen.getByText('Aguas'));
-    expect(screen.queryByText('Basura en la plaza')).toBeNull();
-    expect(screen.getByText('Agua contaminada')).toBeTruthy();
+    await waitFor(() => expect(mockLeafletProps.reports).toHaveLength(1));
+    expect(mockLeafletProps.reports[0].category.name).toBe('aguas');
 
     await fireEvent.press(screen.getByText('Aguas'));
-    expect(screen.getByText('Basura en la plaza')).toBeTruthy();
+    await waitFor(() => expect(mockLeafletProps.reports).toHaveLength(2));
   });
 
   it('"Todos" quita el filtro', async () => {
     await setup();
     await fireEvent.press(screen.getByText('Aguas'));
+    await waitFor(() => expect(mockLeafletProps.reports).toHaveLength(1));
+
     await fireEvent.press(screen.getByText('Todos'));
-    expect(screen.getByText('Basura en la plaza')).toBeTruthy();
+    await waitFor(() => expect(mockLeafletProps.reports).toHaveLength(2));
   });
 
-  it('tocar el callout de un marcador navega al detalle', async () => {
+  it('tocar un marcador del mapa navega al detalle', async () => {
     const navigation = await setup();
-    await fireEvent.press(screen.getAllByText('Ver detalle →')[0]);
-    expect(navigation.navigate).toHaveBeenCalledWith('DetalleReporte', { reportId: 1 });
+    mockLeafletProps.onSelectReport(2);
+    expect(navigation.navigate).toHaveBeenCalledWith('DetalleReporte', { reportId: 2 });
   });
 
   it('saluda al usuario por su primer nombre', async () => {
@@ -226,22 +252,18 @@ describe('HomeScreen', () => {
     Location.getCurrentPositionAsync.mockResolvedValue({ coords: { latitude: -41.3, longitude: -72.9 } });
     await setup();
 
-    await waitFor(() => expect(mockAnimateToRegion).toHaveBeenCalledWith(
-      expect.objectContaining({ latitude: -41.3, longitude: -72.9 }), 1000
-    ));
+    await waitFor(() => expect(mockCenterOn).toHaveBeenCalledWith(-41.3, -72.9, 14));
     await fireEvent.press(await screen.findByText('icon:locate'));
-    expect(mockAnimateToRegion).toHaveBeenLastCalledWith(
-      expect.objectContaining({ latitude: -41.3, latitudeDelta: 0.02 }), 800
-    );
+    expect(mockCenterOn).toHaveBeenLastCalledWith(-41.3, -72.9, 15);
   });
 
   it('sin permiso de ubicación no centra el mapa ni muestra el botón', async () => {
     await setup();
-    expect(mockAnimateToRegion).not.toHaveBeenCalled();
+    expect(mockCenterOn).not.toHaveBeenCalled();
     expect(screen.queryByText('icon:locate')).toBeNull();
   });
 
-  it('un reporte nuevo recibido por parámetro se muestra al instante y se limpia el parámetro', async () => {
+  it('un reporte nuevo recibido por parámetro se agrega al mapa y se limpia el parámetro', async () => {
     // /reports queda pendiente: solo se ve lo que agrega la actualización optimista
     api.get.mockImplementation((url) => {
       if (url === '/reports') return new Promise(() => {});
@@ -251,7 +273,7 @@ describe('HomeScreen', () => {
     const navigation = { navigate: jest.fn(), reset: jest.fn(), setParams: jest.fn() };
     await render(<HomeScreen navigation={navigation} route={{ params: { newReport } }} />);
 
-    expect(await screen.findByText('Recién creado')).toBeTruthy();
+    await waitFor(() => expect(mockLeafletProps.reports?.some(r => r.id === 99)).toBe(true));
     expect(navigation.setParams).toHaveBeenCalledWith({ newReport: undefined });
   });
 
@@ -344,6 +366,21 @@ describe('HomeScreen', () => {
       expect(await screen.findByTestId('notifications-badge')).toBeTruthy();
       await fireEvent.press(screen.getByTestId('notifications-button'));
       expect(await screen.findByText('Tu reporte pasó a "Resuelto".')).toBeTruthy();
+    });
+  });
+
+  describe('admin', () => {
+    it('muestra el botón de admin solo para administradores', async () => {
+      await AsyncStorage.setItem('isAdmin', '1');
+      await setup();
+
+      expect(screen.getByTestId('admin-button')).toBeTruthy();
+    });
+
+    it('no muestra el botón de admin para usuarios normales', async () => {
+      await setup();
+
+      expect(screen.queryByTestId('admin-button')).toBeNull();
     });
   });
 });

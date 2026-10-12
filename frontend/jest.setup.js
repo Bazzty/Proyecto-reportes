@@ -25,3 +25,13 @@ let mockUuidCounter = 0;
 jest.mock('expo-crypto', () => ({
   randomUUID: jest.fn(() => `00000000-0000-4000-8000-${String(++mockUuidCounter).padStart(12, '0')}`),
 }));
+
+jest.mock('react-native-webview', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const WebView = React.forwardRef(function WebView(props, ref) {
+    React.useImperativeHandle(ref, () => ({ postMessage: jest.fn() }));
+    return <View testID={props.testID} />;
+  });
+  return { __esModule: true, WebView };
+});

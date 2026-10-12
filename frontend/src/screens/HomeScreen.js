@@ -1,37 +1,31 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Platform, Modal, FlatList } from 'react-native';
-import { Image } from 'expo-image';
-import MapView, { Marker, Callout, Heatmap } from 'react-native-maps';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Modal, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { clearAuthToken } from '../services/api';
+import LeafletMap from '../components/LeafletMap';
 import useOfflineSync from '../hooks/useOfflineSync';
 import useNotifications from '../hooks/useNotifications';
 import { subscribe as subscribeQueue, getPendingCount, isSyncing } from '../services/offlineQueue';
 import { syncStatusNotifications, markAllRead } from '../services/notifications';
 
 
-const statusColor = (status) => {
-  if (!status) return '#0e7490';
-  const s = status.toLowerCase();
-  if (s === 'resuelto') return '#16a34a';
-  if (s === 'pendiente') return '#f59e0b';
-  return '#0e7490';
-};
-
 export default function HomeScreen({ navigation, route }) {
   const isGuest = route.params?.guest === true;
 
-  const mapRef = useRef(null);
+  const leafletRef = useRef(null);
   const [userLocation, setUserLocation]   = useState(null);
   const [userName, setUserName]           = useState('');
+  const [isAdmin, setIsAdmin]             = useState(false);
   const [reports, setReports]             = useState([]);
   const [myReports, setMyReports]         = useState([]);
   const [activeFilter, setActiveFilter]   = useState(null);
   const [categories, setCategories]       = useState([]);
-  const [heatmapPoints, setHeatmapPoints] = useState([]);
+  const [zoneHeatPoints, setZoneHeatPoints] = useState([]);
+  const [heatMode, setHeatMode]         = useState('zona');
+  const [mapView, setMapView]           = useState('ambos');
   const [offline, setOffline]           = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing]           = useState(false);
@@ -41,11 +35,26 @@ export default function HomeScreen({ navigation, route }) {
   const { notifications, unreadCount } = useNotifications();
 
   useEffect(() => {
-    AsyncStorage.getItem('userName').then(name => { if (name) setUserName(name); });
+    AsyncStorage.multiGet(['userName', 'isAdmin', 'heatMode', 'mapView']).then(([[, name], [, admin], [, mode], [, view]]) => {
+      if (name) setUserName(name);
+      setIsAdmin(admin === '1');
+      if (mode === 'foco' || mode === 'zona') setHeatMode(mode);
+      if (view === 'marcadores' || view === 'calor' || view === 'ambos') setMapView(view);
+    });
     api.get('/categories')
       .then(res => setCategories(res.data))
       .catch(() => setCategories([]));
   }, []);
+
+  const changeHeatMode = (mode) => {
+    setHeatMode(mode);
+    AsyncStorage.setItem('heatMode', mode).catch(() => {});
+  };
+
+  const changeMapView = (view) => {
+    setMapView(view);
+    AsyncStorage.setItem('mapView', view).catch(() => {});
+  };
 
   useEffect(() => {
     let active = true;
@@ -65,12 +74,7 @@ export default function HomeScreen({ navigation, route }) {
       if (status !== 'granted') return;
       const loc = await Location.getCurrentPositionAsync({});
       setUserLocation(loc.coords);
-      mapRef.current?.animateToRegion({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      }, 1000);
+      leafletRef.current?.centerOn(loc.coords.latitude, loc.coords.longitude, 14);
     })();
   }, []);
 
@@ -104,7 +108,7 @@ export default function HomeScreen({ navigation, route }) {
             const next = allRes.data;
             return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
           });
-          setHeatmapPoints(heatRes.data.map(p => ({
+          setZoneHeatPoints(heatRes.data.map(p => ({
             latitude: parseFloat(p.latitude),
             longitude: parseFloat(p.longitude),
             weight: p.count ?? 1,
@@ -169,6 +173,15 @@ export default function HomeScreen({ navigation, route }) {
     ? reports.filter(r => r.category?.name === activeFilter)
     : reports;
 
+  const focusHeatPoints = visibleReports.map(r => ({
+    latitude: r.latitude,
+    longitude: r.longitude,
+    weight: 1,
+  }));
+  const heatPoints = heatMode === 'foco' ? focusHeatPoints : zoneHeatPoints;
+  const showMarkers = mapView !== 'calor';
+  const showHeat = mapView !== 'marcadores';
+
   const offlineBanner = !isConnected
     ? { icon: 'cloud-offline-outline', text: 'Sin conexión: los datos pueden estar desactualizados' }
     : syncing
@@ -187,80 +200,15 @@ export default function HomeScreen({ navigation, route }) {
           <Text style={styles.offlineText}>{offlineBanner.text}</Text>
         </View>
       )}
-      <MapView
-        ref={mapRef}
-        style={StyleSheet.absoluteFillObject}
-        showsUserLocation
-        showsMyLocationButton={false}
-        showsCompass={false}
-        initialRegion={{
-          latitude: -41.31946,
-          longitude: -72.98356,
-          latitudeDelta: 0.08,
-          longitudeDelta: 0.08,
-        }}
-      >
-        {Platform.OS === 'android' && heatmapPoints.length > 0 && (
-          <Heatmap points={heatmapPoints} radius={40} opacity={0.6} />
-        )}
-
-        {visibleReports.map(report => {
-          const color = statusColor(report.status);
-          return (
-            <Marker
-              key={report.id}
-              identifier={String(report.id)}
-              coordinate={{ latitude: report.latitude, longitude: report.longitude }}
-              anchor={{ x: 0.5, y: 1 }}
-              recyclingKey={`report-${report.id}`}
-            >
-              <View style={styles.markerWrapper}>
-                <View style={[styles.markerBubble, { borderColor: color }]}>
-                  {report.photo_url ? (
-                    <Image
-                      source={report.photo_url}
-                      style={styles.markerImage}
-                      contentFit="cover"
-                      cachePolicy="disk"
-                      transition={150}
-                    />
-                  ) : (
-                    <View style={[styles.markerPlaceholder, { backgroundColor: color }]}>
-                      <Ionicons name="leaf" size={16} color="white" />
-                    </View>
-                  )}
-                </View>
-                <View style={[styles.markerArrow, { borderTopColor: color }]} />
-              </View>
-              <Callout tooltip onPress={() => navigation.navigate('DetalleReporte', { reportId: report.id })}>
-                <View style={styles.callout}>
-                  {report.photo_url && (
-                    <Image
-                      source={report.photo_url}
-                      style={styles.calloutImage}
-                      contentFit="cover"
-                      cachePolicy="disk"
-                    />
-                  )}
-                  <View style={styles.calloutBody}>
-                    <View style={styles.calloutHeader}>
-                      <Text style={styles.calloutCategory}>
-                        {report.category?.name ?? 'Sin categoría'}
-                      </Text>
-                      <View style={[styles.statusDot, { backgroundColor: color }]} />
-                    </View>
-                    <Text style={styles.calloutDescription} numberOfLines={2}>
-                      {report.description}
-                    </Text>
-                    <Text style={styles.calloutUser}>📍 {report.user?.name}</Text>
-                    <Text style={styles.calloutLink}>Ver detalle →</Text>
-                  </View>
-                </View>
-              </Callout>
-            </Marker>
-          );
-        })}
-      </MapView>
+      <LeafletMap
+        ref={leafletRef}
+        reports={visibleReports}
+        heat={heatPoints}
+        userLocation={userLocation}
+        showMarkers={showMarkers}
+        showHeat={showHeat}
+        onSelectReport={(reportId) => navigation.navigate('DetalleReporte', { reportId })}
+      />
 
       {/* Greeting card */}
       <View style={styles.greetingCard}>
@@ -288,6 +236,15 @@ export default function HomeScreen({ navigation, route }) {
             <Text style={styles.greetingSubtitle}>Reporta incidencias ambientales en tu zona</Text>
           )}
         </View>
+        {isAdmin && (
+          <TouchableOpacity
+            style={styles.bell}
+            testID="admin-button"
+            onPress={() => navigation.navigate('AdminReports')}
+          >
+            <Ionicons name="shield-checkmark-outline" size={22} color="#0e7490" />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={styles.bell}
           testID="notifications-button"
@@ -323,17 +280,54 @@ export default function HomeScreen({ navigation, route }) {
             </TouchableOpacity>
           ))}
         </ScrollView>
+
+        {/* Controles del mapa: qué ver y cómo ver el heat */}
+        <View style={styles.mapControls}>
+          <View style={styles.controlRow}>
+            <Text style={styles.controlLabel}>Ver</Text>
+            <View style={styles.segmented}>
+              {[
+                { key: 'marcadores', label: 'Marcadores' },
+                { key: 'calor', label: 'Calor' },
+                { key: 'ambos', label: 'Ambos' },
+              ].map(opt => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[styles.segOption, mapView === opt.key && styles.segOptionActive]}
+                  onPress={() => changeMapView(opt.key)}
+                >
+                  <Text style={[styles.segOptionText, mapView === opt.key && styles.segOptionTextActive]}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {mapView !== 'marcadores' && (
+            <View style={styles.controlRow}>
+              <Text style={styles.controlLabel}>Heat</Text>
+              <View style={styles.segmented}>
+                {[
+                  { key: 'zona', label: 'Zona' },
+                  { key: 'foco', label: 'Foco' },
+                ].map(opt => (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[styles.segOption, heatMode === opt.key && styles.segOptionActive]}
+                    onPress={() => changeHeatMode(opt.key)}
+                  >
+                    <Text style={[styles.segOptionText, heatMode === opt.key && styles.segOptionTextActive]}>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+        </View>
       </View>
 
       {userLocation && (
         <TouchableOpacity
           style={styles.locationButton}
-          onPress={() => mapRef.current?.animateToRegion({
-            latitude: userLocation.latitude,
-            longitude: userLocation.longitude,
-            latitudeDelta: 0.02,
-            longitudeDelta: 0.02,
-          }, 800)}
+          onPress={() => leafletRef.current?.centerOn(userLocation.latitude, userLocation.longitude, 15)}
         >
           <Ionicons name="locate" size={22} color="#0e7490" />
         </TouchableOpacity>
@@ -458,6 +452,18 @@ const styles = StyleSheet.create({
   chipActive:     { backgroundColor: '#0e7490', borderColor: '#0e7490' },
   chipText:       { fontSize: 12, color: '#6b7280', fontWeight: '500' },
   chipTextActive: { color: 'white' },
+
+  mapControls:  { alignItems: 'flex-end', paddingHorizontal: 16, marginTop: 8, gap: 6 },
+  controlRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  controlLabel: { fontSize: 11, color: '#6b7280', fontWeight: '600' },
+  segmented: {
+    flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.93)',
+    borderRadius: 20, borderWidth: 1, borderColor: '#e5e7eb', overflow: 'hidden',
+  },
+  segOption:           { paddingHorizontal: 12, paddingVertical: 5 },
+  segOptionActive:     { backgroundColor: '#0e7490' },
+  segOptionText:       { fontSize: 12, color: '#6b7280', fontWeight: '500' },
+  segOptionTextActive: { color: 'white' },
 
   locationButton: {
     position: 'absolute',
