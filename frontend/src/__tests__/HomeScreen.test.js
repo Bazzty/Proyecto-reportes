@@ -116,6 +116,20 @@ describe('HomeScreen', () => {
     ]));
   });
 
+  it('el control "Ver" cambia qué capas muestra el mapa', async () => {
+    await setup();
+    expect(mockLeafletProps.showMarkers).toBe(true);
+    expect(mockLeafletProps.showHeat).toBe(true);
+
+    await fireEvent.press(screen.getByText('Calor'));
+    await waitFor(() => expect(mockLeafletProps.showMarkers).toBe(false));
+    expect(mockLeafletProps.showHeat).toBe(true);
+
+    await fireEvent.press(screen.getByText('Marcadores'));
+    await waitFor(() => expect(mockLeafletProps.showMarkers).toBe(true));
+    expect(mockLeafletProps.showHeat).toBe(false);
+  });
+
   it('el filtro por categoría limita los reportes del mapa', async () => {
     await setup();
 

@@ -25,6 +25,7 @@ export default function HomeScreen({ navigation, route }) {
   const [categories, setCategories]       = useState([]);
   const [zoneHeatPoints, setZoneHeatPoints] = useState([]);
   const [heatMode, setHeatMode]         = useState('zona');
+  const [mapView, setMapView]           = useState('ambos');
   const [offline, setOffline]           = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing]           = useState(false);
@@ -34,10 +35,11 @@ export default function HomeScreen({ navigation, route }) {
   const { notifications, unreadCount } = useNotifications();
 
   useEffect(() => {
-    AsyncStorage.multiGet(['userName', 'isAdmin', 'heatMode']).then(([[, name], [, admin], [, mode]]) => {
+    AsyncStorage.multiGet(['userName', 'isAdmin', 'heatMode', 'mapView']).then(([[, name], [, admin], [, mode], [, view]]) => {
       if (name) setUserName(name);
       setIsAdmin(admin === '1');
       if (mode === 'foco' || mode === 'zona') setHeatMode(mode);
+      if (view === 'marcadores' || view === 'calor' || view === 'ambos') setMapView(view);
     });
     api.get('/categories')
       .then(res => setCategories(res.data))
@@ -47,6 +49,11 @@ export default function HomeScreen({ navigation, route }) {
   const changeHeatMode = (mode) => {
     setHeatMode(mode);
     AsyncStorage.setItem('heatMode', mode).catch(() => {});
+  };
+
+  const changeMapView = (view) => {
+    setMapView(view);
+    AsyncStorage.setItem('mapView', view).catch(() => {});
   };
 
   useEffect(() => {
@@ -172,6 +179,8 @@ export default function HomeScreen({ navigation, route }) {
     weight: 1,
   }));
   const heatPoints = heatMode === 'foco' ? focusHeatPoints : zoneHeatPoints;
+  const showMarkers = mapView !== 'calor';
+  const showHeat = mapView !== 'marcadores';
 
   const offlineBanner = !isConnected
     ? { icon: 'cloud-offline-outline', text: 'Sin conexión: los datos pueden estar desactualizados' }
@@ -196,6 +205,8 @@ export default function HomeScreen({ navigation, route }) {
         reports={visibleReports}
         heat={heatPoints}
         userLocation={userLocation}
+        showMarkers={showMarkers}
+        showHeat={showHeat}
         onSelectReport={(reportId) => navigation.navigate('DetalleReporte', { reportId })}
       />
 
@@ -270,22 +281,46 @@ export default function HomeScreen({ navigation, route }) {
           ))}
         </ScrollView>
 
-        {/* Modo de heatmap: por zona o por foco */}
-        <View style={styles.heatToggleRow}>
-          <View style={styles.heatToggle}>
-            <TouchableOpacity
-              style={[styles.heatOption, heatMode === 'zona' && styles.heatOptionActive]}
-              onPress={() => changeHeatMode('zona')}
-            >
-              <Text style={[styles.heatOptionText, heatMode === 'zona' && styles.heatOptionTextActive]}>Zona</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.heatOption, heatMode === 'foco' && styles.heatOptionActive]}
-              onPress={() => changeHeatMode('foco')}
-            >
-              <Text style={[styles.heatOptionText, heatMode === 'foco' && styles.heatOptionTextActive]}>Foco</Text>
-            </TouchableOpacity>
+        {/* Controles del mapa: qué ver y cómo ver el heat */}
+        <View style={styles.mapControls}>
+          <View style={styles.controlRow}>
+            <Text style={styles.controlLabel}>Ver</Text>
+            <View style={styles.segmented}>
+              {[
+                { key: 'marcadores', label: 'Marcadores' },
+                { key: 'calor', label: 'Calor' },
+                { key: 'ambos', label: 'Ambos' },
+              ].map(opt => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[styles.segOption, mapView === opt.key && styles.segOptionActive]}
+                  onPress={() => changeMapView(opt.key)}
+                >
+                  <Text style={[styles.segOptionText, mapView === opt.key && styles.segOptionTextActive]}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
+
+          {mapView !== 'marcadores' && (
+            <View style={styles.controlRow}>
+              <Text style={styles.controlLabel}>Heat</Text>
+              <View style={styles.segmented}>
+                {[
+                  { key: 'zona', label: 'Zona' },
+                  { key: 'foco', label: 'Foco' },
+                ].map(opt => (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[styles.segOption, heatMode === opt.key && styles.segOptionActive]}
+                    onPress={() => changeHeatMode(opt.key)}
+                  >
+                    <Text style={[styles.segOptionText, heatMode === opt.key && styles.segOptionTextActive]}>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
         </View>
       </View>
 
@@ -418,15 +453,17 @@ const styles = StyleSheet.create({
   chipText:       { fontSize: 12, color: '#6b7280', fontWeight: '500' },
   chipTextActive: { color: 'white' },
 
-  heatToggleRow:    { alignItems: 'flex-end', paddingHorizontal: 16, marginTop: 8 },
-  heatToggle: {
+  mapControls:  { alignItems: 'flex-end', paddingHorizontal: 16, marginTop: 8, gap: 6 },
+  controlRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  controlLabel: { fontSize: 11, color: '#6b7280', fontWeight: '600' },
+  segmented: {
     flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.93)',
     borderRadius: 20, borderWidth: 1, borderColor: '#e5e7eb', overflow: 'hidden',
   },
-  heatOption:          { paddingHorizontal: 14, paddingVertical: 5 },
-  heatOptionActive:    { backgroundColor: '#0e7490' },
-  heatOptionText:      { fontSize: 12, color: '#6b7280', fontWeight: '500' },
-  heatOptionTextActive: { color: 'white' },
+  segOption:           { paddingHorizontal: 12, paddingVertical: 5 },
+  segOptionActive:     { backgroundColor: '#0e7490' },
+  segOptionText:       { fontSize: 12, color: '#6b7280', fontWeight: '500' },
+  segOptionTextActive: { color: 'white' },
 
   locationButton: {
     position: 'absolute',

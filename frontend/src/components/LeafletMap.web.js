@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { HTML, buildPayload } from './leafletMapHtml';
 
 const LeafletMap = forwardRef(function LeafletMap(
-  { reports = [], heat = [], userLocation = null, onSelectReport, style },
+  { reports = [], heat = [], userLocation = null, showMarkers = true, showHeat = true, onSelectReport, style },
   ref
 ) {
   const iframeRef = useRef(null);
@@ -13,8 +13,8 @@ const LeafletMap = forwardRef(function LeafletMap(
   };
 
   useEffect(() => {
-    send(buildPayload(reports, heat, userLocation));
-  }, [reports, heat, userLocation]);
+    send(buildPayload(reports, heat, userLocation, showMarkers, showHeat));
+  }, [reports, heat, userLocation, showMarkers, showHeat]);
 
   useImperativeHandle(ref, () => ({
     centerOn: (latitude, longitude, zoom) => send({ type: 'center', lat: latitude, lng: longitude, zoom }),
@@ -30,7 +30,7 @@ const LeafletMap = forwardRef(function LeafletMap(
       try {
         const message = JSON.parse(event.data);
         if (message.type === 'ready') {
-          send(buildPayload(reports, heat, userLocation));
+          send(buildPayload(reports, heat, userLocation, showMarkers, showHeat));
         } else if (message.type === 'select' && onSelectReport) {
           onSelectReport(message.reportId);
         }
@@ -41,7 +41,7 @@ const LeafletMap = forwardRef(function LeafletMap(
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [reports, heat, userLocation, onSelectReport]);
+  }, [reports, heat, userLocation, showMarkers, showHeat, onSelectReport]);
 
   return (
     <View style={[styles.container, style]} testID="leaflet-map">

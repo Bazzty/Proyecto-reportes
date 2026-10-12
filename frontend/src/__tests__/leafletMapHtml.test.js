@@ -41,6 +41,15 @@ describe('leafletMapHtml', () => {
     });
     expect(payload.heat).toHaveLength(1);
     expect(payload.userLocation).toEqual({ latitude: -41.3, longitude: -72.9 });
+    expect(payload.showMarkers).toBe(true);
+    expect(payload.showHeat).toBe(true);
+  });
+
+  it('buildPayload incluye los flags de visibilidad', () => {
+    const payload = buildPayload([], [], null, false, true);
+
+    expect(payload.showMarkers).toBe(false);
+    expect(payload.showHeat).toBe(true);
   });
 
   it('statusColor mapea los estados', () => {

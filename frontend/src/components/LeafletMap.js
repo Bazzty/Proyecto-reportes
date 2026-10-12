@@ -4,7 +4,7 @@ import { WebView } from 'react-native-webview';
 import { HTML, buildPayload } from './leafletMapHtml';
 
 const LeafletMap = forwardRef(function LeafletMap(
-  { reports = [], heat = [], userLocation = null, onSelectReport, style },
+  { reports = [], heat = [], userLocation = null, showMarkers = true, showHeat = true, onSelectReport, style },
   ref
 ) {
   const webRef = useRef(null);
@@ -14,8 +14,8 @@ const LeafletMap = forwardRef(function LeafletMap(
   };
 
   useEffect(() => {
-    send(buildPayload(reports, heat, userLocation));
-  }, [reports, heat, userLocation]);
+    send(buildPayload(reports, heat, userLocation, showMarkers, showHeat));
+  }, [reports, heat, userLocation, showMarkers, showHeat]);
 
   useImperativeHandle(ref, () => ({
     centerOn: (latitude, longitude, zoom) => send({ type: 'center', lat: latitude, lng: longitude, zoom }),
@@ -25,7 +25,7 @@ const LeafletMap = forwardRef(function LeafletMap(
     try {
       const message = JSON.parse(event.nativeEvent.data);
       if (message.type === 'ready') {
-        send(buildPayload(reports, heat, userLocation));
+        send(buildPayload(reports, heat, userLocation, showMarkers, showHeat));
       } else if (message.type === 'select' && onSelectReport) {
         onSelectReport(message.reportId);
       }

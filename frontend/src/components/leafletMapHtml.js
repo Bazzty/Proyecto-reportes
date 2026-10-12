@@ -6,7 +6,13 @@ export const statusColor = (status) => {
   return '#0e7490';
 };
 
-export const buildPayload = (reports = [], heat = [], userLocation = null) => ({
+export const buildPayload = (
+  reports = [],
+  heat = [],
+  userLocation = null,
+  showMarkers = true,
+  showHeat = true
+) => ({
   type: 'update',
   reports: reports.map(r => ({
     id: r.id,
@@ -20,6 +26,8 @@ export const buildPayload = (reports = [], heat = [], userLocation = null) => ({
   })),
   heat,
   userLocation,
+  showMarkers,
+  showHeat,
 });
 
 export const HTML = `<!DOCTYPE html>
@@ -60,30 +68,32 @@ export const HTML = `<!DOCTYPE html>
 
     function render(data) {
       if (heat) { map.removeLayer(heat); heat = null; }
-      if (data.heat && data.heat.length && L.heatLayer) {
+      if (data.showHeat !== false && data.heat && data.heat.length && L.heatLayer) {
         heat = L.heatLayer(data.heat.map(function (p) { return [p.latitude, p.longitude, p.weight || 1]; }), { radius: 35, blur: 25, maxZoom: 12 });
         heat.addTo(map);
       }
 
       markersLayer.clearLayers();
-      (data.reports || []).forEach(function (r) {
-        var color = r.color || '#0e7490';
-        var img = r.photo_url
-          ? '<img src="' + r.photo_url + '" style="width:100%;height:100%;object-fit:cover;" />'
-          : '<div style="width:100%;height:100%;background:' + color + '"></div>';
-        var icon = L.divIcon({
-          className: '',
-          html: '<div style="width:36px;height:36px;border:2px solid ' + color + ';border-radius:8px;overflow:hidden;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">' + img + '</div>',
-          iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -36],
+      if (data.showMarkers !== false) {
+        (data.reports || []).forEach(function (r) {
+          var color = r.color || '#0e7490';
+          var img = r.photo_url
+            ? '<img src="' + r.photo_url + '" style="width:100%;height:100%;object-fit:cover;" />'
+            : '<div style="width:100%;height:100%;background:' + color + '"></div>';
+          var icon = L.divIcon({
+            className: '',
+            html: '<div style="width:36px;height:36px;border:2px solid ' + color + ';border-radius:8px;overflow:hidden;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.3)">' + img + '</div>',
+            iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -36],
+          });
+          var popup = '<div style="min-width:150px">'
+            + (r.photo_url ? '<img src="' + r.photo_url + '" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:6px;" />' : '')
+            + '<div style="font-weight:bold;color:#0e7490">' + (r.category || 'Sin categoría') + '</div>'
+            + '<div style="font-size:12px;color:#374151;margin:4px 0">' + (r.description || '') + '</div>'
+            + '<div style="font-size:11px;color:#9ca3af">' + (r.user || '') + '</div>'
+            + '<a href="#" onclick="select(' + r.id + ');return false;" style="color:#0e7490;font-weight:600;font-size:12px">Ver detalle &rarr;</a></div>';
+          L.marker([r.latitude, r.longitude], { icon: icon }).bindPopup(popup).addTo(markersLayer);
         });
-        var popup = '<div style="min-width:150px">'
-          + (r.photo_url ? '<img src="' + r.photo_url + '" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:6px;" />' : '')
-          + '<div style="font-weight:bold;color:#0e7490">' + (r.category || 'Sin categoría') + '</div>'
-          + '<div style="font-size:12px;color:#374151;margin:4px 0">' + (r.description || '') + '</div>'
-          + '<div style="font-size:11px;color:#9ca3af">' + (r.user || '') + '</div>'
-          + '<a href="#" onclick="select(' + r.id + ');return false;" style="color:#0e7490;font-weight:600;font-size:12px">Ver detalle &rarr;</a></div>';
-        L.marker([r.latitude, r.longitude], { icon: icon }).bindPopup(popup).addTo(markersLayer);
-      });
+      }
 
       if (data.userLocation) {
         if (userMarker) { map.removeLayer(userMarker); }
