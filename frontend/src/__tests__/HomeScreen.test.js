@@ -95,6 +95,27 @@ describe('HomeScreen', () => {
     expect(api.get).toHaveBeenCalledWith('/reports/heatmap');
   });
 
+  it('el modo "Foco" usa los reportes individuales como heatmap', async () => {
+    await setup();
+
+    await fireEvent.press(screen.getByText('Foco'));
+
+    await waitFor(() => expect(mockLeafletProps.heat).toEqual([
+      { latitude: -41.31, longitude: -72.98, weight: 1 },
+      { latitude: -41.32, longitude: -72.99, weight: 1 },
+    ]));
+  });
+
+  it('el modo "Zona" vuelve a usar los centroides por zona', async () => {
+    await setup();
+    await fireEvent.press(screen.getByText('Foco'));
+    await fireEvent.press(screen.getByText('Zona'));
+
+    await waitFor(() => expect(mockLeafletProps.heat).toEqual([
+      { latitude: -41.31, longitude: -72.98, weight: 3 },
+    ]));
+  });
+
   it('el filtro por categoría limita los reportes del mapa', async () => {
     await setup();
 

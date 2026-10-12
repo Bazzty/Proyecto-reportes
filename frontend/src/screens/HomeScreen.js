@@ -23,7 +23,8 @@ export default function HomeScreen({ navigation, route }) {
   const [myReports, setMyReports]         = useState([]);
   const [activeFilter, setActiveFilter]   = useState(null);
   const [categories, setCategories]       = useState([]);
-  const [heatmapPoints, setHeatmapPoints] = useState([]);
+  const [zoneHeatPoints, setZoneHeatPoints] = useState([]);
+  const [heatMode, setHeatMode]         = useState('zona');
   const [offline, setOffline]           = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing]           = useState(false);
@@ -33,14 +34,20 @@ export default function HomeScreen({ navigation, route }) {
   const { notifications, unreadCount } = useNotifications();
 
   useEffect(() => {
-    AsyncStorage.multiGet(['userName', 'isAdmin']).then(([[, name], [, admin]]) => {
+    AsyncStorage.multiGet(['userName', 'isAdmin', 'heatMode']).then(([[, name], [, admin], [, mode]]) => {
       if (name) setUserName(name);
       setIsAdmin(admin === '1');
+      if (mode === 'foco' || mode === 'zona') setHeatMode(mode);
     });
     api.get('/categories')
       .then(res => setCategories(res.data))
       .catch(() => setCategories([]));
   }, []);
+
+  const changeHeatMode = (mode) => {
+    setHeatMode(mode);
+    AsyncStorage.setItem('heatMode', mode).catch(() => {});
+  };
 
   useEffect(() => {
     let active = true;
@@ -94,7 +101,7 @@ export default function HomeScreen({ navigation, route }) {
             const next = allRes.data;
             return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
           });
-          setHeatmapPoints(heatRes.data.map(p => ({
+          setZoneHeatPoints(heatRes.data.map(p => ({
             latitude: parseFloat(p.latitude),
             longitude: parseFloat(p.longitude),
             weight: p.count ?? 1,
@@ -159,6 +166,13 @@ export default function HomeScreen({ navigation, route }) {
     ? reports.filter(r => r.category?.name === activeFilter)
     : reports;
 
+  const focusHeatPoints = visibleReports.map(r => ({
+    latitude: r.latitude,
+    longitude: r.longitude,
+    weight: 1,
+  }));
+  const heatPoints = heatMode === 'foco' ? focusHeatPoints : zoneHeatPoints;
+
   const offlineBanner = !isConnected
     ? { icon: 'cloud-offline-outline', text: 'Sin conexión: los datos pueden estar desactualizados' }
     : syncing
@@ -180,7 +194,7 @@ export default function HomeScreen({ navigation, route }) {
       <LeafletMap
         ref={leafletRef}
         reports={visibleReports}
-        heat={heatmapPoints}
+        heat={heatPoints}
         userLocation={userLocation}
         onSelectReport={(reportId) => navigation.navigate('DetalleReporte', { reportId })}
       />
@@ -255,6 +269,24 @@ export default function HomeScreen({ navigation, route }) {
             </TouchableOpacity>
           ))}
         </ScrollView>
+
+        {/* Modo de heatmap: por zona o por foco */}
+        <View style={styles.heatToggleRow}>
+          <View style={styles.heatToggle}>
+            <TouchableOpacity
+              style={[styles.heatOption, heatMode === 'zona' && styles.heatOptionActive]}
+              onPress={() => changeHeatMode('zona')}
+            >
+              <Text style={[styles.heatOptionText, heatMode === 'zona' && styles.heatOptionTextActive]}>Zona</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.heatOption, heatMode === 'foco' && styles.heatOptionActive]}
+              onPress={() => changeHeatMode('foco')}
+            >
+              <Text style={[styles.heatOptionText, heatMode === 'foco' && styles.heatOptionTextActive]}>Foco</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       {userLocation && (
@@ -385,6 +417,16 @@ const styles = StyleSheet.create({
   chipActive:     { backgroundColor: '#0e7490', borderColor: '#0e7490' },
   chipText:       { fontSize: 12, color: '#6b7280', fontWeight: '500' },
   chipTextActive: { color: 'white' },
+
+  heatToggleRow:    { alignItems: 'flex-end', paddingHorizontal: 16, marginTop: 8 },
+  heatToggle: {
+    flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.93)',
+    borderRadius: 20, borderWidth: 1, borderColor: '#e5e7eb', overflow: 'hidden',
+  },
+  heatOption:          { paddingHorizontal: 14, paddingVertical: 5 },
+  heatOptionActive:    { backgroundColor: '#0e7490' },
+  heatOptionText:      { fontSize: 12, color: '#6b7280', fontWeight: '500' },
+  heatOptionTextActive: { color: 'white' },
 
   locationButton: {
     position: 'absolute',
