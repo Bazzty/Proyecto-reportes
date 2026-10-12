@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Linking,
-  StyleSheet, ScrollView, Image, Alert, ActivityIndicator
+  StyleSheet, ScrollView, Image, Alert, ActivityIndicator, Modal
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,7 @@ import api from '../services/api';
 import useAutoLocation from '../hooks/useAutoLocation';
 import useNetworkStatus from '../hooks/useNetworkStatus';
 import { enqueue } from '../services/offlineQueue';
+import LeafletMap from '../components/LeafletMap';
 
 const LOCATION_ERRORS = {
   permission: 'Permiso de ubicación denegado. Actívalo para continuar.',
@@ -24,11 +25,24 @@ export default function NewReportScreen({ navigation }) {
   const [categoryId, setCategoryId]   = useState(null);
   const [loading, setLoading]         = useState(false);
   const [categories, setCategories]   = useState([]);
+  const [manualLocation, setManualLocation] = useState(null);
+  const [showPicker, setShowPicker]         = useState(false);
+  const pickerRef = useRef(null);
 
   const { location, locating, error: locationError, permanentlyDenied, refresh: refreshLocation } = useAutoLocation();
   const { isConnected } = useNetworkStatus();
 
+  const effectiveLocation = manualLocation ?? location;
+
   const selectedCategory = categories.find((cat) => cat.id === categoryId) ?? null;
+
+  const openPicker = () => {
+    setShowPicker(true);
+    const base = effectiveLocation;
+    setTimeout(() => {
+      if (base) pickerRef.current?.centerOn(base.latitude, base.longitude, 14);
+    }, 400);
+  };
 
   useEffect(() => {
     api.get('/categories')
@@ -87,8 +101,8 @@ export default function NewReportScreen({ navigation }) {
     try {
       await enqueue({
         description,
-        latitude: location.latitude,
-        longitude: location.longitude,
+        latitude: effectiveLocation.latitude,
+        longitude: effectiveLocation.longitude,
         categoryId,
         photoUri: photo.uri,
       });
@@ -104,7 +118,7 @@ export default function NewReportScreen({ navigation }) {
 
   const handleSubmit = async () => {
     if (!photo)             { Alert.alert('Falta foto', 'Debes adjuntar una foto.');         return; }
-    if (!location)          { Alert.alert('Falta ubicación', 'Espera a que se detecte tu ubicación.'); return; }
+    if (!effectiveLocation) { Alert.alert('Falta ubicación', 'Espera a que se detecte tu ubicación o elige un punto en el mapa.'); return; }
     if (!description.trim()){ Alert.alert('Falta descripción', 'Escribe una descripción.'); return; }
     if (!categoryId)        { Alert.alert('Falta categoría', 'Selecciona una categoría.');   return; }
 
@@ -117,8 +131,8 @@ export default function NewReportScreen({ navigation }) {
     try {
       const form = new FormData();
       form.append('description', description);
-      form.append('latitude',    String(location.latitude));
-      form.append('longitude',   String(location.longitude));
+      form.append('latitude',    String(effectiveLocation.latitude));
+      form.append('longitude',   String(effectiveLocation.longitude));
       form.append('category_id', String(categoryId));
       form.append('photo', {
         uri:  photo.uri,
@@ -152,6 +166,7 @@ export default function NewReportScreen({ navigation }) {
   };
 
   return (
+    <>
     <ScrollView contentContainerStyle={styles.container} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
       <LinearGradient colors={['#0e7490', '#0891b2']} style={styles.header}>
         <Text style={styles.title}>Reportar Incidencia</Text>
@@ -183,39 +198,55 @@ export default function NewReportScreen({ navigation }) {
 
       {/* GPS */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Ubicación GPS</Text>
+        <Text style={styles.sectionTitle}>Ubicación</Text>
 
-        {locating && !location ? (
-          <View style={styles.locationLoading}>
-            <ActivityIndicator color="#0e7490" />
-            <Text style={styles.helperText}>Obteniendo ubicación…</Text>
-          </View>
-        ) : location ? (
+        {effectiveLocation ? (
           <>
-            <TouchableOpacity style={styles.locationButton} onPress={refreshLocation} disabled={locating}>
-              <Ionicons name="refresh-outline" size={20} color="#0e7490" />
-              <Text style={styles.locationButtonText}>
-                {locating ? 'Actualizando…' : 'Actualizar ubicación'}
-              </Text>
+            <TouchableOpacity style={styles.locationButton} onPress={openPicker}>
+              <Ionicons name="map-outline" size={20} color="#0e7490" />
+              <Text style={styles.locationButtonText}>Elegir ubicación en el mapa</Text>
             </TouchableOpacity>
+            <Text style={styles.helperText}>{manualLocation ? 'Ubicación elegida:' : 'Ubicación GPS:'}</Text>
             <Text style={styles.helperText}>
-              Lat: {location.latitude.toFixed(5)}, Lng: {location.longitude.toFixed(5)}
+              Lat: {effectiveLocation.latitude.toFixed(5)}, Lng: {effectiveLocation.longitude.toFixed(5)}
             </Text>
+            {manualLocation ? (
+              <TouchableOpacity style={styles.settingsLink} onPress={() => setManualLocation(null)}>
+                <Text style={styles.settingsLinkText}>Usar mi ubicación GPS</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.settingsLink} onPress={refreshLocation} disabled={locating}>
+                <Text style={styles.settingsLinkText}>{locating ? 'Actualizando…' : 'Actualizar ubicación GPS'}</Text>
+              </TouchableOpacity>
+            )}
           </>
         ) : (
           <>
+            {locating ? (
+              <View style={styles.locationLoading}>
+                <ActivityIndicator color="#0e7490" />
+                <Text style={styles.helperText}>Obteniendo ubicación…</Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.helperText}>
+                  {LOCATION_ERRORS[locationError] ?? LOCATION_ERRORS.unavailable}
+                </Text>
+                {permanentlyDenied && (
+                  <TouchableOpacity style={styles.settingsLink} onPress={() => Linking.openSettings()}>
+                    <Text style={styles.settingsLinkText}>Abrir Ajustes</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
             <TouchableOpacity style={styles.locationButton} onPress={refreshLocation} disabled={locating}>
               <Ionicons name="location-outline" size={20} color="#0e7490" />
-              <Text style={styles.locationButtonText}>Reintentar</Text>
+              <Text style={styles.locationButtonText}>Reintentar GPS</Text>
             </TouchableOpacity>
-            <Text style={styles.helperText}>
-              {LOCATION_ERRORS[locationError] ?? LOCATION_ERRORS.unavailable}
-            </Text>
-            {permanentlyDenied && (
-              <TouchableOpacity style={styles.settingsLink} onPress={() => Linking.openSettings()}>
-                <Text style={styles.settingsLinkText}>Abrir Ajustes</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity style={styles.locationButton} onPress={openPicker}>
+              <Ionicons name="map-outline" size={20} color="#0e7490" />
+              <Text style={styles.locationButtonText}>Elegir ubicación en el mapa</Text>
+            </TouchableOpacity>
           </>
         )}
       </View>
@@ -277,6 +308,42 @@ export default function NewReportScreen({ navigation }) {
       </TouchableOpacity>
       </View>
     </ScrollView>
+
+    <Modal
+      visible={showPicker}
+      animationType="slide"
+      onRequestClose={() => setShowPicker(false)}
+    >
+      <View style={styles.pickerContainer}>
+        <Text style={styles.pickerTitle}>Toca el mapa para marcar el punto</Text>
+        <View style={styles.pickerMap}>
+          <LeafletMap
+            ref={pickerRef}
+            reports={[]}
+            heat={[]}
+            showMarkers={false}
+            showHeat={false}
+            pickable
+            pickedLocation={manualLocation}
+            userLocation={location}
+            onPick={(loc) => setManualLocation(loc)}
+          />
+        </View>
+        <View style={styles.pickerActions}>
+          <TouchableOpacity style={styles.pickerCancel} onPress={() => setShowPicker(false)}>
+            <Text style={styles.pickerCancelText}>Cancelar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.pickerConfirm, !manualLocation && styles.pickerConfirmDisabled]}
+            onPress={() => setShowPicker(false)}
+            disabled={!manualLocation}
+          >
+            <Text style={styles.pickerConfirmText}>Confirmar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+    </>
   );
 }
 
@@ -338,4 +405,17 @@ const styles = StyleSheet.create({
   },
   submitButtonDisabled:       { backgroundColor: '#9ca3af' },
   submitButtonText:           { color: 'white', fontWeight: 'bold', fontSize: 18 },
+
+  pickerContainer:       { flex: 1, backgroundColor: '#fff' },
+  pickerTitle:           { fontSize: 16, fontWeight: '600', color: '#0e7490', textAlign: 'center', paddingTop: 56, paddingBottom: 12, paddingHorizontal: 16 },
+  pickerMap:             { flex: 1 },
+  pickerActions:         { flexDirection: 'row', gap: 12, padding: 16 },
+  pickerCancel: {
+    flex: 1, paddingVertical: 14, borderRadius: 10, borderWidth: 1,
+    borderColor: '#d1d5db', alignItems: 'center',
+  },
+  pickerCancelText:      { color: '#374151', fontWeight: '600' },
+  pickerConfirm:         { flex: 1, paddingVertical: 14, borderRadius: 10, backgroundColor: '#0e7490', alignItems: 'center' },
+  pickerConfirmDisabled: { backgroundColor: '#9ca3af' },
+  pickerConfirmText:     { color: '#fff', fontWeight: '600' },
 });

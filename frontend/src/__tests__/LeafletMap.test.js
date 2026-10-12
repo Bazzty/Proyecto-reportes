@@ -65,6 +65,15 @@ describe('LeafletMap', () => {
     expect(onSelectReport).toHaveBeenCalledWith(1);
   });
 
+  it('avisa al elegir un punto en el mapa (pick)', async () => {
+    const onPick = jest.fn();
+    await render(<LeafletMap reports={REPORTS} pickable onPick={onPick} />);
+
+    mockWebViewProps.onMessage({ nativeEvent: { data: JSON.stringify({ type: 'pick', latitude: -41.5, longitude: -73.1 }) } });
+
+    expect(onPick).toHaveBeenCalledWith({ latitude: -41.5, longitude: -73.1 });
+  });
+
   it('centerOn envía el mensaje de centrado', async () => {
     const ref = createRef();
     await render(<LeafletMap ref={ref} reports={REPORTS} />);

@@ -52,6 +52,18 @@ describe('leafletMapHtml', () => {
     expect(payload.showHeat).toBe(true);
   });
 
+  it('buildPayload incluye pickable y pickedLocation', () => {
+    const payload = buildPayload([], [], null, true, true, true, { latitude: -41.5, longitude: -73.1 });
+
+    expect(payload.pickable).toBe(true);
+    expect(payload.pickedLocation).toEqual({ latitude: -41.5, longitude: -73.1 });
+  });
+
+  it('el HTML permite elegir un punto en el mapa', () => {
+    expect(HTML).toContain("map.on('click'");
+    expect(HTML).toContain("type: 'pick'");
+  });
+
   it('statusColor mapea los estados', () => {
     expect(statusColor('Resuelto')).toBe('#16a34a');
     expect(statusColor('Pendiente')).toBe('#f59e0b');

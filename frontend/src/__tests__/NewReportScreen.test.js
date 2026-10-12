@@ -32,6 +32,19 @@ jest.mock('expo-location', () => ({
   Accuracy: { High: 4 },
 }));
 
+let mockLeafletProps = {};
+const mockCenterOn = jest.fn();
+jest.mock('../components/LeafletMap', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const LeafletMap = React.forwardRef(function LeafletMap(props, ref) {
+    mockLeafletProps = props;
+    React.useImperativeHandle(ref, () => ({ centerOn: mockCenterOn }));
+    return <View testID="leaflet-map" />;
+  });
+  return { __esModule: true, default: LeafletMap };
+});
+
 const CATEGORIES = [
   { id: 1, name: 'basura', description: 'Residuos sólidos', icon: 'trash-outline' },
   { id: 2, name: 'aguas', description: 'Vertidos líquidos', icon: 'water-outline' },
@@ -67,6 +80,7 @@ describe('NewReportScreen', () => {
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     grantLocation();
     Network.getNetworkStateAsync.mockResolvedValue({ isConnected: true, isInternetReachable: true });
+    mockLeafletProps = {};
   });
 
   const fillForm = async () => {
@@ -145,7 +159,7 @@ describe('NewReportScreen', () => {
     await takePhoto();
     await fireEvent.press(screen.getByText('Enviar Reporte'));
 
-    expect(Alert.alert).toHaveBeenLastCalledWith('Falta ubicación', 'Espera a que se detecte tu ubicación.');
+    expect(Alert.alert).toHaveBeenLastCalledWith('Falta ubicación', 'Espera a que se detecte tu ubicación o elige un punto en el mapa.');
     expect(api.post).not.toHaveBeenCalled();
   });
 
@@ -154,7 +168,7 @@ describe('NewReportScreen', () => {
     await setup();
 
     expect(await screen.findByText('Permiso de ubicación denegado. Actívalo para continuar.')).toBeTruthy();
-    expect(screen.getByText('Reintentar')).toBeTruthy();
+    expect(screen.getByText('Reintentar GPS')).toBeTruthy();
   });
 
   it('si el permiso está denegado permanentemente ofrece abrir Ajustes', async () => {
@@ -249,5 +263,25 @@ describe('NewReportScreen', () => {
 
     await waitFor(() => expect(enqueue).toHaveBeenCalledTimes(1));
     expect(Alert.alert).toHaveBeenCalledWith('Guardado sin conexión', expect.any(String), expect.any(Array));
+  });
+
+  it('permite elegir la ubicación en el mapa y usa esas coordenadas', async () => {
+    api.post.mockResolvedValue({ data: { id: 20 } });
+    await setup();
+    await takePhoto();
+    await screen.findByText(COORDS_TEXT);
+
+    await fireEvent.press(screen.getByText('Elegir ubicación en el mapa'));
+    mockLeafletProps.onPick({ latitude: -41.5, longitude: -73.1 });
+    await fireEvent.press(screen.getByText('Confirmar'));
+
+    await fireEvent.changeText(screen.getByPlaceholderText('Ej. Basura acumulada en la esquina...'), 'Manual');
+    await fireEvent.press(screen.getByText('aguas'));
+    await fireEvent.press(screen.getByText('Enviar Reporte'));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1));
+    const [, form] = api.post.mock.calls[0];
+    expect(form.get('latitude')).toBe('-41.5');
+    expect(form.get('longitude')).toBe('-73.1');
   });
 });

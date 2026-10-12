@@ -11,7 +11,9 @@ export const buildPayload = (
   heat = [],
   userLocation = null,
   showMarkers = true,
-  showHeat = true
+  showHeat = true,
+  pickable = false,
+  pickedLocation = null
 ) => ({
   type: 'update',
   reports: reports.map(r => ({
@@ -28,6 +30,8 @@ export const buildPayload = (
   userLocation,
   showMarkers,
   showHeat,
+  pickable,
+  pickedLocation,
 });
 
 export const HTML = `<!DOCTYPE html>
@@ -61,6 +65,17 @@ export const HTML = `<!DOCTYPE html>
     var heat = null;
     var markersLayer = L.layerGroup().addTo(map);
     var userMarker = null;
+    var pickable = false;
+    var pickMarker = null;
+
+    map.on('click', function (e) {
+      if (!pickable) { return; }
+      var lat = e.latlng.lat;
+      var lng = e.latlng.lng;
+      if (pickMarker) { map.removeLayer(pickMarker); }
+      pickMarker = L.marker([lat, lng]).addTo(map);
+      post({ type: 'pick', latitude: lat, longitude: lng });
+    });
 
     function select(id) {
       post({ type: 'select', reportId: id });
@@ -99,6 +114,17 @@ export const HTML = `<!DOCTYPE html>
         if (userMarker) { map.removeLayer(userMarker); }
         userMarker = L.circleMarker([data.userLocation.latitude, data.userLocation.longitude], { radius: 7, color: '#fff', weight: 2, fillColor: '#2563eb', fillOpacity: 1 });
         userMarker.addTo(map);
+      }
+
+      pickable = data.pickable === true;
+      map.getContainer().style.cursor = pickable ? 'crosshair' : '';
+
+      if (data.pickedLocation) {
+        if (pickMarker) { map.removeLayer(pickMarker); }
+        pickMarker = L.marker([data.pickedLocation.latitude, data.pickedLocation.longitude]).addTo(map);
+      } else if (pickMarker) {
+        map.removeLayer(pickMarker);
+        pickMarker = null;
       }
     }
 

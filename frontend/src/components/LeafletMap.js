@@ -4,7 +4,10 @@ import { WebView } from 'react-native-webview';
 import { HTML, buildPayload } from './leafletMapHtml';
 
 const LeafletMap = forwardRef(function LeafletMap(
-  { reports = [], heat = [], userLocation = null, showMarkers = true, showHeat = true, onSelectReport, style },
+  {
+    reports = [], heat = [], userLocation = null, showMarkers = true, showHeat = true,
+    pickable = false, pickedLocation = null, onSelectReport, onPick, style,
+  },
   ref
 ) {
   const webRef = useRef(null);
@@ -14,8 +17,8 @@ const LeafletMap = forwardRef(function LeafletMap(
   };
 
   useEffect(() => {
-    send(buildPayload(reports, heat, userLocation, showMarkers, showHeat));
-  }, [reports, heat, userLocation, showMarkers, showHeat]);
+    send(buildPayload(reports, heat, userLocation, showMarkers, showHeat, pickable, pickedLocation));
+  }, [reports, heat, userLocation, showMarkers, showHeat, pickable, pickedLocation]);
 
   useImperativeHandle(ref, () => ({
     centerOn: (latitude, longitude, zoom) => send({ type: 'center', lat: latitude, lng: longitude, zoom }),
@@ -25,9 +28,11 @@ const LeafletMap = forwardRef(function LeafletMap(
     try {
       const message = JSON.parse(event.nativeEvent.data);
       if (message.type === 'ready') {
-        send(buildPayload(reports, heat, userLocation, showMarkers, showHeat));
+        send(buildPayload(reports, heat, userLocation, showMarkers, showHeat, pickable, pickedLocation));
       } else if (message.type === 'select' && onSelectReport) {
         onSelectReport(message.reportId);
+      } else if (message.type === 'pick' && onPick) {
+        onPick({ latitude: message.latitude, longitude: message.longitude });
       }
     } catch {
       // Mensaje no JSON: se ignora.
