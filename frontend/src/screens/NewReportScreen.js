@@ -11,6 +11,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import api from '../services/api';
 import useAutoLocation from '../hooks/useAutoLocation';
 import useNetworkStatus from '../hooks/useNetworkStatus';
+import useKeyboardHeight from '../hooks/useKeyboardHeight';
 import { enqueue } from '../services/offlineQueue';
 import LeafletMap from '../components/LeafletMap';
 
@@ -29,7 +30,9 @@ export default function NewReportScreen({ navigation }) {
   const [manualLocation, setManualLocation] = useState(null);
   const [showPicker, setShowPicker]         = useState(false);
   const pickerRef = useRef(null);
+  const scrollRef = useRef(null);
 
+  const keyboardHeight = useKeyboardHeight();
   const { location, locating, error: locationError, permanentlyDenied, refresh: refreshLocation } = useAutoLocation();
   const { isConnected } = useNetworkStatus();
 
@@ -43,6 +46,12 @@ export default function NewReportScreen({ navigation }) {
     setTimeout(() => {
       if (base) pickerRef.current?.centerOn(base.latitude, base.longitude, 14);
     }, 400);
+  };
+
+  const scrollToFocused = () => {
+    if (Platform.OS === 'android') {
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300);
+    }
   };
 
   useEffect(() => {
@@ -173,7 +182,12 @@ export default function NewReportScreen({ navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-    <ScrollView contentContainerStyle={styles.container} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
+    <ScrollView
+      ref={scrollRef}
+      contentContainerStyle={[styles.container, { paddingBottom: Platform.OS === 'android' ? keyboardHeight + 24 : 24 }]}
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
+    >
       <LinearGradient colors={['#0e7490', '#0891b2']} style={styles.header}>
         <Text style={styles.title}>Reportar Incidencia</Text>
         <Text style={styles.subtitle}>Ayúdanos a identificar problemas ambientales</Text>
@@ -299,6 +313,7 @@ export default function NewReportScreen({ navigation }) {
           numberOfLines={4}
           value={description}
           onChangeText={setDescription}
+          onFocus={scrollToFocused}
         />
       </View>
 

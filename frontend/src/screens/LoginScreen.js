@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback,
   StyleSheet, ActivityIndicator, Alert, Image, Dimensions,
@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { setAuthToken } from '../services/api';
+import useKeyboardHeight from '../hooks/useKeyboardHeight';
 
 const { height } = Dimensions.get('window');
 
@@ -16,6 +17,14 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading]   = useState(false);
+
+  const keyboardHeight = useKeyboardHeight();
+  const scrollRef = useRef(null);
+  const scrollToFocused = () => {
+    if (Platform.OS === 'android') {
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -53,7 +62,8 @@ export default function LoginScreen({ navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
     <ScrollView
-      contentContainerStyle={styles.container}
+      ref={scrollRef}
+      contentContainerStyle={[styles.container, { paddingBottom: Platform.OS === 'android' ? keyboardHeight + 40 : 40 }]}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
     >
@@ -76,6 +86,7 @@ export default function LoginScreen({ navigation }) {
         onChangeText={setEmail}
         keyboardType="email-address"
         autoCapitalize="none"
+        onFocus={scrollToFocused}
       />
       <View style={styles.passwordRow}>
         <TextInput
@@ -85,6 +96,7 @@ export default function LoginScreen({ navigation }) {
           value={password}
           onChangeText={setPassword}
           secureTextEntry={!showPassword}
+          onFocus={scrollToFocused}
         />
         <TouchableOpacity
           style={styles.eyeButton}

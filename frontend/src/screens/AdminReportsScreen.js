@@ -8,6 +8,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
+import useKeyboardHeight from '../hooks/useKeyboardHeight';
 
 const validationStyle = (status) => {
   switch (status) {
@@ -37,6 +38,8 @@ export default function AdminReportsScreen() {
   const [rejecting, setRejecting] = useState(null);
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const keyboardHeight = useKeyboardHeight();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -179,7 +182,7 @@ export default function AdminReportsScreen() {
         animationType="fade"
         onRequestClose={() => setRejecting(null)}
       >
-        <KeyboardAvoidingView style={styles.modalBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={[styles.modalBackdrop, { paddingBottom: Platform.OS === 'android' ? keyboardHeight : 0 }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.modalPanel}>
             <Text style={styles.modalTitle}>Motivo del rechazo</Text>
             <TextInput
