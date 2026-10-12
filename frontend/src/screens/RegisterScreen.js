@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback,
-  StyleSheet, ActivityIndicator, Alert, Image, Dimensions, ScrollView
+  StyleSheet, ActivityIndicator, Alert, Image, Dimensions, ScrollView,
+  KeyboardAvoidingView, Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -69,6 +70,7 @@ export default function RegisterScreen({ navigation }) {
         <LinearGradient colors={['transparent', '#0e7490']} style={styles.fade} />
       </View>
 
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.container} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Crear Cuenta</Text>
         <Text style={styles.subtitle}>Únete a la comunidad</Text>
@@ -141,12 +143,14 @@ export default function RegisterScreen({ navigation }) {
           <Text style={styles.link}>¿Ya tienes cuenta? Inicia sesión</Text>
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
     </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
+  flex:         { flex: 1 },
   wrapper:      { flex: 1, backgroundColor: '#0e7490' },
   imageWrapper: { height: height * 0.28, marginHorizontal: 0 },
   image:        { width: '100%', height: '100%', resizeMode: 'cover' },

@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, Modal, TextInput, Alert,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -178,7 +179,7 @@ export default function AdminReportsScreen() {
         animationType="fade"
         onRequestClose={() => setRejecting(null)}
       >
-        <View style={styles.modalBackdrop}>
+        <KeyboardAvoidingView style={styles.modalBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.modalPanel}>
             <Text style={styles.modalTitle}>Motivo del rechazo</Text>
             <TextInput
@@ -199,7 +200,7 @@ export default function AdminReportsScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

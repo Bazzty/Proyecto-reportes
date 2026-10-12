@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback,
-  StyleSheet, ActivityIndicator, Alert, Image, Dimensions
+  StyleSheet, ActivityIndicator, Alert, Image, Dimensions,
+  KeyboardAvoidingView, Platform, ScrollView
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,7 +48,15 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+    <ScrollView
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+    >
       <View style={styles.imageWrapper}>
         <Image source={require('../../assets/lake.png')} style={styles.image} />
         <LinearGradient
@@ -105,13 +114,15 @@ export default function LoginScreen({ navigation }) {
       <TouchableOpacity style={{ marginTop: 12 }} onPress={() => navigation.navigate('Home', { guest: true })}>
         <Text style={styles.guestLink}>Continuar sin cuenta →</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
+    </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: '#0e7490', paddingHorizontal: 24, paddingBottom: 40 },
+  flex:         { flex: 1 },
+  container:    { flexGrow: 1, backgroundColor: '#0e7490', paddingHorizontal: 24, paddingBottom: 40 },
   imageWrapper: { height: height * 0.42, marginHorizontal: -24 },
   image:        { width: '100%', height: '100%', resizeMode: 'cover' },
   fade: {
