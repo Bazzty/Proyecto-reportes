@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  StyleSheet, Text, View, SafeAreaView, ActivityIndicator,
+  StyleSheet, Text, View, ActivityIndicator,
   Alert, TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,7 +23,7 @@ const formatDate = (iso) => {
   return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-export default function DetalleReporteScreen({ route }) {
+export default function DetalleReporteScreen({ route, navigation }) {
   const { reportId } = route.params;
 
   const [report, setReport]         = useState(null);
@@ -140,7 +141,17 @@ export default function DetalleReporteScreen({ route }) {
           <Text style={styles.infoText}>{formatDate(report.created_at)}</Text>
         </View>
 
-        {/* Confirmaciones — oculto si es tu propio reporte */}
+        <TouchableOpacity
+          style={styles.mapBtn}
+          activeOpacity={0.75}
+          onPress={() => navigation.popTo('Home', {
+            focusReport: { id: report.id, latitude: report.latitude, longitude: report.longitude },
+          }, { merge: true })}
+        >
+          <Ionicons name="map-outline" size={20} color="#fff" />
+          <Text style={styles.mapBtnText}>Ver en el mapa</Text>
+        </TouchableOpacity>
+
         {!isOwner && <TouchableOpacity
           style={[styles.confirmBtn, confirmed && styles.confirmBtnActive]}
           onPress={handleConfirm}
@@ -172,7 +183,6 @@ export default function DetalleReporteScreen({ route }) {
           </View>
         )}
 
-        {/* Título sección comentarios */}
         <Text style={styles.commentsTitle}>
           Comentarios {comments.length > 0 ? `(${comments.length})` : ''}
         </Text>
@@ -181,7 +191,7 @@ export default function DetalleReporteScreen({ route }) {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -261,6 +271,11 @@ const styles = StyleSheet.create({
   infoRow:     { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   infoText:    { fontSize: 12, color: '#9ca3af', marginLeft: 4 },
 
+  mapBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#0e7490', borderRadius: 12, paddingVertical: 12, marginBottom: 12,
+  },
+  mapBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   confirmBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     borderWidth: 1.5, borderColor: '#0e7490', borderRadius: 24,
