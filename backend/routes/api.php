@@ -1,25 +1,30 @@
 <?php
 
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\CommentController;
+use App\Http\Controllers\ConfirmationController;
+use App\Http\Controllers\ReportController;
 use Illuminate\Support\Facades\Route;
 
 // Public routes
-Route::post('/register', [App\Http\Controllers\AuthController::class, 'register']);
-Route::post('/login',    [App\Http\Controllers\AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
-Route::get('/categories',             [App\Http\Controllers\CategoryController::class, 'index']);
-Route::get('/reports/heatmap',        [App\Http\Controllers\ReportController::class, 'heatmap']);
-Route::get('/reports',                [App\Http\Controllers\ReportController::class, 'index']);
-Route::get('/reports/{id}',           [App\Http\Controllers\ReportController::class, 'show']);
-Route::get('/reports/{id}/comments',  [App\Http\Controllers\CommentController::class, 'index']);
+Route::get('/categories', [CategoryController::class, 'index']);
+Route::get('/reports/heatmap', [ReportController::class, 'heatmap']);
+Route::get('/reports', [ReportController::class, 'index']);
+Route::get('/reports/{id}', [ReportController::class, 'show']);
+Route::get('/reports/{id}/comments', [CommentController::class, 'index']);
 
 // Protected routes (require Sanctum token)
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [App\Http\Controllers\AuthController::class, 'logout']);
+    Route::post('/logout', [AuthController::class, 'logout']);
 
-    Route::post('/reports',                    [App\Http\Controllers\ReportController::class, 'store']);
-    Route::get('/user/reports',                [App\Http\Controllers\ReportController::class, 'userReports']);
+    Route::post('/reports', [ReportController::class, 'store']);
+    Route::get('/user/reports', [ReportController::class, 'userReports']);
 
-    Route::post('/reports/{id}/confirm',       [App\Http\Controllers\ConfirmationController::class, 'toggle']);
+    Route::post('/reports/{id}/confirm', [ConfirmationController::class, 'toggle']);
 
-    Route::post('/reports/{id}/comments',      [App\Http\Controllers\CommentController::class, 'store']);
+    Route::post('/reports/{id}/comments', [CommentController::class, 'store']);
 });

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Category;
 use App\Models\Report;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -20,15 +21,20 @@ class ReportSeeder extends Seeder
             ['name' => 'Alonso Vera',        'email' => 'alonso@demo.cl'],
         ];
 
+        $userRoleId = Role::firstOrCreate(['name' => Role::USER])->id;
+
         $createdUsers = [];
         foreach ($users as $u) {
-            $createdUsers[] = User::firstOrCreate(
+            $user = User::firstOrCreate(
                 ['email' => $u['email']],
                 ['name' => $u['name'], 'password' => Hash::make('password')]
             );
+            // DatabaseSeeder desactiva los eventos del modelo, así que el rol se asigna aquí.
+            $user->roles()->syncWithoutDetaching([$userRoleId]);
+            $createdUsers[] = $user;
         }
 
-        $categories = Category::all()->keyBy(fn($c) => strtolower($c->name));
+        $categories = Category::all()->keyBy(fn ($c) => strtolower($c->name));
 
         // Reportes distribuidos por el Lago Llanquihue y comunas aledañas
         $reports = [
@@ -70,18 +76,20 @@ class ReportSeeder extends Seeder
 
         foreach ($reports as $i => $r) {
             $cat = $categories->get($r['cat']);
-            if (!$cat) continue;
+            if (! $cat) {
+                continue;
+            }
 
             $user = $createdUsers[$i % count($createdUsers)];
 
             Report::create([
-                'user_id'     => $user->id,
+                'user_id' => $user->id,
                 'category_id' => $cat->id,
                 'description' => $r['desc'],
-                'latitude'    => $r['lat'],
-                'longitude'   => $r['lng'],
-                'photo_path'  => null,
-                'status'      => $r['status'],
+                'latitude' => $r['lat'],
+                'longitude' => $r['lng'],
+                'photo_path' => null,
+                'status' => $r['status'],
             ]);
         }
     }

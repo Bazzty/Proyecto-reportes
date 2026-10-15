@@ -25,9 +25,10 @@ export default function HomeScreen({ navigation, route }) {
   const [userName, setUserName]           = useState('');
   const [reports, setReports]             = useState([]);
   const [myReports, setMyReports]         = useState([]);
-  const [activeFilter, setActiveFilters]   = useState(null);
+  const [activeFilters, setActiveFilters] = useState([]); // ids de categoría; vacío = "Todos"
   const [categories, setCategories]       = useState([]);
   const [heatmapPoints, setHeatmapPoints] = useState([]);
+  const [offline, setOffline]           = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem('userName').then(name => { if (name) setUserName(name); });
@@ -80,6 +81,8 @@ export default function HomeScreen({ navigation, route }) {
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      let timer = null;
+      let failures = 0;
       const fetchReports = async () => {
         try {
           const requests = [api.get('/reports'), api.get('/reports/heatmap')];
@@ -103,12 +106,18 @@ export default function HomeScreen({ navigation, route }) {
               return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
             });
           }
-        } catch {}
+          failures = 0;
+          setOffline(false);
+        } catch {
+          // Un fallo aislado se ignora; dos seguidos indican que los datos mostrados están desactualizados
+          failures += 1;
+          if (active && failures >= 2) setOffline(true);
+        }
+        if (active) timer = setTimeout(fetchReports, 5000);
       };
 
       fetchReports();
-      const interval = setInterval(fetchReports, 5000);
-      return () => { active = false; clearInterval(interval); };
+      return () => { active = false; clearTimeout(timer); };
     }, [isGuest])
   );
 
@@ -146,12 +155,25 @@ export default function HomeScreen({ navigation, route }) {
   const pendientes = myReports.filter(r => r.status?.toLowerCase() === 'pendiente').length;
   const resueltos  = myReports.filter(r => r.status?.toLowerCase() === 'resuelto').length;
 
-  const visibleReports = activeFilter
-    ? reports.filter(r => r.category?.name === activeFilter)
+  const toggleFilter = (id) =>
+    setActiveFilters(prev =>
+      prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]
+    );
+
+  // Sin filtros se muestran todos los reportes; con filtros, solo los de las
+  // categorías seleccionadas.
+  const visibleReports = activeFilters.length > 0
+    ? reports.filter(r => activeFilters.includes(r.category?.id))
     : reports;
 
   return (
     <View style={styles.container}>
+      {offline && (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={16} color="#fff" />
+          <Text style={styles.offlineText}>Sin conexión: los datos pueden estar desactualizados</Text>
+        </View>
+      )}
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFillObject}
@@ -257,22 +279,25 @@ export default function HomeScreen({ navigation, route }) {
       <View style={styles.filtersWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersContent}>
           <TouchableOpacity
-            style={[styles.chip, !activeFilter && styles.chipActive]}
-            onPress={() => setActiveFilters(null)}
+            style={[styles.chip, activeFilters.length === 0 && styles.chipActive]}
+            onPress={() => setActiveFilters([])}
           >
-            <Text style={[styles.chipText, !activeFilter && styles.chipTextActive]}>Todos</Text>
+            <Text style={[styles.chipText, activeFilters.length === 0 && styles.chipTextActive]}>Todos</Text>
           </TouchableOpacity>
-          {categories.map(cat => (
-            <TouchableOpacity
-              key={cat.id}
-              style={[styles.chip, activeFilter === cat.name && styles.chipActive]}
-              onPress={() => setActiveFilters(activeFilter === cat.name ? null : cat.name)}
-            >
-              <Text style={[styles.chipText, activeFilter === cat.name && styles.chipTextActive]}>
-                {cat.name.charAt(0).toUpperCase() + cat.name.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {categories.map(cat => {
+            const selected = activeFilters.includes(cat.id);
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                style={[styles.chip, selected && styles.chipActive]}
+                onPress={() => toggleFilter(cat.id)}
+              >
+                <Text style={[styles.chipText, selected && styles.chipTextActive]}>
+                  {cat.name.charAt(0).toUpperCase() + cat.name.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </View>
 
@@ -319,6 +344,13 @@ export default function HomeScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  offlineBanner: {
+    position: 'absolute', top: 50, left: 16, right: 16, zIndex: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#b91c1c', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+  },
+  offlineText: { color: '#fff', fontSize: 12, fontWeight: '600', flexShrink: 1 },
+
   container: { flex: 1 },
 
   greetingCard: {

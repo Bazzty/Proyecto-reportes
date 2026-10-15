@@ -13,3 +13,7 @@ generar_informe.py
 # Editor
 .vscode/
 .idea/
+
+# Claude Code (local)
+.claude/settings.local.json
+backend/.claude/
