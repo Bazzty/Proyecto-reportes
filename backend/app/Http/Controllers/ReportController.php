@@ -55,7 +55,7 @@ class ReportController extends Controller
 
     public function userReports(Request $request)
     {
-        $uid   = $request->user()->id;
+        $uid = $request->user()->id;
         $query = $this->withReportData($request->user()->reports(), $uid)
             ->latest()
             ->latest('id');
@@ -65,13 +65,13 @@ class ReportController extends Controller
         }
 
         $perPage = max(1, min((int) $request->query('per_page', 2), 50));
-        $page    = $query->paginate($perPage);
+        $page = $query->paginate($perPage);
 
         return response()->json([
-            'data'         => $page->getCollection()->map(fn (Report $r) => $this->formatReport($r, $uid))->values(),
+            'data' => $page->getCollection()->map(fn (Report $r) => $this->formatReport($r, $uid))->values(),
             'current_page' => $page->currentPage(),
-            'last_page'    => $page->lastPage(),
-            'total'        => $page->total(),
+            'last_page' => $page->lastPage(),
+            'total' => $page->total(),
         ]);
     }
 
