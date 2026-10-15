@@ -7,6 +7,7 @@ use App\Models\Report;
 use App\Models\User;
 use App\Models\Zone;
 use App\Services\ZoneResolver;
+use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\ZoneSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -250,6 +251,14 @@ class ZoneHeatmapTest extends TestCase
             ['min_lat' => 2.0, 'max_lat' => 22.0, 'min_lng' => 1.0, 'max_lng' => 12.0],
             $zone->only(['min_lat', 'max_lat', 'min_lng', 'max_lng'])
         );
+    }
+
+    public function test_database_seeder_stores_bounding_boxes_even_without_model_events()
+    {
+        $this->seed(DatabaseSeeder::class);
+
+        $this->assertSame(0, Zone::where('min_lat', 0)->where('max_lat', 0)->count());
+        $this->assertGreaterThan(0, Report::whereNotNull('zone_id')->count());
     }
 
     public function test_seeder_reassigns_existing_reports_after_zones_are_recreated()

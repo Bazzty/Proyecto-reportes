@@ -31,6 +31,10 @@ class ZoneSeeder extends Seeder
 
             $slug = $this->uniqueSlug(Str::slug($name), $type, $used);
 
+            $zone = new Zone(['boundary' => $feature['geometry']]);
+
+            // La caja envolvente se calcula aquí y no solo en el hook del modelo: DatabaseSeeder usa
+            // WithoutModelEvents, así que con `db:seed` los eventos del modelo no se disparan.
             Zone::updateOrCreate(
                 ['slug' => $slug],
                 [
@@ -38,7 +42,7 @@ class ZoneSeeder extends Seeder
                     'type' => $type,
                     'boundary' => $feature['geometry'],
                     'area' => $this->area($feature['geometry']),
-                ]
+                ] + $zone->boundingBox()
             );
         }
 
