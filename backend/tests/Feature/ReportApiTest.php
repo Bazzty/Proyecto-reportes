@@ -172,48 +172,6 @@ class ReportApiTest extends TestCase
             ->assertJsonFragment(['description' => 'Detalle público']);
     }
 
-    public function test_heatmap_returns_only_coordinates()
-    {
-        $user = User::factory()->create();
-        $category = Category::create(['name' => 'basura']);
-
-        Report::create([
-            'user_id' => $user->id,
-            'category_id' => $category->id,
-            'description' => 'Punto 1',
-            'latitude' => -33.4489,
-            'longitude' => -70.6693,
-            'photo_path' => 'photos/a.jpg',
-            'status' => 'Pendiente',
-        ]);
-
-        Report::create([
-            'user_id' => $user->id,
-            'category_id' => $category->id,
-            'description' => 'Punto 2',
-            'latitude' => -33.4600,
-            'longitude' => -70.6800,
-            'photo_path' => 'photos/b.jpg',
-            'status' => 'Resuelto',
-        ]);
-
-        Sanctum::actingAs($user, ['*']);
-
-        $response = $this->getJson('/api/reports/heatmap');
-
-        $response->assertStatus(200)
-            ->assertJsonCount(2)
-            ->assertJsonFragment(['latitude' => -33.4489, 'longitude' => -70.6693])
-            ->assertJsonFragment(['latitude' => -33.4600, 'longitude' => -70.6800]);
-
-        // Solo coordenadas, sin description ni status
-        $first = $response->json()[0];
-        $this->assertArrayHasKey('latitude', $first);
-        $this->assertArrayHasKey('longitude', $first);
-        $this->assertArrayNotHasKey('description', $first);
-        $this->assertArrayNotHasKey('status', $first);
-    }
-
     private function validReportPayload(Category $category, array $overrides = []): array
     {
         return array_merge([

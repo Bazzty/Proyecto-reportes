@@ -88,7 +88,7 @@ Escanear el QR con **Expo Go**. El dispositivo y la computadora deben estar en l
 - Modo invitado (solo lectura, sin registro)
 - Mapa con marcadores coloreados por estado (Pendiente / En Progreso / Resuelto)
 - Filtros por categoría (basura, escombros, aguas, otro)
-- Heatmap de densidad en Android
+- Heatmap de densidad agrupado por zona (comunas/sectores) en Android
 - Crear reporte con foto (cámara o galería), GPS y categoría
 - Mis Reportes con foto, estado y lightbox de imagen
 - Detalle de reporte con botón "Yo también lo vi" y comentarios

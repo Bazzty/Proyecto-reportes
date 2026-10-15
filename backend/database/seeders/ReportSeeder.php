@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Report;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\ZoneResolver;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -81,10 +82,12 @@ class ReportSeeder extends Seeder
             }
 
             $user = $createdUsers[$i % count($createdUsers)];
+            $zone = app(ZoneResolver::class)->resolve((float) $r['lat'], (float) $r['lng']);
 
             Report::create([
                 'user_id' => $user->id,
                 'category_id' => $cat->id,
+                'zone_id' => $zone?->id,
                 'description' => $r['desc'],
                 'latitude' => $r['lat'],
                 'longitude' => $r['lng'],
