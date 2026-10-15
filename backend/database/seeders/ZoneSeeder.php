@@ -4,7 +4,9 @@ namespace Database\Seeders;
 
 use App\Models\Zone;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 class ZoneSeeder extends Seeder
 {
@@ -13,22 +15,49 @@ class ZoneSeeder extends Seeder
         $path = database_path('data/zones.geojson');
 
         if (! is_file($path)) {
-            return;
+            throw new RuntimeException("No se encontró {$path}; es necesario para sembrar las zonas del heatmap.");
         }
 
         $data = json_decode(file_get_contents($path), true);
+        $used = [];
 
         foreach ($data['features'] ?? [] as $feature) {
+            $name = $feature['properties']['name'];
+            $type = $feature['properties']['type'];
+
             Zone::updateOrCreate(
-                ['slug' => Str::slug($feature['properties']['name'])],
+                ['slug' => $this->uniqueSlug(Str::slug($name), $type, $used)],
                 [
-                    'name' => $feature['properties']['name'],
-                    'type' => $feature['properties']['type'],
+                    'name' => $name,
+                    'type' => $type,
                     'boundary' => $feature['geometry'],
                     'area' => $this->area($feature['geometry']),
                 ]
             );
         }
+
+        Cache::forget('zones.all');
+    }
+
+    /**
+     * @param  array<string, bool>  $used
+     */
+    private function uniqueSlug(string $base, string $type, array &$used): string
+    {
+        $slug = $base;
+
+        if (isset($used[$slug])) {
+            $slug = $base.'-'.$type;
+        }
+
+        $i = 2;
+        while (isset($used[$slug])) {
+            $slug = $base.'-'.$type.'-'.$i++;
+        }
+
+        $used[$slug] = true;
+
+        return $slug;
     }
 
     private function area(array $geometry): float

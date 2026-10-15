@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Zone;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class ZoneResolver
 {
@@ -31,7 +32,7 @@ class ZoneResolver
 
     private function zones(): Collection
     {
-        return $this->zones ??= Zone::all();
+        return $this->zones ??= Cache::remember('zones.all', now()->addHour(), fn () => Zone::all());
     }
 
     private function contains(array $geometry, float $latitude, float $longitude): bool

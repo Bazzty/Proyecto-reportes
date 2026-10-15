@@ -84,7 +84,7 @@ class ZoneHeatmapTest extends TestCase
         $this->assertDatabaseHas('reports', ['id' => $response->json('id'), 'zone_id' => null]);
     }
 
-    public function test_heatmap_groups_by_zone_and_buckets_without_zone()
+    public function test_heatmap_returns_individual_points_with_zone()
     {
         $this->seed(ZoneSeeder::class);
         $user = User::factory()->create();
@@ -95,17 +95,66 @@ class ZoneHeatmapTest extends TestCase
         $this->makeReport($user, $category, -41.3175, -72.9860, $puertoVaras);
         $this->makeReport($user, $category, -33.45, -70.65, null);
 
-        $response = $this->getJson('/api/reports/heatmap')->assertOk()->assertJsonCount(2);
+        // Un punto por reporte (no agregado), así no se pierde la densidad.
+        $response = $this->getJson('/api/reports/heatmap')->assertOk()->assertJsonCount(3);
 
         $data = collect($response->json());
-        $comuna = $data->firstWhere('zone.name', 'Puerto Varas');
-        $sinZona = $data->firstWhere('zone.name', 'Sin zona');
+        $this->assertTrue($data->every(fn ($p) => isset($p['latitude'], $p['longitude'])));
 
-        $this->assertSame(2, $comuna['count']);
-        $this->assertSame(1, $sinZona['count']);
-        $this->assertNull($sinZona['zone']['id']);
-        $this->assertArrayHasKey('latitude', $comuna);
-        $this->assertArrayHasKey('longitude', $comuna);
+        $zoned = $data->filter(fn ($p) => ($p['zone']['name'] ?? null) === 'Puerto Varas');
+        $this->assertCount(2, $zoned);
+
+        $unzoned = $data->first(fn ($p) => $p['zone'] === null);
+        $this->assertNotNull($unzoned);
+        $this->assertSame(-33.45, $unzoned['latitude']);
+    }
+
+    public function test_resolver_matches_multipolygon()
+    {
+        Zone::create([
+            'name' => 'Multi', 'slug' => 'multi', 'type' => 'sector', 'area' => 1.0,
+            'boundary' => ['type' => 'MultiPolygon', 'coordinates' => [
+                [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]],
+                [[[10, 10], [10, 11], [11, 11], [11, 10], [10, 10]]],
+            ]],
+        ]);
+
+        $resolver = app(ZoneResolver::class);
+
+        $this->assertNotNull($resolver->resolve(0.5, 0.5));
+        $this->assertNotNull($resolver->resolve(10.5, 10.5));
+        $this->assertNull($resolver->resolve(5.0, 5.0));
+    }
+
+    public function test_resolver_respects_polygon_holes()
+    {
+        Zone::create([
+            'name' => 'Hole', 'slug' => 'hole', 'type' => 'comuna', 'area' => 1.0,
+            'boundary' => ['type' => 'Polygon', 'coordinates' => [
+                [[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]],
+                [[4, 4], [6, 4], [6, 6], [4, 6], [4, 4]],
+            ]],
+        ]);
+
+        $resolver = app(ZoneResolver::class);
+
+        $this->assertNotNull($resolver->resolve(2.0, 2.0));
+        $this->assertNull($resolver->resolve(5.0, 5.0));
+    }
+
+    public function test_resolver_handles_points_near_the_edge()
+    {
+        Zone::create([
+            'name' => 'Edge', 'slug' => 'edge', 'type' => 'comuna', 'area' => 1.0,
+            'boundary' => ['type' => 'Polygon', 'coordinates' => [
+                [[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]],
+            ]],
+        ]);
+
+        $resolver = app(ZoneResolver::class);
+
+        $this->assertNotNull($resolver->resolve(0.0001, 0.0001));
+        $this->assertNull($resolver->resolve(-0.5, -0.5));
     }
 
     private function makeReport(User $user, Category $category, float $lat, float $lng, ?int $zoneId): void

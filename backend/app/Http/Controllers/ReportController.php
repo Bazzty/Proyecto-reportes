@@ -65,24 +65,15 @@ class ReportController extends Controller
 
     public function heatmap()
     {
-        $reports = Report::with('zone')->get(['id', 'zone_id', 'latitude', 'longitude']);
+        $reports = Report::with('zone')->get(['latitude', 'longitude', 'zone_id']);
 
-        $grouped = $reports->groupBy(fn (Report $report) => $report->zone_id ?? 'none');
-
-        $zones = $grouped->map(function ($items) {
-            $zone = $items->first()->zone;
-
-            return [
-                'zone' => $zone
-                    ? ['id' => $zone->id, 'name' => $zone->name]
-                    : ['id' => null, 'name' => 'Sin zona'],
-                'latitude' => round((float) $items->avg('latitude'), 6),
-                'longitude' => round((float) $items->avg('longitude'), 6),
-                'count' => $items->count(),
-            ];
-        })->values();
-
-        return response()->json($zones);
+        return response()->json($reports->map(fn (Report $report) => [
+            'latitude' => (float) $report->latitude,
+            'longitude' => (float) $report->longitude,
+            'zone' => $report->zone
+                ? ['id' => $report->zone->id, 'name' => $report->zone->name]
+                : null,
+        ]));
     }
 
     private function withReportData(Builder|Relation $query, ?int $authUserId): Builder|Relation
