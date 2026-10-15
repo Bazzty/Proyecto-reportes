@@ -88,7 +88,7 @@ Escanear el QR con **Expo Go**. El dispositivo y la computadora deben estar en l
 - Modo invitado (solo lectura, sin registro)
 - Mapa con marcadores coloreados por estado (Pendiente / En Progreso / Resuelto)
 - Filtros por categoría (basura, escombros, aguas, otro)
-- Heatmap de densidad: cada reporte es un punto con su zona (comuna/sector). Tras el deploy, correr `php artisan zones:assign` para asignar la zona a los reportes existentes (backfill)
+- Heatmap de densidad: cada reporte es un punto con su zona (comuna/sector). Tras el deploy, correr `php artisan db:seed --class=ZoneSeeder` (carga las zonas) y luego `php artisan zones:assign` para asignar la zona a los reportes existentes (backfill)
 - Crear reporte con foto (cámara o galería), GPS y categoría
 - Mis Reportes con foto, estado y lightbox de imagen
 - Detalle de reporte con botón "Yo también lo vi" y comentarios

@@ -22,11 +22,17 @@ class ZoneSeeder extends Seeder
         $used = [];
 
         foreach ($data['features'] ?? [] as $feature) {
-            $name = $feature['properties']['name'];
-            $type = $feature['properties']['type'];
+            $name = $feature['properties']['name'] ?? null;
+            $type = $feature['properties']['type'] ?? null;
+
+            if ($name === null || $type === null || empty($feature['geometry'])) {
+                throw new RuntimeException('Feature inválido en zones.geojson: requiere properties.name, properties.type y geometry.');
+            }
+
+            $slug = $this->uniqueSlug(Str::slug($name), $type, $used);
 
             Zone::updateOrCreate(
-                ['slug' => $this->uniqueSlug(Str::slug($name), $type, $used)],
+                ['slug' => $slug],
                 [
                     'name' => $name,
                     'type' => $type,
@@ -35,6 +41,9 @@ class ZoneSeeder extends Seeder
                 ]
             );
         }
+
+        // Elimina zonas que ya no están en el archivo; sus reportes quedan sin zona (re-ejecutar zones:assign).
+        Zone::whereNotIn('slug', array_keys($used))->delete();
 
         Cache::forget('zones.all');
     }
@@ -69,6 +78,11 @@ class ZoneSeeder extends Seeder
         foreach ($polygons as $polygon) {
             if (($polygon[0] ?? []) !== []) {
                 $total += $this->ringArea($polygon[0]);
+
+                // Los anillos siguientes son huecos.
+                foreach (array_slice($polygon, 1) as $hole) {
+                    $total -= $this->ringArea($hole);
+                }
             }
         }
 

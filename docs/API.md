@@ -244,7 +244,7 @@ No requiere token. Devuelve **un punto por reporte** (`latitude`, `longitude`) j
   { "latitude": -33.4569, "longitude": -70.6483, "zone": null }
 ]
 ```
-> Para asignar `zone` a los reportes ya existentes, ejecutá una vez tras el deploy: `php artisan zones:assign` (backfill).
+> Para asignar `zone` a los reportes ya existentes, ejecutá una vez tras el deploy: `php artisan db:seed --class=ZoneSeeder` (carga las zonas) y luego `php artisan zones:assign` (backfill).
 
 ---
 

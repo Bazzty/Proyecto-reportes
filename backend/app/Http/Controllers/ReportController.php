@@ -65,7 +65,7 @@ class ReportController extends Controller
 
     public function heatmap()
     {
-        $reports = Report::with('zone')->get(['latitude', 'longitude', 'zone_id']);
+        $reports = Report::with('zone:id,name')->get(['latitude', 'longitude', 'zone_id']);
 
         return response()->json($reports->map(fn (Report $report) => [
             'latitude' => (float) $report->latitude,

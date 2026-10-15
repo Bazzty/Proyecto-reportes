@@ -10,6 +10,7 @@ use App\Services\ZoneResolver;
 use Database\Seeders\ZoneSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -17,6 +18,13 @@ use Tests\TestCase;
 class ZoneHeatmapTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Cache::forget('zones.all');
+    }
 
     public function test_seeder_creates_the_expected_zones()
     {
@@ -155,6 +163,41 @@ class ZoneHeatmapTest extends TestCase
 
         $this->assertNotNull($resolver->resolve(0.0001, 0.0001));
         $this->assertNull($resolver->resolve(-0.5, -0.5));
+    }
+
+    public function test_assign_command_backfills_zones_without_touching_updated_at()
+    {
+        $this->seed(ZoneSeeder::class);
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $this->makeReport($user, $category, -41.3198, -72.9833, null);
+        $this->makeReport($user, $category, -33.45, -70.65, null);
+        Report::query()->update(['updated_at' => '2020-01-01 00:00:00']);
+
+        $this->artisan('zones:assign')->expectsOutput('Reportes actualizados: 1')->assertSuccessful();
+
+        $this->assertSame(1, Report::whereNotNull('zone_id')->count());
+        $this->assertSame(
+            Zone::where('name', 'Puerto Varas')->value('id'),
+            Report::where('latitude', -41.3198)->value('zone_id')
+        );
+        $this->assertSame(2, Report::where('updated_at', '2020-01-01 00:00:00')->count());
+    }
+
+    public function test_assign_command_fails_when_there_are_no_zones()
+    {
+        $this->artisan('zones:assign')->assertFailed();
+    }
+
+    public function test_seeder_removes_zones_missing_from_the_file()
+    {
+        $this->seed(ZoneSeeder::class);
+        Zone::create(['name' => 'Vieja', 'slug' => 'vieja', 'type' => 'comuna', 'boundary' => ['type' => 'Polygon', 'coordinates' => []], 'area' => 1.0]);
+
+        $this->seed(ZoneSeeder::class);
+
+        $this->assertDatabaseMissing('zones', ['slug' => 'vieja']);
+        $this->assertSame(7, Zone::count());
     }
 
     private function makeReport(User $user, Category $category, float $lat, float $lng, ?int $zoneId): void
