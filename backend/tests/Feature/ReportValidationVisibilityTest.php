@@ -49,10 +49,11 @@ class ReportValidationVisibilityTest extends TestCase
         $this->makeReport($user, $category, 'valido');
         $this->makeReport($user, $category, 'rechazado');
 
+        // El endpoint devuelve puntos individuales (sin agregar): solo el reporte válido.
         $this->getJson('/api/reports/heatmap')
             ->assertOk()
             ->assertJsonCount(1)
-            ->assertJsonPath('0.count', 1);
+            ->assertJsonStructure([['latitude', 'longitude']]);
     }
 
     public function test_show_returns_404_for_rejected_report_to_guest()

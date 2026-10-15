@@ -11,6 +11,39 @@ import useNotifications from '../hooks/useNotifications';
 import { subscribe as subscribeQueue, getPendingCount, isSyncing } from '../services/offlineQueue';
 import { syncStatusNotifications, markAllRead } from '../services/notifications';
 
+// El endpoint /reports/heatmap devuelve un punto por reporte (con su zona).
+// Para el heat "por zona" agrupamos los reportes con zona en su centroide; los
+// que no caen en ninguna zona se muestran individuales (no hay centroide representativo).
+const groupHeatByZone = (points) => {
+  const zones = new Map();
+  const unzoned = [];
+
+  points.forEach((p) => {
+    const latitude = parseFloat(p.latitude);
+    const longitude = parseFloat(p.longitude);
+
+    if (p.zone?.id != null) {
+      const group = zones.get(p.zone.id) ?? { name: p.zone.name, lat: 0, lng: 0, count: 0 };
+      group.lat += latitude;
+      group.lng += longitude;
+      group.count += 1;
+      zones.set(p.zone.id, group);
+    } else {
+      unzoned.push({ latitude, longitude, weight: 1, zoneName: 'Sin zona', count: 1 });
+    }
+  });
+
+  const zoned = Array.from(zones.values()).map((g) => ({
+    latitude: g.lat / g.count,
+    longitude: g.lng / g.count,
+    weight: g.count,
+    zoneName: g.name,
+    count: g.count,
+  }));
+
+  return [...zoned, ...unzoned];
+};
+
 
 export default function HomeScreen({ navigation, route }) {
   const isGuest = route.params?.guest === true;
@@ -108,13 +141,7 @@ export default function HomeScreen({ navigation, route }) {
             const next = allRes.data;
             return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
           });
-          setZoneHeatPoints(heatRes.data.map(p => ({
-            latitude: parseFloat(p.latitude),
-            longitude: parseFloat(p.longitude),
-            weight: p.count ?? 1,
-            zoneName: p.zone?.name ?? 'Sin zona',
-            count: p.count ?? 0,
-          })));
+          setZoneHeatPoints(groupHeatByZone(heatRes.data));
           if (!isGuest && myRes) {
             setMyReports(prev => {
               const next = myRes.data;

@@ -55,7 +55,12 @@ const mockApi = ({ mine = [] } = {}) => {
   api.get.mockImplementation((url) => {
     if (url === '/categories') return Promise.resolve({ data: CATEGORIES });
     if (url === '/reports') return Promise.resolve({ data: REPORTS });
-    if (url === '/reports/heatmap') return Promise.resolve({ data: [{ latitude: '-41.31', longitude: '-72.98', count: 3 }] });
+    if (url === '/reports/heatmap') return Promise.resolve({ data: [
+      { latitude: '-41.31', longitude: '-72.98', zone: { id: 5, name: 'Puerto Varas' } },
+      { latitude: '-41.33', longitude: '-73.00', zone: { id: 5, name: 'Puerto Varas' } },
+      { latitude: '-41.35', longitude: '-73.02', zone: { id: 5, name: 'Puerto Varas' } },
+      { latitude: '-33.45', longitude: '-70.65', zone: null },
+    ] });
     if (url === '/user/reports') return Promise.resolve({ data: mine });
     return Promise.reject(new Error(`unexpected ${url}`));
   });
@@ -96,12 +101,17 @@ describe('HomeScreen', () => {
     expect(mockLeafletProps.reports[1].iconCode).toBe((63023).toString(16));
   });
 
-  it('pasa los puntos del heatmap (con conteo como peso) al mapa', async () => {
+  it('agrupa los puntos del heatmap por zona (centroide + peso) y deja "Sin zona" individuales', async () => {
     await setup();
 
-    await waitFor(() => expect(mockLeafletProps.heat).toEqual([
-      expect.objectContaining({ latitude: -41.31, longitude: -72.98, weight: 3 }),
-    ]));
+    await waitFor(() => expect(mockLeafletProps.heat).toHaveLength(2));
+
+    const [zoned, unzoned] = mockLeafletProps.heat;
+    expect(zoned).toMatchObject({ weight: 3, count: 3, zoneName: 'Puerto Varas' });
+    expect(zoned.latitude).toBeCloseTo(-41.33, 5);
+    expect(zoned.longitude).toBeCloseTo(-73, 5);
+    expect(unzoned).toMatchObject({ latitude: -33.45, longitude: -70.65, weight: 1, zoneName: 'Sin zona', count: 1 });
+
     expect(api.get).toHaveBeenCalledWith('/reports/heatmap');
   });
 
@@ -120,9 +130,8 @@ describe('HomeScreen', () => {
     await fireEvent.press(screen.getByText('Foco'));
     await fireEvent.press(screen.getByText('Zona'));
 
-    await waitFor(() => expect(mockLeafletProps.heat).toEqual([
-      expect.objectContaining({ latitude: -41.31, longitude: -72.98, weight: 3 }),
-    ]));
+    await waitFor(() => expect(mockLeafletProps.heat).toHaveLength(2));
+    expect(mockLeafletProps.heat[0]).toMatchObject({ weight: 3, zoneName: 'Puerto Varas', count: 3 });
   });
 
   it('el control "Ver" cambia qué capas muestra el mapa', async () => {
