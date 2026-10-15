@@ -25,7 +25,7 @@ export default function HomeScreen({ navigation, route }) {
   const [userName, setUserName]           = useState('');
   const [reports, setReports]             = useState([]);
   const [myReports, setMyReports]         = useState([]);
-  const [activeFilter, setActiveFilter]   = useState(null);
+  const [activeFilter, setActiveFilters]   = useState(null);
   const [categories, setCategories]       = useState([]);
   const [heatmapPoints, setHeatmapPoints] = useState([]);
 
@@ -67,7 +67,7 @@ export default function HomeScreen({ navigation, route }) {
   useEffect(() => {
   const focus = route.params?.focusReport;
   if (!focus) return;
-  setActiveFilter(null);
+  setActiveFilters(null);
   mapRef.current?.animateToRegion({
     latitude: parseFloat(focus.latitude),
     longitude: parseFloat(focus.longitude),
@@ -258,7 +258,7 @@ export default function HomeScreen({ navigation, route }) {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersContent}>
           <TouchableOpacity
             style={[styles.chip, !activeFilter && styles.chipActive]}
-            onPress={() => setActiveFilter(null)}
+            onPress={() => setActiveFilters(null)}
           >
             <Text style={[styles.chipText, !activeFilter && styles.chipTextActive]}>Todos</Text>
           </TouchableOpacity>
@@ -266,7 +266,7 @@ export default function HomeScreen({ navigation, route }) {
             <TouchableOpacity
               key={cat.id}
               style={[styles.chip, activeFilter === cat.name && styles.chipActive]}
-              onPress={() => setActiveFilter(activeFilter === cat.name ? null : cat.name)}
+              onPress={() => setActiveFilters(activeFilter === cat.name ? null : cat.name)}
             >
               <Text style={[styles.chipText, activeFilter === cat.name && styles.chipTextActive]}>
                 {cat.name.charAt(0).toUpperCase() + cat.name.slice(1)}
