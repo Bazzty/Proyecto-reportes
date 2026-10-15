@@ -410,21 +410,17 @@ describe('HomeScreen', () => {
     });
     await setup();
 
-    // Seleccionar Basura y Aguas: se ven ambas y se oculta Escombros
+    // Seleccionar Basura y Aguas: el mapa recibe ambas y no la de escombros
     await fireEvent.press(screen.getByText('Basura'));
     await fireEvent.press(screen.getByText('Aguas'));
-    expect(screen.getByText('Basura en la plaza')).toBeTruthy();
-    expect(screen.getByText('Agua contaminada')).toBeTruthy();
-    expect(screen.queryByText('Escombros en la calle')).toBeNull();
+    expect(mockLeafletProps.reports.map(r => r.id).sort()).toEqual([1, 2]);
 
     // Quitar Basura: queda solo Aguas
     await fireEvent.press(screen.getByText('Basura'));
-    expect(screen.queryByText('Basura en la plaza')).toBeNull();
-    expect(screen.getByText('Agua contaminada')).toBeTruthy();
+    expect(mockLeafletProps.reports.map(r => r.id)).toEqual([2]);
 
     // "Todos" limpia la selección y vuelven a verse todos
     await fireEvent.press(screen.getByText('Todos'));
-    expect(screen.getByText('Basura en la plaza')).toBeTruthy();
-    expect(screen.getByText('Escombros en la calle')).toBeTruthy();
+    expect(mockLeafletProps.reports.map(r => r.id).sort()).toEqual([1, 2, 3]);
   });
 });
