@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -165,5 +166,37 @@ class AuthApiTest extends TestCase
         $this->app['auth']->forgetGuards();
 
         $this->withToken($token)->getJson('/api/user/reports')->assertUnauthorized();
+    }
+
+    public function test_registered_user_gets_user_role_only()
+    {
+        $this->postJson('/api/register', [
+            'name' => 'Test User',
+            'email' => 'roles@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ])->assertCreated();
+
+        $user = User::where('email', 'roles@example.com')->first();
+
+        $this->assertTrue($user->hasRole('user'));
+        $this->assertFalse($user->isAdmin());
+    }
+
+    public function test_admin_factory_state_adds_admin_role()
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->assertTrue($admin->hasRole('user'));
+        $this->assertTrue($admin->isAdmin());
+    }
+
+    public function test_new_user_still_gets_user_role_if_it_was_deleted()
+    {
+        Role::where('name', 'user')->delete();
+
+        $user = User::factory()->create();
+
+        $this->assertTrue($user->hasRole('user'));
     }
 }
