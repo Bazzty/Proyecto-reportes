@@ -163,7 +163,7 @@ export default function HomeScreen({ navigation, route }) {
       )}
       <MapView
         ref={mapRef}
-        style={{ flex: 1 }}
+        style={styles.map}
         showsUserLocation
         showsMyLocationButton={false}
         showsCompass={false}
@@ -339,6 +339,8 @@ const styles = StyleSheet.create({
   offlineText: { color: '#fff', fontSize: 12, fontWeight: '600', flexShrink: 1 },
 
   container: { flex: 1 },
+  // flex (no absoluteFill): en iOS/Apple Maps el mapa debe ocupar el alto del contenedor
+  map: { flex: 1 },
 
   greetingCard: {
     position: 'absolute',

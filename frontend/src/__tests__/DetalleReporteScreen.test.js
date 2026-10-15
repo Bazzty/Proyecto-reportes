@@ -61,12 +61,22 @@ describe('DetalleReporteScreen', () => {
     expect(await screen.findByText('Lat -33.43720, Lng -70.65060')).toBeTruthy();
   });
 
+  it('no muestra la ubicación si el reporte no tiene coordenadas', async () => {
+    mockGet({ report: { ...REPORT, latitude: null, longitude: null } });
+    await setup();
+    await screen.findByText('Basura acumulada');
+    expect(screen.queryByText(/Lat /)).toBeNull();
+  });
+
+  it('no muestra la ubicación si las coordenadas no son numéricas', async () => {
+    mockGet({ report: { ...REPORT, latitude: 'abc', longitude: '' } });
+    await setup();
+    await screen.findByText('Basura acumulada');
+    expect(screen.queryByText(/Lat /)).toBeNull();
+  });
+
   it('si el reporte no existe (404) muestra "Reporte no encontrado" sin alerta', async () => {
-    api.get.mockImplementation((url) =>
-      url === '/reports/5'
-        ? Promise.reject({ response: { status: 404 } })
-        : Promise.resolve({ data: [] })
-    );
+    api.get.mockImplementation(() => Promise.reject({ response: { status: 404 } }));
     await setup();
 
     expect(await screen.findByText('Reporte no encontrado.')).toBeTruthy();

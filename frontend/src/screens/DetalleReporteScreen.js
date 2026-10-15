@@ -44,20 +44,33 @@ export default function DetalleReporteScreen({ route }) {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setReport(null);
+    setNotFound(false);
+    setComments([]);
+
     api.get(`/reports/${reportId}`)
-      .then(({ data }) => setReport(data))
+      .then(({ data }) => { if (!cancelled) setReport(data); })
       .catch((error) => {
+        if (cancelled) return;
         if (error.response?.status === 404) {
           setNotFound(true);
           return;
         }
         Alert.alert('Error', 'No se pudo cargar el detalle del reporte.');
       })
-      .finally(() => setLoading(false));
+      .finally(() => { if (!cancelled) setLoading(false); });
 
     api.get(`/reports/${reportId}/comments`)
-      .then(({ data }) => setComments(data))
-      .catch(() => Alert.alert('Error', 'No se pudieron cargar los comentarios.'));
+      .then(({ data }) => { if (!cancelled) setComments(data); })
+      .catch((error) => {
+        if (cancelled || error.response?.status === 404) return;
+        // Si el reporte no existe ya se informa en pantalla; no duplicar la alerta.
+        Alert.alert('Error', 'No se pudieron cargar los comentarios.');
+      });
+
+    return () => { cancelled = true; };
   }, [reportId]);
 
   const handleConfirm = async () => {
@@ -112,6 +125,9 @@ export default function DetalleReporteScreen({ route }) {
   }
 
   const confirmed  = report.confirmed_by_me;
+  const lat = report.latitude == null ? NaN : Number(report.latitude);
+  const lng = report.longitude == null ? NaN : Number(report.longitude);
+  const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
   const isOwner    = myUserId && report.user?.id === myUserId;
 
   const Header = (
@@ -152,11 +168,11 @@ export default function DetalleReporteScreen({ route }) {
           <Text style={styles.infoText}>{formatDate(report.created_at)}</Text>
         </View>
 
-        {report.latitude != null && report.longitude != null && (
+        {hasLocation && (
           <View style={styles.infoRow}>
             <Ionicons name="location-outline" size={14} color="#9ca3af" />
             <Text style={styles.infoText}>
-              {`Lat ${Number(report.latitude).toFixed(5)}, Lng ${Number(report.longitude).toFixed(5)}`}
+              {`Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`}
             </Text>
           </View>
         )}
