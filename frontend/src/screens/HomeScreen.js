@@ -25,8 +25,7 @@ export default function HomeScreen({ navigation, route }) {
   const [userName, setUserName]           = useState('');
   const [reports, setReports]             = useState([]);
   const [myReports, setMyReports]         = useState([]);
-  // Cambio REP-45: lista de categorías seleccionadas (vacía = "Todos").
-  const [activeFilters, setActiveFilters]   = useState([]);
+  const [activeFilters, setActiveFilters] = useState([]); // ids de categoría; vacío = "Todos"
   const [categories, setCategories]       = useState([]);
   const [heatmapPoints, setHeatmapPoints] = useState([]);
   const [offline, setOffline]           = useState(false);
@@ -143,17 +142,15 @@ export default function HomeScreen({ navigation, route }) {
   const pendientes = myReports.filter(r => r.status?.toLowerCase() === 'pendiente').length;
   const resueltos  = myReports.filter(r => r.status?.toLowerCase() === 'resuelto').length;
 
-  // NOTA: La base de este código fue generada con ayuda de Claude (Anthropic).
-  // Agrega la categoría si no estaba seleccionada, o la quita si ya lo estaba.
-  const toggleFilter = (name) =>
+  const toggleFilter = (id) =>
     setActiveFilters(prev =>
-      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+      prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]
     );
 
   // Sin filtros se muestran todos los reportes; con filtros, solo los de las
   // categorías seleccionadas.
   const visibleReports = activeFilters.length > 0
-    ? reports.filter(r => activeFilters.includes(r.category?.name))
+    ? reports.filter(r => activeFilters.includes(r.category?.id))
     : reports;
 
   return (
@@ -275,12 +272,12 @@ export default function HomeScreen({ navigation, route }) {
             <Text style={[styles.chipText, activeFilters.length === 0 && styles.chipTextActive]}>Todos</Text>
           </TouchableOpacity>
           {categories.map(cat => {
-            const selected = activeFilters.includes(cat.name);
+            const selected = activeFilters.includes(cat.id);
             return (
               <TouchableOpacity
                 key={cat.id}
                 style={[styles.chip, selected && styles.chipActive]}
-                onPress={() => toggleFilter(cat.name)}
+                onPress={() => toggleFilter(cat.id)}
               >
                 <Text style={[styles.chipText, selected && styles.chipTextActive]}>
                   {cat.name.charAt(0).toUpperCase() + cat.name.slice(1)}

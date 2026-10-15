@@ -280,7 +280,6 @@ describe('HomeScreen', () => {
     });
   });
 
-  // NOTA: Test generado con ayuda de Claude (Anthropic); revisar antes de integrar.
   it('permite combinar varias categorías a la vez', async () => {
     // Se usa una tercera categoría para comprobar que la selección múltiple
     // excluye lo que no está seleccionado.
