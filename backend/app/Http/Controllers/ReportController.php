@@ -7,6 +7,7 @@ use App\Services\ZoneResolver;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
@@ -65,13 +66,16 @@ class ReportController extends Controller
 
     public function heatmap()
     {
-        $reports = Report::with('zone:id,name')->get(['latitude', 'longitude', 'zone_id']);
+        // Filas planas con join: evita hidratar modelos (y el GeoJSON de cada zona) en un endpoint público.
+        $points = DB::table('reports')
+            ->leftJoin('zones', 'zones.id', '=', 'reports.zone_id')
+            ->get(['reports.latitude', 'reports.longitude', 'zones.id as zone_id', 'zones.name as zone_name']);
 
-        return response()->json($reports->map(fn (Report $report) => [
-            'latitude' => (float) $report->latitude,
-            'longitude' => (float) $report->longitude,
-            'zone' => $report->zone
-                ? ['id' => $report->zone->id, 'name' => $report->zone->name]
+        return response()->json($points->map(fn ($point) => [
+            'latitude' => (float) $point->latitude,
+            'longitude' => (float) $point->longitude,
+            'zone' => $point->zone_id !== null
+                ? ['id' => (int) $point->zone_id, 'name' => $point->zone_name]
                 : null,
         ]));
     }

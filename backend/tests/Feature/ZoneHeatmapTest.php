@@ -13,6 +13,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
+use RuntimeException;
 use Tests\TestCase;
 
 class ZoneHeatmapTest extends TestCase
@@ -198,6 +199,96 @@ class ZoneHeatmapTest extends TestCase
 
         $this->assertDatabaseMissing('zones', ['slug' => 'vieja']);
         $this->assertSame(7, Zone::count());
+    }
+
+    public function test_resolver_assigns_a_border_point_to_exactly_one_adjacent_zone()
+    {
+        foreach ([['A', 0], ['B', 10]] as [$name, $offset]) {
+            Zone::create([
+                'name' => $name, 'slug' => strtolower($name), 'type' => 'comuna', 'area' => 1.0,
+                'boundary' => ['type' => 'Polygon', 'coordinates' => [
+                    [[$offset, 0], [$offset + 10, 0], [$offset + 10, 10], [$offset, 10], [$offset, 0]],
+                ]],
+            ]);
+        }
+
+        // lng = 10 es el borde compartido: debe caer en una sola zona, de forma determinista.
+        $zone = app(ZoneResolver::class)->resolve(5.0, 10.0);
+
+        $this->assertNotNull($zone);
+        $this->assertSame('B', $zone->name);
+    }
+
+    public function test_sector_wins_over_comuna_regardless_of_area()
+    {
+        $square = fn (int $size) => ['type' => 'Polygon', 'coordinates' => [[[0, 0], [$size, 0], [$size, $size], [0, $size], [0, 0]]]];
+        Zone::create(['name' => 'Comuna chica', 'slug' => 'comuna', 'type' => 'comuna', 'area' => 1.0, 'boundary' => $square(10)]);
+        Zone::create(['name' => 'Sector grande', 'slug' => 'sector', 'type' => 'sector', 'area' => 5_000_000_000.0, 'boundary' => $square(10)]);
+
+        $this->assertSame('Sector grande', app(ZoneResolver::class)->resolve(5.0, 5.0)->name);
+    }
+
+    public function test_flush_discards_in_memory_zones_after_they_change()
+    {
+        $zone = Zone::create([
+            'name' => 'Movil', 'slug' => 'movil', 'type' => 'comuna', 'area' => 1.0,
+            'boundary' => ['type' => 'Polygon', 'coordinates' => [[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]]]],
+        ]);
+        $resolver = app(ZoneResolver::class);
+
+        $this->assertSame('Movil', $resolver->resolve(5.0, 5.0)->name);
+
+        $zone->update(['boundary' => ['type' => 'Polygon', 'coordinates' => [[[20, 20], [30, 20], [30, 30], [20, 30], [20, 20]]]]]);
+
+        // Sin flush() se sigue usando la copia en memoria (singleton).
+        $this->assertSame($resolver, app(ZoneResolver::class));
+        $this->assertNotNull($resolver->resolve(5.0, 5.0));
+
+        $resolver->flush();
+
+        $this->assertNull($resolver->resolve(5.0, 5.0));
+        $this->assertSame('Movil', $resolver->resolve(25.0, 25.0)->name);
+    }
+
+    public function test_seeder_reassigns_existing_reports_after_zones_are_recreated()
+    {
+        $this->seed(ZoneSeeder::class);
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $this->makeReport($user, $category, -41.3198, -72.9833, null);
+
+        Zone::query()->delete();
+        $this->seed(ZoneSeeder::class);
+
+        $this->assertSame(
+            Zone::where('name', 'Puerto Varas')->value('id'),
+            Report::value('zone_id')
+        );
+    }
+
+    public function test_seeder_rejects_features_without_name_or_type()
+    {
+        $file = tempnam(sys_get_temp_dir(), 'zones');
+        file_put_contents($file, json_encode(['features' => [
+            ['properties' => ['name' => 'Sin tipo'], 'geometry' => ['type' => 'Polygon', 'coordinates' => []]],
+        ]]));
+
+        $seeder = new class($file) extends ZoneSeeder
+        {
+            public function __construct(private string $file) {}
+
+            protected function path(): string
+            {
+                return $this->file;
+            }
+        };
+
+        try {
+            $this->expectException(RuntimeException::class);
+            $seeder->run();
+        } finally {
+            unlink($file);
+        }
     }
 
     private function makeReport(User $user, Category $category, float $lat, float $lng, ?int $zoneId): void

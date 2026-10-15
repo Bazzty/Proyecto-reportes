@@ -2,11 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Report;
 use App\Models\Zone;
 use App\Services\ZoneResolver;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
 
 class AssignZones extends Command
 {
@@ -22,22 +20,7 @@ class AssignZones extends Command
             return self::FAILURE;
         }
 
-        // Evita usar zonas cacheadas desactualizadas.
-        Cache::forget('zones.all');
-
-        $updated = 0;
-
-        Report::query()->chunkById(200, function ($reports) use ($resolver, &$updated) {
-            foreach ($reports as $report) {
-                $zoneId = $resolver->resolve((float) $report->latitude, (float) $report->longitude)?->id;
-
-                if ($report->zone_id !== $zoneId) {
-                    // toBase() evita que Eloquent actualice updated_at en el backfill.
-                    Report::whereKey($report->id)->toBase()->update(['zone_id' => $zoneId]);
-                    $updated++;
-                }
-            }
-        });
+        $updated = $resolver->assignToReports();
 
         $this->info("Reportes actualizados: {$updated}");
 

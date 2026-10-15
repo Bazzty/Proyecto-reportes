@@ -3,8 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\Zone;
+use App\Services\ZoneResolver;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -12,7 +12,7 @@ class ZoneSeeder extends Seeder
 {
     public function run(): void
     {
-        $path = database_path('data/zones.geojson');
+        $path = $this->path();
 
         if (! is_file($path)) {
             throw new RuntimeException("No se encontró {$path}; es necesario para sembrar las zonas del heatmap.");
@@ -45,7 +45,15 @@ class ZoneSeeder extends Seeder
         // Elimina zonas que ya no están en el archivo; sus reportes quedan sin zona (re-ejecutar zones:assign).
         Zone::whereNotIn('slug', array_keys($used))->delete();
 
-        Cache::forget('zones.all');
+        // Recalcula la zona de los reportes existentes (las filas borradas/recreadas dejan zone_id en NULL).
+        $resolver = app(ZoneResolver::class);
+        $resolver->flush();
+        $resolver->assignToReports();
+    }
+
+    protected function path(): string
+    {
+        return database_path('data/zones.geojson');
     }
 
     /**
