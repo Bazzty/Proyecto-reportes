@@ -2,36 +2,50 @@
 
 namespace App\Services;
 
+use App\Models\Report;
 use App\Models\Zone;
-use Illuminate\Support\Collection;
 
 class ZoneResolver
 {
-    private ?Collection $zones = null;
-
     public function resolve(?float $latitude, ?float $longitude): ?Zone
     {
         if ($latitude === null || $longitude === null) {
             return null;
         }
 
-        $matches = $this->zones()
-            ->filter(fn (Zone $zone) => $this->contains($zone->boundary, $latitude, $longitude))
-            ->values();
-
-        if ($matches->isEmpty()) {
-            return null;
-        }
+        // Solo se cargan (con su GeoJSON) las zonas cuya caja envolvente contiene el punto.
+        $matches = Zone::query()
+            ->where('min_lat', '<=', $latitude)->where('max_lat', '>=', $latitude)
+            ->where('min_lng', '<=', $longitude)->where('max_lng', '>=', $longitude)
+            ->get()
+            ->filter(fn (Zone $zone) => $this->contains($zone->boundary, $latitude, $longitude));
 
         // Prioridad: un sector (más específico) gana sobre una comuna; ante empate, la zona más pequeña.
         return $matches
-            ->sortBy(fn (Zone $zone) => ($zone->type === 'sector' ? 0 : 1) * 1_000_000_000 + $zone->area)
+            ->sort(fn (Zone $a, Zone $b) => [$a->type === 'sector' ? 0 : 1, $a->area] <=> [$b->type === 'sector' ? 0 : 1, $b->area])
             ->first();
     }
 
-    private function zones(): Collection
+    /**
+     * Asigna (o limpia) la zona de todos los reportes según sus coordenadas.
+     * Usa la query base para no modificar updated_at. Devuelve cuántos reportes cambiaron.
+     */
+    public function assignToReports(): int
     {
-        return $this->zones ??= Zone::all();
+        $updated = 0;
+
+        Report::query()->chunkById(200, function ($reports) use (&$updated) {
+            foreach ($reports as $report) {
+                $zoneId = $this->resolve((float) $report->latitude, (float) $report->longitude)?->id;
+
+                if ($report->zone_id !== $zoneId) {
+                    Report::whereKey($report->id)->toBase()->update(['zone_id' => $zoneId]);
+                    $updated++;
+                }
+            }
+        });
+
+        return $updated;
     }
 
     private function contains(array $geometry, float $latitude, float $longitude): bool

@@ -232,21 +232,21 @@ No requiere token (si se envía, se calcula `confirmed_by_me`).
 
 ---
 
-### Mapa de calor agrupado por zona
+### Puntos del mapa de calor (con su zona)
 ```
 GET /reports/heatmap
 ```
-No requiere token. Agrupa los focos por **zona** (comuna o sector) y devuelve, por cada zona con reportes, un centroide y el conteo. Los reportes fuera de toda zona se agrupan como **"Sin zona"**.
+No requiere token. Devuelve **un punto por reporte** (`latitude`, `longitude`) junto con su `zone` (`{ id, name }`, o `null` si el reporte no cae en ninguna zona). No agrupa: se mantiene la densidad y la agrupación visual por zona, si se necesita, la resuelve el cliente.
 
 **Response 200:**
 ```json
 [
-  { "zone": { "id": 1, "name": "Puerto Varas" }, "latitude": -41.3198, "longitude": -72.9833, "count": 3 },
-  { "zone": { "id": 7, "name": "Ensenada" },     "latitude": -41.2030, "longitude": -72.5700, "count": 1 },
-  { "zone": { "id": null, "name": "Sin zona" },  "latitude": -33.4569, "longitude": -70.6483, "count": 2 }
+  { "latitude": -41.3198, "longitude": -72.9833, "zone": { "id": 1, "name": "Puerto Varas" } },
+  { "latitude": -41.2030, "longitude": -72.5700, "zone": { "id": 7, "name": "Ensenada" } },
+  { "latitude": -33.4569, "longitude": -70.6483, "zone": null }
 ]
 ```
-> El cliente dibuja el mapa con **Leaflet + tiles de Esri** (sin Google Maps) y usa `count` como peso de cada zona. Funciona en Android e iOS dentro de Expo Go.
+> Para asignar `zone` a los reportes ya existentes, ejecutá una vez tras el deploy: `php artisan db:seed --class=ZoneSeeder` (carga las zonas) y luego `php artisan zones:assign` (backfill).
 
 ---
 

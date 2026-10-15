@@ -7,6 +7,7 @@ use App\Models\Report;
 use App\Services\ZoneResolver;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ReportController extends Controller
@@ -118,25 +119,18 @@ class ReportController extends Controller
 
     public function heatmap()
     {
-        $reports = Report::with('zone')
-            ->where('validation_status', '!=', 'rechazado')
-            ->get(['id', 'zone_id', 'latitude', 'longitude']);
+        // Filas planas con join: evita hidratar modelos (y el GeoJSON de cada zona) en un endpoint público.
+        $points = DB::table('reports')
+            ->leftJoin('zones', 'zones.id', '=', 'reports.zone_id')
+            ->where('reports.validation_status', '!=', 'rechazado')
+            ->get(['reports.latitude', 'reports.longitude', 'zones.id as zone_id', 'zones.name as zone_name']);
 
-        $grouped = $reports->groupBy(fn (Report $report) => $report->zone_id ?? 'none');
-
-        $zones = $grouped->map(function ($items) {
-            $zone = $items->first()->zone;
-
-            return [
-                'zone' => $zone
-                    ? ['id' => $zone->id, 'name' => $zone->name]
-                    : ['id' => null, 'name' => 'Sin zona'],
-                'latitude' => round((float) $items->avg('latitude'), 6),
-                'longitude' => round((float) $items->avg('longitude'), 6),
-                'count' => $items->count(),
-            ];
-        })->values();
-
-        return response()->json($zones);
+        return response()->json($points->map(fn ($point) => [
+            'latitude' => (float) $point->latitude,
+            'longitude' => (float) $point->longitude,
+            'zone' => $point->zone_id !== null
+                ? ['id' => (int) $point->zone_id, 'name' => $point->zone_name]
+                : null,
+        ]));
     }
 }

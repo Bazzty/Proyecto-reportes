@@ -3,32 +3,80 @@
 namespace Database\Seeders;
 
 use App\Models\Zone;
+use App\Services\ZoneResolver;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 class ZoneSeeder extends Seeder
 {
     public function run(): void
     {
-        $path = database_path('data/zones.geojson');
+        $path = $this->path();
 
         if (! is_file($path)) {
-            return;
+            throw new RuntimeException("No se encontró {$path}; es necesario para sembrar las zonas del heatmap.");
         }
 
         $data = json_decode(file_get_contents($path), true);
+        $used = [];
 
         foreach ($data['features'] ?? [] as $feature) {
+            $name = $feature['properties']['name'] ?? null;
+            $type = $feature['properties']['type'] ?? null;
+
+            if ($name === null || $type === null || empty($feature['geometry'])) {
+                throw new RuntimeException('Feature inválido en zones.geojson: requiere properties.name, properties.type y geometry.');
+            }
+
+            $slug = $this->uniqueSlug(Str::slug($name), $type, $used);
+
+            $zone = new Zone(['boundary' => $feature['geometry']]);
+
+            // La caja envolvente se calcula aquí y no solo en el hook del modelo: DatabaseSeeder usa
+            // WithoutModelEvents, así que con `db:seed` los eventos del modelo no se disparan.
             Zone::updateOrCreate(
-                ['slug' => Str::slug($feature['properties']['name'])],
+                ['slug' => $slug],
                 [
-                    'name' => $feature['properties']['name'],
-                    'type' => $feature['properties']['type'],
+                    'name' => $name,
+                    'type' => $type,
                     'boundary' => $feature['geometry'],
                     'area' => $this->area($feature['geometry']),
-                ]
+                ] + $zone->boundingBox()
             );
         }
+
+        // Elimina zonas que ya no están en el archivo; sus reportes quedan sin zona (re-ejecutar zones:assign).
+        Zone::whereNotIn('slug', array_keys($used))->delete();
+
+        // Recalcula la zona de los reportes existentes (las filas borradas/recreadas dejan zone_id en NULL).
+        app(ZoneResolver::class)->assignToReports();
+    }
+
+    protected function path(): string
+    {
+        return database_path('data/zones.geojson');
+    }
+
+    /**
+     * @param  array<string, bool>  $used
+     */
+    private function uniqueSlug(string $base, string $type, array &$used): string
+    {
+        $slug = $base;
+
+        if (isset($used[$slug])) {
+            $slug = $base.'-'.$type;
+        }
+
+        $i = 2;
+        while (isset($used[$slug])) {
+            $slug = $base.'-'.$type.'-'.$i++;
+        }
+
+        $used[$slug] = true;
+
+        return $slug;
     }
 
     private function area(array $geometry): float
@@ -40,6 +88,11 @@ class ZoneSeeder extends Seeder
         foreach ($polygons as $polygon) {
             if (($polygon[0] ?? []) !== []) {
                 $total += $this->ringArea($polygon[0]);
+
+                // Los anillos siguientes son huecos.
+                foreach (array_slice($polygon, 1) as $hole) {
+                    $total -= $this->ringArea($hole);
+                }
             }
         }
 

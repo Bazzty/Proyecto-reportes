@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Report;
+use App\Models\Zone;
 use App\Services\ZoneResolver;
 use Illuminate\Console\Command;
 
@@ -14,19 +14,13 @@ class AssignZones extends Command
 
     public function handle(ZoneResolver $resolver): int
     {
-        $updated = 0;
+        if (Zone::count() === 0) {
+            $this->error('No hay zonas cargadas. Ejecuta primero: php artisan db:seed --class=ZoneSeeder');
 
-        Report::query()->chunkById(200, function ($reports) use ($resolver, &$updated) {
-            foreach ($reports as $report) {
-                $zoneId = $resolver->resolve((float) $report->latitude, (float) $report->longitude)?->id;
+            return self::FAILURE;
+        }
 
-                if ($report->zone_id !== $zoneId) {
-                    $report->zone_id = $zoneId;
-                    $report->save();
-                    $updated++;
-                }
-            }
-        });
+        $updated = $resolver->assignToReports();
 
         $this->info("Reportes actualizados: {$updated}");
 
