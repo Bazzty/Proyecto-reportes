@@ -37,6 +37,7 @@ export default function MyReportsScreen({ navigation }) {
   const [total, setTotal]             = useState(0);
   const [loading, setLoading]         = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError]             = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [viewMode, setViewMode]       = useState('list');
   const { width } = useWindowDimensions();
@@ -48,7 +49,8 @@ export default function MyReportsScreen({ navigation }) {
   const fetchPage = useCallback(async (page) => {
     if (busyRef.current) return;
     busyRef.current = true;
-    page === 1 ? setLoading(true) : setLoadingMore(true);
+    if (page === 1) { setLoading(true); setError(false); }
+    else setLoadingMore(true);
     try {
       const { data } = await api.get('/user/reports', { params: { page, per_page: PAGE_SIZE } });
       pageRef.current     = data.current_page;
@@ -56,7 +58,7 @@ export default function MyReportsScreen({ navigation }) {
       setTotal(data.total);
       setReports(prev => (page === 1 ? data.data : [...prev, ...data.data]));
     } catch {
-      if (page === 1) { setReports([]); setTotal(0); }
+      if (page === 1) { setReports([]); setTotal(0); setError(true); }
     } finally {
       busyRef.current = false;
       setLoading(false);
@@ -64,16 +66,18 @@ export default function MyReportsScreen({ navigation }) {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { fetchPage(1); }, [fetchPage]));
+  const loadReports = useCallback(() => fetchPage(1), [fetchPage]);
+
+  useFocusEffect(loadReports);
 
   const loadMore = () => {
     if (pageRef.current < lastPageRef.current) fetchPage(pageRef.current + 1);
   };
 
   const goToMap = (item) =>
-  navigation.popTo('Home', {
-    focusReport: { id: item.id, latitude: item.latitude, longitude: item.longitude },
-  }, { merge: true });
+    navigation.popTo('Home', {
+      focusReport: { id: item.id, latitude: item.latitude, longitude: item.longitude },
+    }, { merge: true });
 
   const renderReportCard = ({ item }) => {
     const statusColors = getStatusStyle(item.status);
@@ -166,8 +170,7 @@ export default function MyReportsScreen({ navigation }) {
       </TouchableOpacity>
 
       <Text style={styles.title}>Mis Reportes</Text>
-
-      {!loading && (
+      {!loading && !error && (
         <View style={styles.counter}>
           <Ionicons name="document-text-outline" size={14} color="#0e7490" />
           <Text style={styles.counterText}>
@@ -197,6 +200,14 @@ export default function MyReportsScreen({ navigation }) {
 
       {loading ? (
         <ActivityIndicator size="large" color="#0e7490" style={{ marginTop: 40 }} />
+      ) : error ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="cloud-offline-outline" size={48} color="#fca5a5" />
+          <Text style={styles.emptyStateText}>No se pudieron cargar tus reportes.</Text>
+          <TouchableOpacity onPress={loadReports}>
+            <Text style={styles.emptyStateLink}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           key={viewMode}
