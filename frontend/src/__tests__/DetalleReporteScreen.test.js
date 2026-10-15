@@ -82,6 +82,13 @@ describe('DetalleReporteScreen', () => {
     expect(screen.queryByText(/Lat /)).toBeNull();
   });
 
+  it('no muestra la ubicación si las coordenadas están fuera de rango', async () => {
+    mockGet({ report: { ...REPORT, latitude: 999, longitude: -70.6 } });
+    await setup();
+    await screen.findByText('Basura acumulada');
+    expect(screen.queryByText(/Lat /)).toBeNull();
+  });
+
   it('si solo fallan los comentarios (404) con el reporte cargado, avisa', async () => {
     api.get.mockImplementation((url) =>
       url === '/reports/5'

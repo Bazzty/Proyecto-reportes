@@ -139,7 +139,7 @@ function DetalleReporte({ route }) {
   const confirmed  = report.confirmed_by_me;
   const lat = toCoord(report.latitude);
   const lng = toCoord(report.longitude);
-  const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
+  const hasLocation = Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
   const isOwner    = myUserId && report.user?.id === myUserId;
 
   const Header = (
