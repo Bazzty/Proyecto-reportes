@@ -15,6 +15,8 @@ const REPORT = {
   status: 'Pendiente',
   photo_url: null,
   created_at: '2026-10-01T12:00:00.000Z',
+  latitude: -33.4372,
+  longitude: -70.6506,
   category: { id: 1, name: 'basura' },
   user: { id: 2, name: 'Carla' },
   confirmations_count: 1,
@@ -52,6 +54,23 @@ describe('DetalleReporteScreen', () => {
     expect(screen.getByText('Carla')).toBeTruthy();
     expect(screen.getByText('Lo vi ayer también')).toBeTruthy();
     expect(screen.getByText('Comentarios (1)')).toBeTruthy();
+  });
+
+  it('muestra la ubicación del reporte', async () => {
+    await setup();
+    expect(await screen.findByText('Lat -33.43720, Lng -70.65060')).toBeTruthy();
+  });
+
+  it('si el reporte no existe (404) muestra "Reporte no encontrado" sin alerta', async () => {
+    api.get.mockImplementation((url) =>
+      url === '/reports/5'
+        ? Promise.reject({ response: { status: 404 } })
+        : Promise.resolve({ data: [] })
+    );
+    await setup();
+
+    expect(await screen.findByText('Reporte no encontrado.')).toBeTruthy();
+    expect(Alert.alert).not.toHaveBeenCalled();
   });
 
   it('si falla la carga muestra el error', async () => {

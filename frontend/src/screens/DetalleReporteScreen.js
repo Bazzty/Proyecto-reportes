@@ -28,6 +28,7 @@ export default function DetalleReporteScreen({ route }) {
 
   const [report, setReport]         = useState(null);
   const [loading, setLoading]       = useState(true);
+  const [notFound, setNotFound]     = useState(false);
   const [comments, setComments]     = useState([]);
   const [newComment, setNewComment] = useState('');
   const [sending, setSending]       = useState(false);
@@ -45,7 +46,13 @@ export default function DetalleReporteScreen({ route }) {
   useEffect(() => {
     api.get(`/reports/${reportId}`)
       .then(({ data }) => setReport(data))
-      .catch(() => Alert.alert('Error', 'No se pudo cargar el detalle del reporte.'))
+      .catch((error) => {
+        if (error.response?.status === 404) {
+          setNotFound(true);
+          return;
+        }
+        Alert.alert('Error', 'No se pudo cargar el detalle del reporte.');
+      })
       .finally(() => setLoading(false));
 
     api.get(`/reports/${reportId}/comments`)
@@ -97,7 +104,9 @@ export default function DetalleReporteScreen({ route }) {
   if (!report) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <Text style={styles.errorText}>No se pudo cargar el reporte.</Text>
+        <Text style={styles.errorText}>
+          {notFound ? 'Reporte no encontrado.' : 'No se pudo cargar el reporte.'}
+        </Text>
       </SafeAreaView>
     );
   }
@@ -142,6 +151,15 @@ export default function DetalleReporteScreen({ route }) {
           <Ionicons name="calendar-outline" size={14} color="#9ca3af" style={{ marginLeft: 12 }} />
           <Text style={styles.infoText}>{formatDate(report.created_at)}</Text>
         </View>
+
+        {report.latitude != null && report.longitude != null && (
+          <View style={styles.infoRow}>
+            <Ionicons name="location-outline" size={14} color="#9ca3af" />
+            <Text style={styles.infoText}>
+              {`Lat ${Number(report.latitude).toFixed(5)}, Lng ${Number(report.longitude).toFixed(5)}`}
+            </Text>
+          </View>
+        )}
 
         {/* Confirmaciones — oculto si es tu propio reporte */}
         {!isOwner && <TouchableOpacity
