@@ -25,7 +25,7 @@ export default function HomeScreen({ navigation, route }) {
   const [userName, setUserName]           = useState('');
   const [reports, setReports]             = useState([]);
   const [myReports, setMyReports]         = useState([]);
-  const [activeFilter, setActiveFilter]   = useState(null);
+  const [activeFilters, setActiveFilters] = useState([]); // ids de categoría; vacío = "Todos"
   const [categories, setCategories]       = useState([]);
   const [heatmapPoints, setHeatmapPoints] = useState([]);
   const [offline, setOffline]           = useState(false);
@@ -142,8 +142,15 @@ export default function HomeScreen({ navigation, route }) {
   const pendientes = myReports.filter(r => r.status?.toLowerCase() === 'pendiente').length;
   const resueltos  = myReports.filter(r => r.status?.toLowerCase() === 'resuelto').length;
 
-  const visibleReports = activeFilter
-    ? reports.filter(r => r.category?.name === activeFilter)
+  const toggleFilter = (id) =>
+    setActiveFilters(prev =>
+      prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]
+    );
+
+  // Sin filtros se muestran todos los reportes; con filtros, solo los de las
+  // categorías seleccionadas.
+  const visibleReports = activeFilters.length > 0
+    ? reports.filter(r => activeFilters.includes(r.category?.id))
     : reports;
 
   return (
@@ -259,22 +266,25 @@ export default function HomeScreen({ navigation, route }) {
       <View style={styles.filtersWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersContent}>
           <TouchableOpacity
-            style={[styles.chip, !activeFilter && styles.chipActive]}
-            onPress={() => setActiveFilter(null)}
+            style={[styles.chip, activeFilters.length === 0 && styles.chipActive]}
+            onPress={() => setActiveFilters([])}
           >
-            <Text style={[styles.chipText, !activeFilter && styles.chipTextActive]}>Todos</Text>
+            <Text style={[styles.chipText, activeFilters.length === 0 && styles.chipTextActive]}>Todos</Text>
           </TouchableOpacity>
-          {categories.map(cat => (
-            <TouchableOpacity
-              key={cat.id}
-              style={[styles.chip, activeFilter === cat.name && styles.chipActive]}
-              onPress={() => setActiveFilter(activeFilter === cat.name ? null : cat.name)}
-            >
-              <Text style={[styles.chipText, activeFilter === cat.name && styles.chipTextActive]}>
-                {cat.name.charAt(0).toUpperCase() + cat.name.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {categories.map(cat => {
+            const selected = activeFilters.includes(cat.id);
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                style={[styles.chip, selected && styles.chipActive]}
+                onPress={() => toggleFilter(cat.id)}
+              >
+                <Text style={[styles.chipText, selected && styles.chipTextActive]}>
+                  {cat.name.charAt(0).toUpperCase() + cat.name.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </View>
 
