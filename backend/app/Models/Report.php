@@ -9,6 +9,7 @@ class Report extends Model
     protected $fillable = [
         'user_id',
         'category_id',
+        'zone_id',
         'description',
         'latitude',
         'longitude',
@@ -24,6 +25,11 @@ class Report extends Model
     public function category()
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function zone()
+    {
+        return $this->belongsTo(Zone::class);
     }
 
     public function confirmations()
