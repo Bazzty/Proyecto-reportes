@@ -163,7 +163,7 @@ export default function HomeScreen({ navigation, route }) {
       )}
       <MapView
         ref={mapRef}
-        style={StyleSheet.absoluteFillObject}
+        style={{ flex: 1 }}
         showsUserLocation
         showsMyLocationButton={false}
         showsCompass={false}
