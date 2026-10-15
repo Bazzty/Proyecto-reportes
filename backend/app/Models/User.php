@@ -60,6 +60,7 @@ class User extends Authenticatable
         return $this->belongsToMany(Role::class)->withTimestamps();
     }
 
+    /** Si `roles` ya está cargada se usa esa copia: tras attach/detach hay que hacer `load('roles')`. */
     public function hasRole(string $name): bool
     {
         return $this->relationLoaded('roles')
