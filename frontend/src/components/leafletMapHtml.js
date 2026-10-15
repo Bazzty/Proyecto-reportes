@@ -61,8 +61,8 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
     document.getElementById('map').style.display = 'none';
     document.getElementById('fallback').style.display = 'flex';
   } else {
-    var map = L.map('map', { zoomControl: false }).setView([-41.31946, -72.98356], 10);
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Tiles &copy; Esri' }).addTo(map);
+    var map = L.map('map', { zoomControl: false, zoomSnap: 0, scrollWheelZoom: false, doubleClickZoom: false }).setView([-41.31946, -72.98356], 10);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, updateWhenIdle: true, keepBuffer: 6, attribution: 'Tiles &copy; Esri' }).addTo(map);
 
     var heat = null;
     var markersLayer = L.layerGroup().addTo(map);
@@ -70,6 +70,62 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
     var userMarker = null;
     var pickable = false;
     var pickMarker = null;
+
+    var zoomRaf = null;
+    function smoothZoomTo(targetZoom, anchorPoint) {
+      if (zoomRaf) { cancelAnimationFrame(zoomRaf); zoomRaf = null; }
+      map._stop();
+      var startZoom = map.getZoom();
+      var endZoom = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), targetZoom));
+      if (Math.abs(endZoom - startZoom) < 0.01) { return; }
+      map._moveStart(true, false);
+      var startTime = performance.now();
+      var dur = 180;
+      var viewHalf = map.getSize().divideBy(2);
+      function step(now) {
+        var t = Math.min(1, (now - startTime) / dur);
+        var ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+        var z = startZoom + (endZoom - startZoom) * ease;
+        var center;
+        if (anchorPoint) {
+          var scale = map.getZoomScale(z);
+          var centerOffset = anchorPoint.subtract(viewHalf).multiplyBy(1 - 1 / scale);
+          center = map.containerPointToLatLng(viewHalf.add(centerOffset));
+        } else {
+          center = map.getCenter();
+        }
+        map._move(center, z, { pinch: true });
+        if (t < 1) {
+          zoomRaf = requestAnimationFrame(step);
+        } else {
+          zoomRaf = null;
+          map._moveEnd(true);
+        }
+      }
+      zoomRaf = requestAnimationFrame(step);
+    }
+
+    map.getContainer().addEventListener('wheel', function (e) {
+      e.preventDefault();
+      var anchor = map.mouseEventToContainerPoint(e);
+      var dir = e.deltaY > 0 ? -1 : 1;
+      smoothZoomTo(map.getZoom() + dir * 0.5, anchor);
+    }, { passive: false });
+
+    map.on('dblclick', function (e) {
+      smoothZoomTo(map.getZoom() + 1, e.containerPoint);
+    });
+
+    var heatRedrawScheduled = false;
+    function scheduleHeatRedraw() {
+      if (heatRedrawScheduled) { return; }
+      heatRedrawScheduled = true;
+      requestAnimationFrame(function () {
+        heatRedrawScheduled = false;
+        if (heat && heat._reset) { heat._reset(); }
+      });
+    }
+    map.on('move', scheduleHeatRedraw);
 
     map.on('click', function (e) {
       if (!pickable) { return; }
@@ -153,7 +209,7 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
 
     function center(data) {
       if (data.lat != null && data.lng != null) {
-        map.setView([data.lat, data.lng], data.zoom || 13);
+        map.flyTo([data.lat, data.lng], data.zoom || 13, { duration: 0.6 });
       }
     }
 

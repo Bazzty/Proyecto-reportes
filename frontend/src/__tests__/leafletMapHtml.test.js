@@ -80,6 +80,19 @@ describe('leafletMapHtml', () => {
     expect(HTML).toContain('heatClickLayer');
   });
 
+  it('usa zoom propio y redibuja el heat en move', () => {
+    expect(HTML).toContain('zoomSnap: 0');
+    expect(HTML).toContain('scrollWheelZoom: false');
+    expect(HTML).toContain('smoothZoomTo');
+    expect(HTML).toContain("addEventListener('wheel'");
+    expect(HTML).toContain("map.on('move'");
+  });
+
+  it('evita el flash de tiles animando como pinch (sin podar tiles)', () => {
+    expect(HTML).toContain('updateWhenIdle: true');
+    expect(HTML).toContain('pinch: true');
+  });
+
   it('statusColor mapea los estados', () => {
     expect(statusColor('Resuelto')).toBe('#16a34a');
     expect(statusColor('Pendiente')).toBe('#f59e0b');
