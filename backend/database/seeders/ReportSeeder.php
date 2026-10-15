@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Category;
 use App\Models\Report;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\ZoneResolver;
 use Illuminate\Database\Seeder;
@@ -21,16 +22,24 @@ class ReportSeeder extends Seeder
             ['name' => 'Alonso Vera',        'email' => 'alonso@demo.cl'],
         ];
 
+        $userRoleId = Role::firstOrCreate(['name' => Role::USER])->id;
+
         $createdUsers = [];
         foreach ($users as $u) {
-            $createdUsers[] = User::firstOrCreate(
+            $user = User::firstOrCreate(
                 ['email' => $u['email']],
                 ['name' => $u['name'], 'password' => Hash::make('password')]
             );
+            // DatabaseSeeder desactiva los eventos del modelo, así que el rol se asigna aquí.
+            $user->roles()->syncWithoutDetaching([$userRoleId]);
+            $createdUsers[] = $user;
         }
 
         // Un usuario administrador de ejemplo (investigador de "Más Azul").
-        User::where('email', 'bastian@demo.cl')->update(['is_admin' => true]);
+        $adminUser = User::where('email', 'bastian@demo.cl')->first();
+        if ($adminUser) {
+            $adminUser->roles()->syncWithoutDetaching([Role::firstOrCreate(['name' => Role::ADMIN])->id]);
+        }
 
         $categories = Category::all()->keyBy(fn ($c) => strtolower($c->name));
 

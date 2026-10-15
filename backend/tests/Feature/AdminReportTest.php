@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\Report;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -16,8 +17,7 @@ class AdminReportTest extends TestCase
     private function makeAdmin(): User
     {
         $admin = User::factory()->create();
-        $admin->is_admin = true;
-        $admin->save();
+        $admin->roles()->attach(Role::firstOrCreate(['name' => Role::ADMIN])->id);
 
         return $admin;
     }

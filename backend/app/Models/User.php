@@ -45,9 +45,40 @@ class User extends Authenticatable
         return $this->hasMany(Report::class);
     }
 
+    public function confirmations()
+    {
+        return $this->hasMany(Confirmation::class);
+    }
+
+    public function comments()
+    {
+        return $this->hasMany(Comment::class);
+    }
+
+    public function roles()
+    {
+        return $this->belongsToMany(Role::class)->withTimestamps();
+    }
+
+    /** Si `roles` ya está cargada se usa esa copia: tras attach/detach hay que hacer `load('roles')`. */
+    public function hasRole(string $name): bool
+    {
+        return $this->relationLoaded('roles')
+            ? $this->roles->contains('name', $name)
+            : $this->roles()->where('name', $name)->exists();
+    }
+
     public function isAdmin(): bool
     {
-        return (bool) $this->is_admin;
+        return $this->hasRole(Role::ADMIN);
+    }
+
+    protected static function booted(): void
+    {
+        // Todo usuario nuevo nace con el rol "user".
+        static::created(function (User $user) {
+            $user->roles()->attach(Role::firstOrCreate(['name' => Role::USER])->id);
+        });
     }
 
     protected function casts(): array
@@ -55,7 +86,6 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'is_admin' => 'boolean',
         ];
     }
 }

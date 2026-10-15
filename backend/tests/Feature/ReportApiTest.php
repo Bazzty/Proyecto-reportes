@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\Report;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -391,8 +392,7 @@ class ReportApiTest extends TestCase
     private function makeAdmin(): User
     {
         $admin = User::factory()->create();
-        $admin->is_admin = true;
-        $admin->save();
+        $admin->roles()->attach(Role::firstOrCreate(['name' => Role::ADMIN])->id);
 
         return $admin;
     }
@@ -460,5 +460,57 @@ class ReportApiTest extends TestCase
         Sanctum::actingAs($admin, ['*']);
 
         $this->patchJson('/api/reports/9999/status', ['status' => 'Resuelto'])->assertNotFound();
+    }
+
+    public function test_reports_of_other_users_are_readable_but_not_listed_as_mine()
+    {
+        $owner = User::factory()->create();
+        $viewer = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $report = Report::create([
+            'user_id' => $owner->id,
+            'category_id' => $category->id,
+            'description' => 'Reporte ajeno',
+            'latitude' => -33.45,
+            'longitude' => -70.65,
+            'photo_path' => 'photos/test.jpg',
+            'status' => 'Pendiente',
+        ]);
+
+        Sanctum::actingAs($viewer, ['*']);
+
+        // Lectura pública: cualquiera ve el reporte y su detalle...
+        $this->getJson("/api/reports/{$report->id}")->assertOk()->assertJsonPath('description', 'Reporte ajeno');
+        $this->getJson('/api/reports')->assertJsonFragment(['description' => 'Reporte ajeno']);
+
+        // ...pero "mis reportes" solo trae los propios.
+        $this->getJson('/api/user/reports')->assertOk()->assertJsonCount(0);
+    }
+
+    public function test_no_one_can_modify_or_delete_reports_through_the_api_yet()
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $report = Report::create([
+            'user_id' => $owner->id,
+            'category_id' => $category->id,
+            'description' => 'Reporte intocable',
+            'latitude' => -33.45,
+            'longitude' => -70.65,
+            'photo_path' => 'photos/test.jpg',
+            'status' => 'Pendiente',
+        ]);
+
+        // Hasta REP-51 no existe PATCH/PUT/DELETE: ni el dueño ni un tercero pueden alterar un reporte.
+        foreach ([$owner, $other] as $user) {
+            Sanctum::actingAs($user, ['*']);
+
+            $this->patchJson("/api/reports/{$report->id}", ['status' => 'Resuelto'])->assertStatus(405);
+            $this->putJson("/api/reports/{$report->id}", ['status' => 'Resuelto'])->assertStatus(405);
+            $this->deleteJson("/api/reports/{$report->id}")->assertStatus(405);
+        }
+
+        $this->assertDatabaseHas('reports', ['id' => $report->id, 'status' => 'Pendiente']);
     }
 }
