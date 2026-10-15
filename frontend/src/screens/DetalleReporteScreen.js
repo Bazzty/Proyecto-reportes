@@ -23,7 +23,17 @@ const formatDate = (iso) => {
   return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-export default function DetalleReporteScreen({ route }) {
+// Coordenada válida: número finito; null, '' o texto no numérico no cuentan.
+const toCoord = (value) =>
+  value == null || (typeof value === 'string' && value.trim() === '') ? NaN : Number(value);
+
+// Se remonta al cambiar de reporte, así el estado (reporte, comentarios, errores,
+// respuestas en vuelo) nunca se mezcla entre reportes.
+export default function DetalleReporteScreen(props) {
+  return <DetalleReporte key={props.route.params.reportId} {...props} />;
+}
+
+function DetalleReporte({ route }) {
   const { reportId } = route.params;
 
   const [report, setReport]         = useState(null);
@@ -45,29 +55,31 @@ export default function DetalleReporteScreen({ route }) {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setReport(null);
-    setNotFound(false);
-    setComments([]);
 
-    api.get(`/reports/${reportId}`)
-      .then(({ data }) => { if (!cancelled) setReport(data); })
+    // Resuelve true si el reporte cargó; los comentarios solo alertan en ese caso
+    // (si el reporte falla, la pantalla y su alerta ya lo informan).
+    const reportLoaded = api.get(`/reports/${reportId}`)
+      .then(({ data }) => {
+        if (!cancelled) setReport(data);
+        return true;
+      })
       .catch((error) => {
-        if (cancelled) return;
+        if (cancelled) return false;
         if (error.response?.status === 404) {
           setNotFound(true);
-          return;
+        } else {
+          Alert.alert('Error', 'No se pudo cargar el detalle del reporte.');
         }
-        Alert.alert('Error', 'No se pudo cargar el detalle del reporte.');
+        return false;
       })
       .finally(() => { if (!cancelled) setLoading(false); });
 
     api.get(`/reports/${reportId}/comments`)
       .then(({ data }) => { if (!cancelled) setComments(data); })
-      .catch((error) => {
-        if (cancelled || error.response?.status === 404) return;
-        // Si el reporte no existe ya se informa en pantalla; no duplicar la alerta.
-        Alert.alert('Error', 'No se pudieron cargar los comentarios.');
+      .catch(async () => {
+        if (await reportLoaded && !cancelled) {
+          Alert.alert('Error', 'No se pudieron cargar los comentarios.');
+        }
       });
 
     return () => { cancelled = true; };
@@ -125,8 +137,8 @@ export default function DetalleReporteScreen({ route }) {
   }
 
   const confirmed  = report.confirmed_by_me;
-  const lat = report.latitude == null ? NaN : Number(report.latitude);
-  const lng = report.longitude == null ? NaN : Number(report.longitude);
+  const lat = toCoord(report.latitude);
+  const lng = toCoord(report.longitude);
   const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
   const isOwner    = myUserId && report.user?.id === myUserId;
 

@@ -68,11 +68,57 @@ describe('DetalleReporteScreen', () => {
     expect(screen.queryByText(/Lat /)).toBeNull();
   });
 
-  it('no muestra la ubicación si las coordenadas no son numéricas', async () => {
-    mockGet({ report: { ...REPORT, latitude: 'abc', longitude: '' } });
+  it('no muestra la ubicación si las coordenadas no son válidas (cadena vacía)', async () => {
+    mockGet({ report: { ...REPORT, latitude: -33.4, longitude: '' } });
     await setup();
     await screen.findByText('Basura acumulada');
     expect(screen.queryByText(/Lat /)).toBeNull();
+  });
+
+  it('no muestra la ubicación si una coordenada no es numérica', async () => {
+    mockGet({ report: { ...REPORT, latitude: 'abc' } });
+    await setup();
+    await screen.findByText('Basura acumulada');
+    expect(screen.queryByText(/Lat /)).toBeNull();
+  });
+
+  it('si solo fallan los comentarios (404) con el reporte cargado, avisa', async () => {
+    api.get.mockImplementation((url) =>
+      url === '/reports/5'
+        ? Promise.resolve({ data: REPORT })
+        : Promise.reject({ response: { status: 404 } })
+    );
+    await setup();
+
+    await screen.findByText('Basura acumulada');
+    await waitFor(() =>
+      expect(Alert.alert).toHaveBeenCalledWith('Error', 'No se pudieron cargar los comentarios.')
+    );
+  });
+
+  it('si fallan ambas peticiones (500) muestra una sola alerta', async () => {
+    api.get.mockImplementation(() => Promise.reject({ response: { status: 500 } }));
+    await setup();
+
+    expect(await screen.findByText('No se pudo cargar el reporte.')).toBeTruthy();
+    expect(Alert.alert).toHaveBeenCalledTimes(1);
+    expect(Alert.alert).toHaveBeenCalledWith('Error', 'No se pudo cargar el detalle del reporte.');
+  });
+
+  it('al cambiar de reporte descarta el estado del anterior', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/reports/5') return Promise.resolve({ data: REPORT });
+      if (url === '/reports/6') return Promise.reject({ response: { status: 404 } });
+      return Promise.resolve({ data: [] });
+    });
+    await AsyncStorage.clear();
+    const view = await render(<DetalleReporteScreen route={{ params: { reportId: 5 } }} />);
+    await screen.findByText('Basura acumulada');
+
+    await view.rerender(<DetalleReporteScreen route={{ params: { reportId: 6 } }} />);
+
+    expect(await screen.findByText('Reporte no encontrado.')).toBeTruthy();
+    expect(screen.queryByText('Basura acumulada')).toBeNull();
   });
 
   it('si el reporte no existe (404) muestra "Reporte no encontrado" sin alerta', async () => {
