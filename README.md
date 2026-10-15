@@ -23,7 +23,6 @@ Para poder ejecutar la aplicacion, primero se debe levantar el servidor del back
 cp backend/.env.example backend/.env
 # Debes completar el DB_PASSWORD y DB_ROOT_PASSWORD en backend/.env con una contraseña.
 # Puede ser cualquiera, solo deben estar y ser iguales
-# Si surgiera algun error (ej: no anotaste la contraseña al levantar el servidor), para hacer que el cambio afecte, ejecuta estos dos:
 
 
 # 2. Construir y levantar
@@ -33,6 +32,7 @@ docker compose up -d --build
 # 3. Primera vez
 docker compose exec app composer install #Muy importante asegurarse de instalar las dependencias en el contenedor. Demora unos minutos.
 docker compose exec app php artisan key:generate
+docker compose exec app php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
 docker compose exec app php artisan migrate
 docker compose exec app php artisan storage:link
 
@@ -64,10 +64,58 @@ EXPO_PUBLIC_API_URL=http://192.168.X.X:8000/api
 
 ```bash
 npm install
-npx expo start
+npx expo start --clear
 ```
 
-Escanear el QR con **Expo Go**. El dispositivo y la computadora deben estar en la misma red WiFi.
+Escanear el QR con **Expo Go**.
+
+Si cambias `.env`, detén y vuelve a iniciar Expo para que cargue la nueva URL.
+Comprueba desde el navegador del celular que `http://<IP-DE-LA-PC>:8000/api/categories`
+devuelva JSON. Si no abre, el celular no puede alcanzar la API; si abre, confirma
+que Expo Go esté usando el proyecto y el QR recién generados.
+
+Requisitos:
+- El celular y el PC deben estar en la misma red wifi.
+- La red no debe tener aislamiento de clientes (común en redes de universidades o lugares públicos). Si lo tiene, usa el hotspot del celular.
+- La URL de `EXPO_PUBLIC_API_URL` debe usar la IP Wi-Fi del PC, no `localhost`.
+
+### Conexión desde el celular en Windows
+
+El puerto **8000** es la API del backend; **8081** es Metro, que entrega la app a
+Expo Go. Ambos deben ser accesibles desde el celular. En una red Wi-Fi de
+confianza, cambia el perfil de red de Windows a **Privado** y, en PowerShell como
+administrador, permite ambos puertos solo para ese perfil:
+
+```powershell
+New-NetFirewallRule -DisplayName "Backend API" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow -Profile Private,Public
+New-NetFirewallRule -DisplayName "Expo Metro" -Direction Inbound -Protocol TCP -LocalPort 8081 -Action Allow -Profile Private,Public
+```
+
+
+### Expo Go: "Failed to download remote update"
+
+Ocurre cuando el celular no logra conectarse a Metro (puerto 8081) en el PC. En Windows, el firewall bloquea esa conexión entrante por defecto.
+
+**Solución:** abre PowerShell como administrador y ejecuta:
+
+```powershell
+New-NetFirewallRule -DisplayName "Expo Metro" -Direction Inbound -Protocol TCP -LocalPort 8081 -Action Allow -Profile Private
+```
+
+Luego reinicia Metro:
+
+```bash
+npx expo start --clear
+```
+
+Para eliminar la regla cuando ya no la necesites:
+
+```powershell
+Remove-NetFirewallRule -DisplayName "Expo Metro"
+```
+
+> Si Expo usa otro puerto (por ejemplo 8082 porque el 8081 está ocupado), crea la regla con ese número.
+
 
 ---
 ### 172.30.80.1

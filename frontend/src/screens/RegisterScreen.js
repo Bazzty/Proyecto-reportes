@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback,
-  StyleSheet, ActivityIndicator, Alert, Image, Dimensions, ScrollView
+  StyleSheet, ActivityIndicator, Alert, Image, ScrollView,
+  KeyboardAvoidingView, useWindowDimensions
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { setAuthToken } from '../services/api';
 
-const { height } = Dimensions.get('window');
-
 export default function RegisterScreen({ navigation }) {
+  const { height } = useWindowDimensions();
+  const initialHeight = useRef(height).current;
   const [name, setName]                       = useState('');
   const [email, setEmail]                     = useState('');
   const [password, setPassword]               = useState('');
@@ -55,13 +56,20 @@ export default function RegisterScreen({ navigation }) {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-    <View style={styles.wrapper}>
-      <View style={styles.imageWrapper}>
+    <KeyboardAvoidingView
+      style={styles.wrapper}
+      behavior="padding"
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+      >
+      <View style={[styles.imageWrapper, { height: Math.min(initialHeight * 0.28, 240) }]}>
         <Image source={require('../../assets/lake.png')} style={styles.image} />
         <LinearGradient colors={['transparent', '#0e7490']} style={styles.fade} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.container} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Crear Cuenta</Text>
         <Text style={styles.subtitle}>Únete a la comunidad</Text>
 
@@ -113,17 +121,17 @@ export default function RegisterScreen({ navigation }) {
           <Text style={styles.link}>¿Ya tienes cuenta? Inicia sesión</Text>
         </TouchableOpacity>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
   wrapper:      { flex: 1, backgroundColor: '#0e7490' },
-  imageWrapper: { height: height * 0.28, marginHorizontal: 0 },
+  imageWrapper: { marginHorizontal: 0 },
   image:        { width: '100%', height: '100%', resizeMode: 'cover' },
   fade:         { position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' },
-  container:    { paddingHorizontal: 24, paddingBottom: 40 },
+  container:    { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40 },
   title:        { fontSize: 28, fontWeight: 'bold', marginBottom: 4, color: '#ffffff' },
   subtitle:     { fontSize: 15, color: '#ccfbf1', marginBottom: 24 },
   input: {
