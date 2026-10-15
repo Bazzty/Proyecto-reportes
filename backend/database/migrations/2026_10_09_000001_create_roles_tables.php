@@ -32,12 +32,10 @@ return new class extends Migration
 
         // Los usuarios ya existentes quedan con el rol "user".
         $userRoleId = DB::table('roles')->where('name', 'user')->value('id');
-        DB::table('users')->pluck('id')->each(fn ($userId) => DB::table('role_user')->insert([
-            'user_id' => $userId,
-            'role_id' => $userRoleId,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]));
+        DB::table('role_user')->insertUsing(
+            ['user_id', 'role_id', 'created_at', 'updated_at'],
+            DB::table('users')->selectRaw('id, ?, ?, ?', [$userRoleId, $now, $now])
+        );
     }
 
     public function down(): void

@@ -21,7 +21,7 @@ class ReportSeeder extends Seeder
             ['name' => 'Alonso Vera',        'email' => 'alonso@demo.cl'],
         ];
 
-        $userRoleId = Role::where('name', Role::USER)->value('id');
+        $userRoleId = Role::firstOrCreate(['name' => Role::USER])->id;
 
         $createdUsers = [];
         foreach ($users as $u) {

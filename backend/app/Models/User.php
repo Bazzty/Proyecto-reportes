@@ -62,7 +62,9 @@ class User extends Authenticatable
 
     public function hasRole(string $name): bool
     {
-        return $this->roles()->where('name', $name)->exists();
+        return $this->relationLoaded('roles')
+            ? $this->roles->contains('name', $name)
+            : $this->roles()->where('name', $name)->exists();
     }
 
     public function isAdmin(): bool

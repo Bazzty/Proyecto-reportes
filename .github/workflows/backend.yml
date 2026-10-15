@@ -100,11 +100,6 @@ jobs:
       - run: php artisan migrate:fresh --seed --force
       - name: Auditoría SQL (REP-59)
         working-directory: .
-        run: |
-          if [ -f backend/database/audit.sql ]; then
-            mysql -h 127.0.0.1 -uroot lagoenlinea < backend/database/audit.sql
-          else
-            echo "::warning::backend/database/audit.sql (REP-59) aún no existe; se omite la auditoría."
-          fi
+        run: mysql -h 127.0.0.1 -uroot lagoenlinea < backend/database/audit.sql
       - name: Fotos de reportes en disco (REP-59)
         run: php artisan reports:audit-photos

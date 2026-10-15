@@ -40,7 +40,7 @@ class UserFactory extends Factory
     public function admin(): static
     {
         return $this->afterCreating(function (User $user) {
-            $user->roles()->attach(Role::where('name', Role::ADMIN)->value('id'));
+            $user->roles()->attach(Role::firstOrCreate(['name' => Role::ADMIN])->id);
         });
     }
 
