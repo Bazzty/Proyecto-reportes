@@ -279,4 +279,39 @@ describe('HomeScreen', () => {
       expect(api.get.mock.calls.filter(([u]) => u === '/reports').length).toBe(callsAfterHang);
     });
   });
+
+  it('permite combinar varias categorías a la vez', async () => {
+    // Se usa una tercera categoría para comprobar que la selección múltiple
+    // excluye lo que no está seleccionado.
+    const extra = {
+      id: 3, description: 'Escombros en la calle', status: 'Pendiente',
+      latitude: -41.33, longitude: -73.0, photo_url: null,
+      category: { id: 3, name: 'escombros' }, user: { name: 'Caro' },
+    };
+    api.get.mockImplementation((url) => {
+      if (url === '/categories') return Promise.resolve({ data: [...CATEGORIES, { id: 3, name: 'escombros' }] });
+      if (url === '/reports') return Promise.resolve({ data: [...REPORTS, extra] });
+      if (url === '/reports/heatmap') return Promise.resolve({ data: [] });
+      if (url === '/user/reports') return Promise.resolve({ data: [] });
+      return Promise.reject(new Error(`unexpected ${url}`));
+    });
+    await setup();
+
+    // Seleccionar Basura y Aguas: se ven ambas y se oculta Escombros
+    await fireEvent.press(screen.getByText('Basura'));
+    await fireEvent.press(screen.getByText('Aguas'));
+    expect(screen.getByText('Basura en la plaza')).toBeTruthy();
+    expect(screen.getByText('Agua contaminada')).toBeTruthy();
+    expect(screen.queryByText('Escombros en la calle')).toBeNull();
+
+    // Quitar Basura: queda solo Aguas
+    await fireEvent.press(screen.getByText('Basura'));
+    expect(screen.queryByText('Basura en la plaza')).toBeNull();
+    expect(screen.getByText('Agua contaminada')).toBeTruthy();
+
+    // "Todos" limpia la selección y vuelven a verse todos
+    await fireEvent.press(screen.getByText('Todos'));
+    expect(screen.getByText('Basura en la plaza')).toBeTruthy();
+    expect(screen.getByText('Escombros en la calle')).toBeTruthy();
+  });
 });
