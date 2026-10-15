@@ -60,7 +60,7 @@ class ReportController extends Controller
             ->latest()
             ->latest('id');
 
-        if (!$request->hasAny(['page', 'per_page'])) {
+        if (! $request->hasAny(['page', 'per_page'])) {
             return response()->json($query->get()->map(fn (Report $r) => $this->formatReport($r, $uid)));
         }
 
