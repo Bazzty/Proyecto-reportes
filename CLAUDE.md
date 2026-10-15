@@ -90,6 +90,8 @@ Protected routes use `middleware('auth:sanctum')`. Public routes are `register` 
 | `users`      | id, name, email, password |
 | `reports`    | id, user_id, category_id, description, latitude, longitude, photo_path, status (Pendiente/En Progreso/Resuelto) |
 | `categories` | id, name (basura, escombros, aguas, otro) |
+| `roles` | id, name (`user`, `admin`; únicos, sembrados en la migración) |
+| `role_user` | user_id, role_id (PK compuesta; todo usuario nuevo recibe `user`) |
 
 ### Current state
 
@@ -115,4 +117,28 @@ Structure: `frontend/src/screens/`, `frontend/src/components/`, `frontend/src/se
 
 Every task needs an open GitHub Issue and a `feat/` branch before coding starts.
 
-Commit format: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:` prefixes are required.
+Commit format: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, `style:`, `ci:` prefixes are required.
+
+## CI (GitHub Actions)
+
+Workflows en `.github/workflows/` se ejecutan en cada PR hacia `develop` y `main`. Para correr los mismos checks en local:
+
+```bash
+# Backend: tests y estilo
+docker compose exec app php artisan test
+docker compose exec app vendor/bin/pint --test      # sin --test aplica los arreglos
+
+# BD: migraciones + seed desde cero
+docker compose exec app php artisan migrate:fresh --seed
+
+# Tests contra MySQL (BD aparte "reportes_test"; ejercita enum/decimal que SQLite no aplica). Desde backend/
+bin/test-mysql.sh
+
+# Auditoría de integridad de datos (falla con exit 1 si hay hallazgos). Desde backend/
+docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" reportes_db' < database/audit.sql
+
+# Frontend
+cd frontend && npm ci && npm run lint && npm test
+```
+
+Protección de ramas (manual, requiere admin del repo, GitHub → Settings → Branches): `develop` y `main` con PR obligatorio, checks requeridos (`PHPUnit`, `Laravel Pint`, `Validación de BD`, `ESLint + Jest`, `Prefijos de commit`), sin push directo. `main` solo recibe PR desde `develop` (check `main solo recibe PR desde develop`).
