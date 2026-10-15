@@ -106,3 +106,5 @@ jobs:
           else
             echo "::warning::backend/database/audit.sql (REP-59) aún no existe; se omite la auditoría."
           fi
+      - name: Fotos de reportes en disco (REP-59)
+        run: php artisan reports:audit-photos
