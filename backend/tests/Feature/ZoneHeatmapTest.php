@@ -10,7 +10,6 @@ use App\Services\ZoneResolver;
 use Database\Seeders\ZoneSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use RuntimeException;
@@ -19,13 +18,6 @@ use Tests\TestCase;
 class ZoneHeatmapTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        Cache::forget('zones.all');
-    }
 
     public function test_seeder_creates_the_expected_zones()
     {
@@ -228,7 +220,7 @@ class ZoneHeatmapTest extends TestCase
         $this->assertSame('Sector grande', app(ZoneResolver::class)->resolve(5.0, 5.0)->name);
     }
 
-    public function test_flush_discards_in_memory_zones_after_they_change()
+    public function test_resolver_sees_zone_changes_immediately()
     {
         $zone = Zone::create([
             'name' => 'Movil', 'slug' => 'movil', 'type' => 'comuna', 'area' => 1.0,
@@ -240,14 +232,24 @@ class ZoneHeatmapTest extends TestCase
 
         $zone->update(['boundary' => ['type' => 'Polygon', 'coordinates' => [[[20, 20], [30, 20], [30, 30], [20, 30], [20, 20]]]]]);
 
-        // Sin flush() se sigue usando la copia en memoria (singleton).
-        $this->assertSame($resolver, app(ZoneResolver::class));
-        $this->assertNotNull($resolver->resolve(5.0, 5.0));
-
-        $resolver->flush();
-
         $this->assertNull($resolver->resolve(5.0, 5.0));
         $this->assertSame('Movil', $resolver->resolve(25.0, 25.0)->name);
+    }
+
+    public function test_zone_bounding_box_follows_the_boundary()
+    {
+        $zone = Zone::create([
+            'name' => 'Caja', 'slug' => 'caja', 'type' => 'sector', 'area' => 1.0,
+            'boundary' => ['type' => 'MultiPolygon', 'coordinates' => [
+                [[[1, 2], [3, 2], [3, 4], [1, 4], [1, 2]]],
+                [[[10, 20], [12, 20], [12, 22], [10, 22], [10, 20]]],
+            ]],
+        ])->fresh();
+
+        $this->assertEquals(
+            ['min_lat' => 2.0, 'max_lat' => 22.0, 'min_lng' => 1.0, 'max_lng' => 12.0],
+            $zone->only(['min_lat', 'max_lat', 'min_lng', 'max_lng'])
+        );
     }
 
     public function test_seeder_reassigns_existing_reports_after_zones_are_recreated()

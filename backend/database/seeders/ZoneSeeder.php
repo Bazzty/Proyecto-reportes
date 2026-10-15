@@ -46,9 +46,7 @@ class ZoneSeeder extends Seeder
         Zone::whereNotIn('slug', array_keys($used))->delete();
 
         // Recalcula la zona de los reportes existentes (las filas borradas/recreadas dejan zone_id en NULL).
-        $resolver = app(ZoneResolver::class);
-        $resolver->flush();
-        $resolver->assignToReports();
+        app(ZoneResolver::class)->assignToReports();
     }
 
     protected function path(): string

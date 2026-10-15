@@ -4,30 +4,21 @@ namespace App\Services;
 
 use App\Models\Report;
 use App\Models\Zone;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 
 class ZoneResolver
 {
-    private ?Collection $zones = null;
-
-    /** @var array<int, array{0: float, 1: float, 2: float, 3: float}> [minLng, minLat, maxLng, maxLat] por zona */
-    private array $boxes = [];
-
     public function resolve(?float $latitude, ?float $longitude): ?Zone
     {
         if ($latitude === null || $longitude === null) {
             return null;
         }
 
-        $matches = $this->zones()
-            ->filter(fn (Zone $zone) => $this->inBoundingBox($zone, $latitude, $longitude)
-                && $this->contains($zone->boundary, $latitude, $longitude))
-            ->values();
-
-        if ($matches->isEmpty()) {
-            return null;
-        }
+        // Solo se cargan (con su GeoJSON) las zonas cuya caja envolvente contiene el punto.
+        $matches = Zone::query()
+            ->where('min_lat', '<=', $latitude)->where('max_lat', '>=', $latitude)
+            ->where('min_lng', '<=', $longitude)->where('max_lng', '>=', $longitude)
+            ->get()
+            ->filter(fn (Zone $zone) => $this->contains($zone->boundary, $latitude, $longitude));
 
         // Prioridad: un sector (más específico) gana sobre una comuna; ante empate, la zona más pequeña.
         return $matches
@@ -41,8 +32,6 @@ class ZoneResolver
      */
     public function assignToReports(): int
     {
-        $this->flush();
-
         $updated = 0;
 
         Report::query()->chunkById(200, function ($reports) use (&$updated) {
@@ -57,52 +46,6 @@ class ZoneResolver
         });
 
         return $updated;
-    }
-
-    /**
-     * Descarta las zonas en memoria y en cache (llamar tras sembrar o modificar zonas).
-     */
-    public function flush(): void
-    {
-        $this->zones = null;
-        $this->boxes = [];
-
-        Cache::forget('zones.all');
-    }
-
-    private function zones(): Collection
-    {
-        return $this->zones ??= Cache::remember('zones.all', now()->addHour(), fn () => Zone::all());
-    }
-
-    private function inBoundingBox(Zone $zone, float $latitude, float $longitude): bool
-    {
-        $this->boxes[$zone->id] ??= $this->boundingBox($zone->boundary);
-
-        [$minLng, $minLat, $maxLng, $maxLat] = $this->boxes[$zone->id];
-
-        return $longitude >= $minLng && $longitude <= $maxLng && $latitude >= $minLat && $latitude <= $maxLat;
-    }
-
-    private function boundingBox(array $geometry): array
-    {
-        $minLng = $minLat = INF;
-        $maxLng = $maxLat = -INF;
-
-        $coordinates = $geometry['coordinates'] ?? [];
-
-        array_walk_recursive($coordinates, function ($value, $index) use (&$minLng, &$minLat, &$maxLng, &$maxLat) {
-            // Los pares [lng, lat] se recorren de forma plana; el índice 0 es lng y el 1 es lat.
-            if ($index === 0) {
-                $minLng = min($minLng, $value);
-                $maxLng = max($maxLng, $value);
-            } elseif ($index === 1) {
-                $minLat = min($minLat, $value);
-                $maxLat = max($maxLat, $value);
-            }
-        });
-
-        return [(float) $minLng, (float) $minLat, (float) $maxLng, (float) $maxLat];
     }
 
     private function contains(array $geometry, float $latitude, float $longitude): bool
