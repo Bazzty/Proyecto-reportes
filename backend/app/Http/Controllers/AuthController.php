@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
@@ -16,11 +17,12 @@ class AuthController extends Controller
             'password' => 'required|string|confirmed|min:8',
         ]);
 
-        $user = User::create([
+        // En transacción: si falla la asignación del rol, no queda un usuario sin rol.
+        $user = DB::transaction(fn () => User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
-        ]);
+        ]));
 
         $token = $user->createToken('auth_token')->plainTextToken;
 

@@ -74,11 +74,7 @@ class User extends Authenticatable
     {
         // Todo usuario nuevo nace con el rol "user".
         static::created(function (User $user) {
-            $roleId = Role::where('name', Role::USER)->value('id');
-
-            if ($roleId) {
-                $user->roles()->attach($roleId);
-            }
+            $user->roles()->attach(Role::firstOrCreate(['name' => Role::USER])->id);
         });
     }
 

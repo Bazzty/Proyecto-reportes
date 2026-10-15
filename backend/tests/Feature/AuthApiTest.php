@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -188,5 +189,14 @@ class AuthApiTest extends TestCase
 
         $this->assertTrue($admin->hasRole('user'));
         $this->assertTrue($admin->isAdmin());
+    }
+
+    public function test_new_user_still_gets_user_role_if_it_was_deleted()
+    {
+        Role::where('name', 'user')->delete();
+
+        $user = User::factory()->create();
+
+        $this->assertTrue($user->hasRole('user'));
     }
 }
