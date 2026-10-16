@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
+import { Alert, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
@@ -12,8 +14,6 @@ import DetalleReporteScreen from './src/screens/DetalleReporteScreen';
 import NewReportScreen from './src/screens/NewReportScreen';
 import MyReportsScreen from './src/screens/MyReportsScreen';
 import { setAuthToken, setUnauthorizedHandler } from './src/services/api';
-import { Alert } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 
 const Stack = createStackNavigator();
 
@@ -28,34 +28,43 @@ export default function App() {
     });
 
     const restoreStartup = async () => {
-      const [tokenResult, pickerResult] = await Promise.allSettled([
-        AsyncStorage.getItem('token'),
-        ImagePicker.getPendingResultAsync(),
-      ]);
-
-      const token = tokenResult.status === 'fulfilled' ? tokenResult.value : null;
-      if (tokenResult.status === 'rejected') {
-        console.warn('No se pudo restaurar la sesión:', tokenResult.reason);
-      }
-
+      let token = null;
       let pendingPhoto = null;
-      if (pickerResult.status === 'rejected') {
-        console.error('No se pudo recuperar el resultado de la cámara:', pickerResult.reason);
-        Alert.alert('Error', 'No se pudo recuperar la foto tomada.');
-      } else if (pickerResult.value && 'code' in pickerResult.value) {
-        Alert.alert('Error al recuperar la foto', pickerResult.value.message);
-      } else if (pickerResult.value && !pickerResult.value.canceled) {
-        pendingPhoto = pickerResult.value.assets?.[0] ?? null;
-      }
+      try {
+        const pickerRequest =
+          Platform.OS === 'android' && typeof ImagePicker?.getPendingResultAsync === 'function'
+            ? ImagePicker.getPendingResultAsync()
+            : Promise.resolve(null);
 
-      if (token) {
-        setAuthToken(token);
-      }
+        const [tokenResult, pickerResult] = await Promise.allSettled([
+          AsyncStorage.getItem('token'),
+          pickerRequest,
+          new Promise((resolve) => setTimeout(resolve, 2500)),
+        ]);
 
-      setStartup({
-        initialRoute: pendingPhoto ? 'NewReport' : token ? 'Home' : 'Login',
-        pendingPhoto,
-      });
+        token = tokenResult.status === 'fulfilled' ? tokenResult.value : null;
+        if (tokenResult.status === 'rejected') {
+          console.warn('No se pudo restaurar la sesión:', tokenResult.reason);
+        }
+
+        if (pickerResult.status === 'rejected') {
+          console.error('No se pudo recuperar el resultado de la cámara:', pickerResult.reason);
+          Alert.alert('Error', 'No se pudo recuperar la foto tomada.');
+        } else if (pickerResult.value && typeof pickerResult.value === 'object' && 'code' in pickerResult.value) {
+          Alert.alert('Error al recuperar la foto', pickerResult.value.message);
+        } else if (pickerResult.value && !pickerResult.value.canceled) {
+          pendingPhoto = pickerResult.value.assets?.[0] ?? null;
+        }
+
+        if (token) setAuthToken(token);
+      } catch (error) {
+        console.warn('Error restaurando el inicio:', error);
+      } finally {
+        setStartup({
+          initialRoute: token ? 'Home' : 'Login',
+          pendingPhoto: token ? pendingPhoto : null,
+        });
+      }
     };
 
     restoreStartup();
@@ -65,24 +74,27 @@ export default function App() {
     return <WelcomeScreen />;
   }
 
+  const initialState = startup.pendingPhoto
+    ? {
+        index: 1,
+        routes: [
+          { name: 'Home' },
+          { name: 'NewReport', params: { pendingPhoto: startup.pendingPhoto } },
+        ],
+      }
+    : undefined;
+
   return (
-    <SafeAreaProvider>
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer ref={navigationRef} initialState={initialState}>
       <Stack.Navigator initialRouteName={startup.initialRoute}>
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Map" component={MapScreen} options={{ headerShown: false }} />
         <Stack.Screen name="DetalleReporte" component={DetalleReporteScreen} options={{ title: 'Detalle del Reporte' }} />
-        <Stack.Screen
-          name="NewReport"
-          component={NewReportScreen}
-          initialParams={startup.pendingPhoto ? { pendingPhoto: startup.pendingPhoto } : undefined}
-          options={{ title: 'Nuevo Reporte', headerTintColor: '#0e7490' }}
-        />
+        <Stack.Screen name="NewReport" component={NewReportScreen} options={{ title: 'Nuevo Reporte', headerTintColor: '#0e7490' }} />
         <Stack.Screen name="MyReports" component={MyReportsScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
-    </SafeAreaProvider>
   );
 }

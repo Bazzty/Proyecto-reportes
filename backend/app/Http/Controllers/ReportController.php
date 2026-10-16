@@ -56,7 +56,7 @@ class ReportController extends Controller
     public function userReports(Request $request)
     {
         $uid = $request->user()->id;
-        $reports = $this->withReportData($request->user()->reports(), $uid)->latest()->latest('id')->get();
+        $reports = $this->withReportData($request->user()->reports(), $uid)->latest()->latest('id')->paginate($request->per_page);
 
         return response()->json($reports->map(fn (Report $report) => $this->formatReport($report, $uid)));
     }

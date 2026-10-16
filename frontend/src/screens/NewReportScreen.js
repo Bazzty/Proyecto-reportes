@@ -10,7 +10,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as Location from 'expo-location';
 import api from '../services/api';
 
-export default function NewReportScreen({ navigation, route }) {
+export default function NewReportScreen({ navigation, route = {} }) {
   const [photo, setPhoto]             = useState(null);
   const [location, setLocation]       = useState(null);
   const [description, setDescription] = useState('');

@@ -1,11 +1,11 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Modal, StatusBar, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
 
-const PAGE_SIZE = 2;
+const PAGE_SIZE = 4;
 
 const getStatusStyle = (status) => {
   const s = (status ?? '').toLowerCase();
@@ -33,45 +33,32 @@ const categoryLabel = (item) =>
     : 'Sin categoría';
 
 export default function MyReportsScreen({ navigation }) {
-  const [reports, setReports]       = useState([]);
-  const [total, setTotal]           = useState(0);
-  const [loading, setLoading]       = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError]           = useState(false);
+  const [allReports, setAllReports]   = useState([]);
+  const [visible, setVisible]         = useState(PAGE_SIZE);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [viewMode, setViewMode]       = useState('list');
   const { width } = useWindowDimensions();
   const gridCardWidth = (width - 40 - 12) / 2;
-  const pageRef     = useRef(0);
-  const lastPageRef = useRef(1);
-  const busyRef     = useRef(false);
 
-  const fetchPage = useCallback(async (page) => {
-    if (busyRef.current) return;
-    busyRef.current = true;
-    if (page === 1) { setLoading(true); setError(false); }
-    else setLoadingMore(true);
-    try {
-      const { data } = await api.get('/user/reports', { params: { page, per_page: PAGE_SIZE } });
-      pageRef.current     = data.current_page;
-      lastPageRef.current = data.last_page;
-      setTotal(data.total);
-      setReports(prev => (page === 1 ? data.data : [...prev, ...data.data]));
-    } catch {
-      if (page === 1) { setReports([]); setTotal(0); setError(true); }
-    } finally {
-      busyRef.current = false;
-      setLoading(false);
-      setLoadingMore(false);
-    }
+  const loadReports = useCallback(() => {
+    setLoading(true);
+    setError(false);
+    api.get('/user/reports')
+      .then(res => { setAllReports(res.data); setVisible(PAGE_SIZE); })
+      .catch(() => { setAllReports([]); setError(true); })
+      .finally(() => setLoading(false));
   }, []);
-
-  const loadReports = useCallback(() => fetchPage(1), [fetchPage]);
 
   useFocusEffect(loadReports);
 
+  const total   = allReports.length;
+  const reports = allReports.slice(0, visible);
+  const hasMore = visible < total;
+
   const loadMore = () => {
-    if (pageRef.current < lastPageRef.current) fetchPage(pageRef.current + 1);
+    if (hasMore) setVisible((v) => v + PAGE_SIZE);
   };
 
   const goToMap = (item) =>
@@ -87,6 +74,22 @@ export default function MyReportsScreen({ navigation }) {
         activeOpacity={0.75}
         onPress={() => navigation.navigate('DetalleReporte', { reportId: item.id })}
       >
+        {item.photo_url ? (
+          <TouchableOpacity activeOpacity={0.9} onPress={() => setLightboxUrl(item.photo_url)}>
+            <Image
+              source={item.photo_url}
+              style={styles.listPhoto}
+              contentFit="cover"
+              cachePolicy="disk"
+              transition={150}
+            />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.photoPlaceholder}>
+            <Ionicons name="image-outline" size={32} color="#d1d5db" />
+          </View>
+        )}
+
         <View style={styles.cardBody}>
           <View style={styles.cardHeader}>
             <View style={styles.categoryRow}>
@@ -221,9 +224,7 @@ export default function MyReportsScreen({ navigation }) {
           onEndReached={loadMore}
           onEndReachedThreshold={0.3}
           ListFooterComponent={
-            loadingMore ? (
-              <ActivityIndicator color="#0e7490" style={{ marginVertical: 16 }} />
-            ) : pageRef.current < lastPageRef.current ? (
+            hasMore ? (
               <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore}>
                 <Text style={styles.loadMoreText}>Cargar más</Text>
               </TouchableOpacity>
@@ -294,6 +295,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
+  listPhoto: { width: '100%', height: 160 },
   photoPlaceholder: {
     width: '100%',
     height: 100,

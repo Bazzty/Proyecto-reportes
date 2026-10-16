@@ -49,8 +49,8 @@ export default function DetalleReporteScreen({ route, navigation }) {
       .finally(() => setLoading(false));
 
     api.get(`/reports/${reportId}/comments`)
-      .then(({ data }) => setComments(data))
-      .catch(() => {});
+    .then(({ data }) => setComments(data))
+    .catch(() => Alert.alert('Error', 'No se pudieron cargar los comentarios.'));
   }, [reportId]);
 
   const handleConfirm = async () => {
@@ -65,7 +65,9 @@ export default function DetalleReporteScreen({ route, navigation }) {
         confirmations_count: data.count,
         confirmed_by_me:     data.confirmed,
       }));
-    } catch {}
+    } catch {
+  Alert.alert('Error', 'No se pudo registrar tu confirmación.');
+}
   };
 
   const handleSendComment = async () => {
@@ -178,8 +180,10 @@ export default function DetalleReporteScreen({ route, navigation }) {
           <View style={styles.ownerConfirmRow}>
             <Ionicons name="people-outline" size={16} color="#6b7280" />
             <Text style={styles.ownerConfirmText}>
-              {report.confirmations_count} persona{report.confirmations_count !== 1 ? 's' : ''} confirmaron este reporte
-            </Text>
+            {report.confirmations_count === 1
+              ? '1 persona confirmó este reporte'
+              : `${report.confirmations_count} personas confirmaron este reporte`}
+          </Text>
           </View>
         )}
 
