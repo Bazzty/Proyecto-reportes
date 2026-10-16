@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback,
-  StyleSheet, ActivityIndicator, Alert, Image, Dimensions, ScrollView
+  StyleSheet, ActivityIndicator, Alert, Image, Dimensions, ScrollView,
+  KeyboardAvoidingView, Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { setAuthToken } from '../services/api';
+import useKeyboardHeight from '../hooks/useKeyboardHeight';
 
 const { height } = Dimensions.get('window');
 
@@ -14,7 +17,17 @@ export default function RegisterScreen({ navigation }) {
   const [email, setEmail]                     = useState('');
   const [password, setPassword]               = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [showPassword, setShowPassword]       = useState(false);
+  const [showConfirm, setShowConfirm]         = useState(false);
   const [loading, setLoading]                 = useState(false);
+
+  const keyboardHeight = useKeyboardHeight();
+  const scrollRef = useRef(null);
+  const scrollToFocused = () => {
+    if (Platform.OS === 'android') {
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300);
+    }
+  };
 
   const handleRegister = async () => {
     if (!name || !email || !password || !passwordConfirm) {
@@ -36,7 +49,12 @@ export default function RegisterScreen({ navigation }) {
       });
       const { token, user } = response.data;
 
-      await AsyncStorage.multiSet([['token', token], ['userName', user.name], ['userId', String(user.id)]]);
+      await AsyncStorage.multiSet([
+        ['token', token],
+        ['userName', user.name],
+        ['userId', String(user.id)],
+        ['isAdmin', user.is_admin ? '1' : '0'],
+      ]);
       setAuthToken(token);
 
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
@@ -61,7 +79,13 @@ export default function RegisterScreen({ navigation }) {
         <LinearGradient colors={['transparent', '#0e7490']} style={styles.fade} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.container} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={[styles.container, { paddingBottom: Platform.OS === 'android' ? keyboardHeight + 40 : 40 }]}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.title}>Crear Cuenta</Text>
         <Text style={styles.subtitle}>Únete a la comunidad</Text>
 
@@ -81,22 +105,44 @@ export default function RegisterScreen({ navigation }) {
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Contraseña"
-          placeholderTextColor="#99f6e4"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Confirmar contraseña"
-          placeholderTextColor="#99f6e4"
-          value={passwordConfirm}
-          onChangeText={setPasswordConfirm}
-          secureTextEntry
-        />
+        <View style={styles.passwordRow}>
+          <TextInput
+            style={[styles.input, styles.passwordInput]}
+            placeholder="Contraseña"
+            placeholderTextColor="#99f6e4"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            onFocus={scrollToFocused}
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            testID="toggle-password"
+            onPressIn={() => setShowPassword(true)}
+            onPressOut={() => setShowPassword(false)}
+          >
+            <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#99f6e4" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.passwordRow}>
+          <TextInput
+            style={[styles.input, styles.passwordInput]}
+            placeholder="Confirmar contraseña"
+            placeholderTextColor="#99f6e4"
+            value={passwordConfirm}
+            onChangeText={setPasswordConfirm}
+            secureTextEntry={!showConfirm}
+            onFocus={scrollToFocused}
+          />
+          <TouchableOpacity
+            style={styles.eyeButton}
+            testID="toggle-confirm"
+            onPressIn={() => setShowConfirm(true)}
+            onPressOut={() => setShowConfirm(false)}
+          >
+            <Ionicons name={showConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color="#99f6e4" />
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
@@ -113,12 +159,14 @@ export default function RegisterScreen({ navigation }) {
           <Text style={styles.link}>¿Ya tienes cuenta? Inicia sesión</Text>
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
     </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
+  flex:         { flex: 1 },
   wrapper:      { flex: 1, backgroundColor: '#0e7490' },
   imageWrapper: { height: height * 0.28, marginHorizontal: 0 },
   image:        { width: '100%', height: '100%', resizeMode: 'cover' },
@@ -131,6 +179,9 @@ const styles = StyleSheet.create({
     padding: 14, marginBottom: 14, backgroundColor: 'rgba(255,255,255,0.15)',
     color: '#ffffff', fontSize: 15,
   },
+  passwordRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  passwordInput: { flex: 1, marginBottom: 0 },
+  eyeButton:     { paddingHorizontal: 12, paddingVertical: 14 },
   button:         { backgroundColor: '#ffffff', padding: 15, borderRadius: 12, alignItems: 'center', marginBottom: 16, marginTop: 4 },
   buttonDisabled: { backgroundColor: '#ccfbf1' },
   buttonText:     { color: '#0e7490', fontWeight: 'bold', fontSize: 16 },

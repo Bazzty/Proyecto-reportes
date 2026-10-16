@@ -38,6 +38,24 @@ describe('RegisterScreen', () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
+  it('los botones ojo muestran las contraseñas mientras se mantienen presionados', async () => {
+    await setup();
+
+    expect(screen.getByPlaceholderText('Contraseña').props.secureTextEntry).toBe(true);
+    expect(screen.getByPlaceholderText('Confirmar contraseña').props.secureTextEntry).toBe(true);
+
+    await fireEvent(screen.getByTestId('toggle-password'), 'pressIn');
+    expect(screen.getByPlaceholderText('Contraseña').props.secureTextEntry).toBe(false);
+
+    await fireEvent(screen.getByTestId('toggle-confirm'), 'pressIn');
+    expect(screen.getByPlaceholderText('Confirmar contraseña').props.secureTextEntry).toBe(false);
+
+    await fireEvent(screen.getByTestId('toggle-password'), 'pressOut');
+    await fireEvent(screen.getByTestId('toggle-confirm'), 'pressOut');
+    expect(screen.getByPlaceholderText('Contraseña').props.secureTextEntry).toBe(true);
+    expect(screen.getByPlaceholderText('Confirmar contraseña').props.secureTextEntry).toBe(true);
+  });
+
   it('con contraseñas distintas muestra "no coinciden" y no llama a la API', async () => {
     await setup();
     await fill({ confirm: 'otra-clave' });

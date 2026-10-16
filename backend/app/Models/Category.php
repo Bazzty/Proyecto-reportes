@@ -8,6 +8,8 @@ class Category extends Model
 {
     protected $fillable = [
         'name',
+        'description',
+        'icon',
     ];
 
     public function reports()
