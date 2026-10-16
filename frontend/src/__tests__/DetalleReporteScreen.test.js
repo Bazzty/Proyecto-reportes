@@ -61,32 +61,23 @@ describe('DetalleReporteScreen', () => {
     expect(await screen.findByText('Lat -33.43720, Lng -70.65060')).toBeTruthy();
   });
 
-  it('no muestra la ubicación si el reporte no tiene coordenadas', async () => {
-    mockGet({ report: { ...REPORT, latitude: null, longitude: null } });
+  it.each([
+    ['sin coordenadas', { latitude: null, longitude: null }],
+    ['cadena vacía', { latitude: -33.4, longitude: '' }],
+    ['texto no numérico', { latitude: 'abc' }],
+    ['fuera de rango', { latitude: 999, longitude: -70.6 }],
+    ['hexadecimal', { latitude: '0x10' }],
+  ])('no muestra la ubicación si las coordenadas no son válidas (%s)', async (_caso, coords) => {
+    mockGet({ report: { ...REPORT, ...coords } });
     await setup();
     await screen.findByText('Basura acumulada');
     expect(screen.queryByText(/Lat /)).toBeNull();
   });
 
-  it('no muestra la ubicación si las coordenadas no son válidas (cadena vacía)', async () => {
-    mockGet({ report: { ...REPORT, latitude: -33.4, longitude: '' } });
+  it('muestra la ubicación en 0, 0 y con coordenadas como texto', async () => {
+    mockGet({ report: { ...REPORT, latitude: 0, longitude: '0.5' } });
     await setup();
-    await screen.findByText('Basura acumulada');
-    expect(screen.queryByText(/Lat /)).toBeNull();
-  });
-
-  it('no muestra la ubicación si una coordenada no es numérica', async () => {
-    mockGet({ report: { ...REPORT, latitude: 'abc' } });
-    await setup();
-    await screen.findByText('Basura acumulada');
-    expect(screen.queryByText(/Lat /)).toBeNull();
-  });
-
-  it('no muestra la ubicación si las coordenadas están fuera de rango', async () => {
-    mockGet({ report: { ...REPORT, latitude: 999, longitude: -70.6 } });
-    await setup();
-    await screen.findByText('Basura acumulada');
-    expect(screen.queryByText(/Lat /)).toBeNull();
+    expect(await screen.findByText('Lat 0.00000, Lng 0.50000')).toBeTruthy();
   });
 
   it('si solo fallan los comentarios (404) con el reporte cargado, avisa', async () => {
@@ -154,13 +145,6 @@ describe('DetalleReporteScreen', () => {
     await render(<DetalleReporteScreen route={{ params: {} }} />);
     expect(await screen.findByText('Reporte no encontrado.')).toBeTruthy();
     expect(api.get).not.toHaveBeenCalled();
-  });
-
-  it('no muestra la ubicación si una coordenada es hexadecimal', async () => {
-    mockGet({ report: { ...REPORT, latitude: '0x10' } });
-    await setup();
-    await screen.findByText('Basura acumulada');
-    expect(screen.queryByText(/Lat /)).toBeNull();
   });
 
   it('si el reporte no existe (404) muestra "Reporte no encontrado" sin alerta', async () => {

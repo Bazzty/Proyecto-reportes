@@ -24,11 +24,8 @@ const formatDate = (iso) => {
 };
 
 // Coordenada válida: número finito; null, '' o texto no numérico no cuentan.
-const toCoord = (value) => {
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string' && /^\s*-?\d+(\.\d+)?\s*$/.test(value)) return Number(value);
-  return NaN;
-};
+const DECIMAL = /^\s*[-+]?\d+(\.\d+)?([eE][-+]?\d+)?\s*$/;
+const toCoord = (value) => (typeof value === 'string' && !DECIMAL.test(value) ? NaN : Number(value ?? NaN));
 
 // Se remonta al cambiar de reporte, así el estado (reporte, comentarios, errores,
 // respuestas en vuelo) nunca se mezcla entre reportes.
