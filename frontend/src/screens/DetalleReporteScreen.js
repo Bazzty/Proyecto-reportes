@@ -23,11 +23,22 @@ const formatDate = (iso) => {
   return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-export default function DetalleReporteScreen({ route }) {
-  const { reportId } = route.params;
+// Coordenada válida: número finito; null, '' o texto no numérico no cuentan.
+const DECIMAL = /^\s*[-+]?\d+(\.\d+)?([eE][-+]?\d+)?\s*$/;
+const toCoord = (value) => (typeof value === 'string' && !DECIMAL.test(value) ? NaN : Number(value ?? NaN));
+
+// Se remonta al cambiar de reporte, así el estado (reporte, comentarios, errores,
+// respuestas en vuelo) nunca se mezcla entre reportes.
+export default function DetalleReporteScreen(props) {
+  return <DetalleReporte key={props.route?.params?.reportId} {...props} />;
+}
+
+function DetalleReporte({ route }) {
+  const { reportId } = route?.params ?? {};
 
   const [report, setReport]         = useState(null);
   const [loading, setLoading]       = useState(true);
+  const [notFound, setNotFound]     = useState(false);
   const [comments, setComments]     = useState([]);
   const [newComment, setNewComment] = useState('');
   const [sending, setSending]       = useState(false);
@@ -43,14 +54,41 @@ export default function DetalleReporteScreen({ route }) {
   }, []);
 
   useEffect(() => {
-    api.get(`/reports/${reportId}`)
-      .then(({ data }) => setReport(data))
-      .catch(() => Alert.alert('Error', 'No se pudo cargar el detalle del reporte.'))
-      .finally(() => setLoading(false));
+    if (reportId == null) {
+      setNotFound(true);
+      setLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    // Resuelve true si el reporte cargó; los comentarios solo alertan en ese caso
+    // (si el reporte falla, la pantalla y su alerta ya lo informan).
+    const reportLoaded = api.get(`/reports/${reportId}`)
+      .then(({ data }) => {
+        if (!cancelled) setReport(data);
+        return true;
+      })
+      .catch((error) => {
+        if (cancelled) return false;
+        if (error.response?.status === 404) {
+          setNotFound(true);
+        } else {
+          Alert.alert('Error', 'No se pudo cargar el detalle del reporte.');
+        }
+        return false;
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
 
     api.get(`/reports/${reportId}/comments`)
-      .then(({ data }) => setComments(data))
-      .catch(() => Alert.alert('Error', 'No se pudieron cargar los comentarios.'));
+      .then(({ data }) => { if (!cancelled) setComments(data); })
+      .catch(async () => {
+        if (await reportLoaded && !cancelled) {
+          Alert.alert('Error', 'No se pudieron cargar los comentarios.');
+        }
+      });
+
+    return () => { cancelled = true; };
   }, [reportId]);
 
   const handleConfirm = async () => {
@@ -97,12 +135,18 @@ export default function DetalleReporteScreen({ route }) {
   if (!report) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <Text style={styles.errorText}>No se pudo cargar el reporte.</Text>
+        <Text style={styles.errorText}>
+          {notFound ? 'Reporte no encontrado.' : 'No se pudo cargar el reporte.'}
+        </Text>
       </SafeAreaView>
     );
   }
 
   const confirmed  = report.confirmed_by_me;
+  const lat = toCoord(report.latitude);
+  const lng = toCoord(report.longitude);
+  const hasLocation = Number.isFinite(lat) && Number.isFinite(lng) &&
+                      Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
   const isOwner    = myUserId && report.user?.id === myUserId;
 
   const Header = (
@@ -142,6 +186,15 @@ export default function DetalleReporteScreen({ route }) {
           <Ionicons name="calendar-outline" size={14} color="#9ca3af" style={{ marginLeft: 12 }} />
           <Text style={styles.infoText}>{formatDate(report.created_at)}</Text>
         </View>
+
+        {hasLocation && (
+          <View style={styles.infoRow}>
+            <Ionicons name="location-outline" size={14} color="#9ca3af" />
+            <Text style={styles.infoText}>
+              {`Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`}
+            </Text>
+          </View>
+        )}
 
         {/* Confirmaciones — oculto si es tu propio reporte */}
         {!isOwner && <TouchableOpacity

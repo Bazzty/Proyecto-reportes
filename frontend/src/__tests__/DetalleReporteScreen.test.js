@@ -1,5 +1,5 @@
 import { Alert } from 'react-native';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DetalleReporteScreen from '../screens/DetalleReporteScreen';
 import api from '../services/api';
@@ -15,6 +15,8 @@ const REPORT = {
   status: 'Pendiente',
   photo_url: null,
   created_at: '2026-10-01T12:00:00.000Z',
+  latitude: -33.4372,
+  longitude: -70.6506,
   category: { id: 1, name: 'basura' },
   user: { id: 2, name: 'Carla' },
   confirmations_count: 1,
@@ -52,6 +54,105 @@ describe('DetalleReporteScreen', () => {
     expect(screen.getByText('Carla')).toBeTruthy();
     expect(screen.getByText('Lo vi ayer también')).toBeTruthy();
     expect(screen.getByText('Comentarios (1)')).toBeTruthy();
+  });
+
+  it('muestra la ubicación del reporte', async () => {
+    await setup();
+    expect(await screen.findByText('Lat -33.43720, Lng -70.65060')).toBeTruthy();
+  });
+
+  it.each([
+    ['sin coordenadas', { latitude: null, longitude: null }],
+    ['cadena vacía', { latitude: -33.4, longitude: '' }],
+    ['texto no numérico', { latitude: 'abc' }],
+    ['fuera de rango', { latitude: 999, longitude: -70.6 }],
+    ['hexadecimal', { latitude: '0x10' }],
+  ])('no muestra la ubicación si las coordenadas no son válidas (%s)', async (_caso, coords) => {
+    mockGet({ report: { ...REPORT, ...coords } });
+    await setup();
+    await screen.findByText('Basura acumulada');
+    expect(screen.queryByText(/Lat /)).toBeNull();
+  });
+
+  it('muestra la ubicación en 0, 0 y con coordenadas como texto', async () => {
+    mockGet({ report: { ...REPORT, latitude: 0, longitude: '0.5' } });
+    await setup();
+    expect(await screen.findByText('Lat 0.00000, Lng 0.50000')).toBeTruthy();
+  });
+
+  it('si solo fallan los comentarios (404) con el reporte cargado, avisa', async () => {
+    api.get.mockImplementation((url) =>
+      url === '/reports/5'
+        ? Promise.resolve({ data: REPORT })
+        : Promise.reject({ response: { status: 404 } })
+    );
+    await setup();
+
+    await screen.findByText('Basura acumulada');
+    await waitFor(() =>
+      expect(Alert.alert).toHaveBeenCalledWith('Error', 'No se pudieron cargar los comentarios.')
+    );
+  });
+
+  it('si fallan ambas peticiones (500) muestra una sola alerta', async () => {
+    api.get.mockImplementation(() => Promise.reject({ response: { status: 500 } }));
+    await setup();
+
+    expect(await screen.findByText('No se pudo cargar el reporte.')).toBeTruthy();
+    expect(Alert.alert).toHaveBeenCalledTimes(1);
+    expect(Alert.alert).toHaveBeenCalledWith('Error', 'No se pudo cargar el detalle del reporte.');
+  });
+
+  it('al cambiar de reporte descarta el estado del anterior', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/reports/5') return Promise.resolve({ data: REPORT });
+      if (url === '/reports/6') return Promise.reject({ response: { status: 404 } });
+      return Promise.resolve({ data: [] });
+    });
+    await AsyncStorage.clear();
+    const view = await render(<DetalleReporteScreen route={{ params: { reportId: 5 } }} />);
+    await screen.findByText('Basura acumulada');
+
+    await view.rerender(<DetalleReporteScreen route={{ params: { reportId: 6 } }} />);
+
+    expect(await screen.findByText('Reporte no encontrado.')).toBeTruthy();
+    expect(screen.queryByText('Basura acumulada')).toBeNull();
+  });
+
+  it('ignora la respuesta tardía del reporte anterior al cambiar de reporte', async () => {
+    let resolveOld;
+    const OTHER = { ...REPORT, id: 6, description: 'Escombros en la vereda' };
+    api.get.mockImplementation((url) => {
+      if (url === '/reports/5') return new Promise((resolve) => { resolveOld = resolve; });
+      if (url === '/reports/5/comments') return Promise.resolve({ data: COMMENTS });
+      if (url === '/reports/6') return Promise.resolve({ data: OTHER });
+      return Promise.resolve({ data: [] });
+    });
+    await AsyncStorage.clear();
+    const view = await render(<DetalleReporteScreen route={{ params: { reportId: 5 } }} />);
+    await view.rerender(<DetalleReporteScreen route={{ params: { reportId: 6 } }} />);
+    expect(await screen.findByText('Escombros en la vereda')).toBeTruthy();
+
+    await act(async () => { resolveOld({ data: REPORT }); });
+
+    expect(screen.queryByText('Basura acumulada')).toBeNull();
+    expect(screen.getByText('Escombros en la vereda')).toBeTruthy();
+    expect(screen.queryByText('Lo vi ayer también')).toBeNull();
+  });
+
+  it('sin reportId no hace peticiones y muestra "Reporte no encontrado"', async () => {
+    api.get.mockClear();
+    await render(<DetalleReporteScreen route={{ params: {} }} />);
+    expect(await screen.findByText('Reporte no encontrado.')).toBeTruthy();
+    expect(api.get).not.toHaveBeenCalled();
+  });
+
+  it('si el reporte no existe (404) muestra "Reporte no encontrado" sin alerta', async () => {
+    api.get.mockImplementation(() => Promise.reject({ response: { status: 404 } }));
+    await setup();
+
+    expect(await screen.findByText('Reporte no encontrado.')).toBeTruthy();
+    expect(Alert.alert).not.toHaveBeenCalled();
   });
 
   it('si falla la carga muestra el error', async () => {
