@@ -26,7 +26,7 @@ class AdminReportController extends Controller
             ->when($filters['validation_status'] ?? null, fn ($q, $value) => $q->where('validation_status', $value))
             ->when($filters['zone_id'] ?? null, fn ($q, $value) => $q->where('zone_id', $value))
             ->when($filters['category_id'] ?? null, fn ($q, $value) => $q->where('category_id', $value))
-            ->latest()
+            ->latest()->latest('id')
             ->paginate(20);
 
         return response()->json([

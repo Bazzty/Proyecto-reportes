@@ -136,7 +136,8 @@ export const syncPending = async () => {
         if (status === 401) break;
 
         // Error de datos (422/413/400…): reintentar nunca lo va a resolver → se marca fallido.
-        if (status && status >= 400 && status < 500) {
+        // 408 (timeout) y 429 (rate limit) son transitorios: se reintentan.
+        if (status && status >= 400 && status < 500 && status !== 408 && status !== 429) {
           await markFailed(item.localId, error.response?.data?.message || `Error ${status}`);
         }
 
