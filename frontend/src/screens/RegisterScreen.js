@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback,
   StyleSheet, ActivityIndicator, Alert, Image, ScrollView,
-  KeyboardAvoidingView, useWindowDimensions
+  KeyboardAvoidingView, useWindowDimensions, Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -58,7 +58,7 @@ export default function RegisterScreen({ navigation }) {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
     <KeyboardAvoidingView
       style={styles.wrapper}
-      behavior="padding"
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
         contentContainerStyle={styles.container}

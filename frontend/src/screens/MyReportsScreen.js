@@ -46,7 +46,7 @@ export default function MyReportsScreen({ navigation }) {
     setLoading(true);
     setError(false);
     api.get('/user/reports')
-      .then(res => { setAllReports(res.data); setVisible(PAGE_SIZE); })
+      .then(res => setAllReports(res.data))
       .catch(() => { setAllReports([]); setError(true); })
       .finally(() => setLoading(false));
   }, []);
@@ -197,7 +197,7 @@ export default function MyReportsScreen({ navigation }) {
           onPress={() => setViewMode('grid')}
         >
           <Ionicons name="grid-outline" size={18} color={viewMode === 'grid' ? '#fff' : '#0e7490'} />
-          <Text style={[styles.segText, viewMode === 'grid' && styles.segTextActive]}>Paginado</Text>
+          <Text style={[styles.segText, viewMode === 'grid' && styles.segTextActive]}>Cuadrícula</Text>
         </TouchableOpacity>
       </View>
 

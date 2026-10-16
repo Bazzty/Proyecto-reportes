@@ -68,7 +68,7 @@ export default function HomeScreen({ navigation, route }) {
   useEffect(() => {
   const focus = route.params?.focusReport;
   if (!focus) return;
-  setActiveFilters(null);
+  setActiveFilters([]);
   mapRef.current?.animateToRegion({
     latitude: parseFloat(focus.latitude),
     longitude: parseFloat(focus.longitude),

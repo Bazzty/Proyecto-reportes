@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ActivityIndicator, Platform } from 'react-native';
 import MapView, { Marker, Heatmap, PROVIDER_GOOGLE } from 'react-native-maps';
 import api from '../services/api';
@@ -17,9 +17,7 @@ export const CATEGORY_COLORS = {
   otro: '#8E44AD'
 };
 
-export default function Maps({ navigation, focusReport }) {
-  const mapRef = useRef(null);
-  const markerRefs = useRef({});
+export default function Maps({ navigation }) {
   const [reports, setReports] = useState([]);
   const [heatmapPoints, setHeatmapPoints] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,10 +30,10 @@ export default function Maps({ navigation, focusReport }) {
     try {
       setLoading(true);
 
-      const reportsData = await api.get('/reports', { timeout: 20000 }).then(r => r.data);
+      const reportsData = await api.get('/reports', { timeout: 3000 }).then(r => r.data);
       setReports(reportsData);
 
-      const heatmapData = await api.get('/reports/heatmap', { timeout: 20000 }).then(r => r.data);
+      const heatmapData = await api.get('/reports/heatmap', { timeout: 3000 }).then(r => r.data);
       const formattedHeatmap = heatmapData.map(point => ({
         latitude: parseFloat(point.latitude),
         longitude: parseFloat(point.longitude),
@@ -50,21 +48,6 @@ export default function Maps({ navigation, focusReport }) {
     }
   };
 
-  const focusRegion = focusReport
-    ? {
-        latitude: parseFloat(focusReport.latitude),
-        longitude: parseFloat(focusReport.longitude),
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }
-    : null;
-
-  useEffect(() => {
-  if (!focusRegion || !mapRef.current) return;
-  mapRef.current.animateToRegion(focusRegion, 600);
-  setTimeout(() => markerRefs.current[focusReport.id]?.showCallout(), 700);
-}, [focusReport?.id]);
-
   if (loading) {
     return <ActivityIndicator size="large" color="#0000ff" style={styles.loader} />;
   }
@@ -72,13 +55,9 @@ export default function Maps({ navigation, focusReport }) {
   return (
     <View style={styles.container}>
       <MapView
-        ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={styles.map}
-        initialRegion={focusRegion ?? LAGO_LLANQUIHUE_REGION}
-        onMapReady={() => {
-          if (focusReport) markerRefs.current[focusReport.id]?.showCallout();
-        }}
+        initialRegion={LAGO_LLANQUIHUE_REGION}
       >
         {Platform.OS === 'android' && heatmapPoints.length > 0 && (
           <Heatmap
@@ -91,7 +70,6 @@ export default function Maps({ navigation, focusReport }) {
         {reports.map((report) => (
           <Marker
             key={report.id.toString()}
-            ref={(m) => { markerRefs.current[report.id] = m; }}
             coordinate={{
               latitude: parseFloat(report.latitude),
               longitude: parseFloat(report.longitude),

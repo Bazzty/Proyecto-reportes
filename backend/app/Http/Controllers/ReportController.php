@@ -59,9 +59,12 @@ class ReportController extends Controller
     public function userReports(Request $request)
     {
         $uid = $request->user()->id;
-        $reports = $this->withReportData($request->user()->reports(), $uid)->latest()->latest('id')->paginate($request->per_page);
+        $reports = $this->withReportData(Report::query(), $uid)
+    ->where('user_id', $uid)
+    ->latest()->latest('id')
+    ->get();
 
-        return response()->json($reports->map(fn (Report $report) => $this->formatReport($report, $uid)));
+return response()->json($reports->map(fn (Report $report) => $this->formatReport($report, $uid)));
     }
 
     public function heatmap()

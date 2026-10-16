@@ -31,12 +31,17 @@ export default function NewReportScreen({ navigation, route = {} }) {
   }, []);
 
   useEffect(() => {
-    const asset = route.params?.pendingPhoto;
-    if (!asset) return;
-
-    setPhoto({ ...asset, mimeType: asset.mimeType || 'image/jpeg' });
-    navigation.setParams({ pendingPhoto: undefined });
-  }, [navigation, route.params?.pendingPhoto]);
+  const asset = route?.params?.pendingPhoto;
+  if (!asset) return;
+  (async () => {
+    try {
+      setPhoto(await toJpeg(asset));
+    } catch {
+      setPhoto({ ...asset, mimeType: asset.mimeType || 'image/jpeg' });
+    }
+  })();
+  navigation.setParams({ pendingPhoto: undefined });
+}, [navigation, route?.params?.pendingPhoto]);
 
   const toJpeg = async (asset) => {
     const manipulated = await ImageManipulator.manipulateAsync(
@@ -57,11 +62,8 @@ export default function NewReportScreen({ navigation, route = {} }) {
       mediaTypes: ['images'],
       quality: 0.7,
     });
-    if (!result.canceled) {
-      const asset = result.assets[0];
-      setPhoto({ ...asset, mimeType: asset.mimeType || 'image/jpeg' });
-    }
-  };
+    if (!result.canceled) setPhoto(await toJpeg(result.assets[0]));
+    };
 
   const handlePickFromGallery = async () => {
     const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();

@@ -33,13 +33,14 @@ export default function DetalleReporteScreen(props) {
   return <DetalleReporte key={props.route?.params?.reportId} {...props} />;
 }
 
-function DetalleReporte({ route }) {
+function DetalleReporte({ route, navigation }) {
   const { reportId } = route?.params ?? {};
 
   const [report, setReport]         = useState(null);
   const [loading, setLoading]       = useState(true);
   const [notFound, setNotFound]     = useState(false);
   const [comments, setComments]     = useState([]);
+  const [commentsError, setCommentsError] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [sending, setSending]       = useState(false);
   const [isGuest, setIsGuest]       = useState(false);
@@ -81,11 +82,20 @@ function DetalleReporte({ route }) {
       .finally(() => { if (!cancelled) setLoading(false); });
 
     api.get(`/reports/${reportId}/comments`)
-      .then(({ data }) => { if (!cancelled) setComments(data); })
-      .catch(async () => {
-        if (await reportLoaded && !cancelled) {
+      .then(({ data }) => {
+        if (cancelled) return;
+        if (!Array.isArray(data)) {
+          setComments([]);
+          setCommentsError(true);
           Alert.alert('Error', 'No se pudieron cargar los comentarios.');
+          return;
         }
+        setComments(data);
+      })
+      .catch(async () => {
+        if (cancelled) return;
+        setCommentsError(true);
+        if (await reportLoaded && !cancelled) Alert.alert('Error', 'No se pudieron cargar los comentarios.');
       });
 
     return () => { cancelled = true; };
@@ -120,6 +130,7 @@ function DetalleReporte({ route }) {
     try {
       const { data } = await api.post(`/reports/${reportId}/comments`, { body });
       setComments(prev => [data, ...prev]);
+      setCommentsError(false);
       setNewComment('');
     } catch {
       Alert.alert('Error', 'No se pudo enviar el comentario.');
@@ -280,7 +291,9 @@ function DetalleReporte({ route }) {
             </View>
           )}
           ListEmptyComponent={
-            <Text style={styles.emptyComments}>Sé el primero en comentar.</Text>
+            <Text style={styles.emptyComments}>
+              {commentsError ? 'No se pudieron cargar los comentarios.' : 'Sé el primero en comentar.'}
+            </Text>
           }
         />
 
