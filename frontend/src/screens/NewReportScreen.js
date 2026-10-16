@@ -10,7 +10,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as Location from 'expo-location';
 import api from '../services/api';
 
-export default function NewReportScreen({ navigation }) {
+export default function NewReportScreen({ navigation, route = {} }) {
   const [photo, setPhoto]             = useState(null);
   const [location, setLocation]       = useState(null);
   const [description, setDescription] = useState('');
@@ -30,6 +30,19 @@ export default function NewReportScreen({ navigation }) {
       });
   }, []);
 
+  useEffect(() => {
+  const asset = route?.params?.pendingPhoto;
+  if (!asset) return;
+  (async () => {
+    try {
+      setPhoto(await toJpeg(asset));
+    } catch {
+      setPhoto({ ...asset, mimeType: asset.mimeType || 'image/jpeg' });
+    }
+  })();
+  navigation.setParams({ pendingPhoto: undefined });
+}, [navigation, route?.params?.pendingPhoto]);
+
   const toJpeg = async (asset) => {
     const manipulated = await ImageManipulator.manipulateAsync(
       asset.uri,
@@ -47,10 +60,10 @@ export default function NewReportScreen({ navigation }) {
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
-      quality: 1,
+      quality: 0.7,
     });
     if (!result.canceled) setPhoto(await toJpeg(result.assets[0]));
-  };
+    };
 
   const handlePickFromGallery = async () => {
     const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -98,7 +111,7 @@ export default function NewReportScreen({ navigation }) {
       form.append('category_id', String(categoryId));
       form.append('photo', {
         uri:  photo.uri,
-        type: 'image/jpeg',
+        type: photo.mimeType || 'image/jpeg',
         name: 'reporte.jpg',
       });
 

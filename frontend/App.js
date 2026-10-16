@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import { Alert, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import LoginScreen from './src/screens/LoginScreen';
@@ -16,8 +18,7 @@ import { setAuthToken, setUnauthorizedHandler } from './src/services/api';
 const Stack = createStackNavigator();
 
 export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [initialRoute, setInitialRoute] = useState('Login');
+  const [startup, setStartup] = useState(null);
   const navigationRef = useRef(null);
 
   useEffect(() => {
@@ -26,33 +27,66 @@ export default function App() {
       navigationRef.current?.reset({ index: 0, routes: [{ name: 'Login' }] });
     });
 
-    const restoreSession = async () => {
+    const restoreStartup = async () => {
+      let token = null;
+      let pendingPhoto = null;
       try {
-        const [token] = await Promise.all([
+        const pickerRequest =
+          Platform.OS === 'android' && typeof ImagePicker?.getPendingResultAsync === 'function'
+            ? ImagePicker.getPendingResultAsync()
+            : Promise.resolve(null);
+
+        const [tokenResult, pickerResult] = await Promise.allSettled([
           AsyncStorage.getItem('token'),
-          new Promise(resolve => setTimeout(resolve, 2500)),
+          pickerRequest,
+          new Promise((resolve) => setTimeout(resolve, 2500)),
         ]);
-        if (token) {
-          setAuthToken(token);
-          setInitialRoute('Home');
+
+        token = tokenResult.status === 'fulfilled' ? tokenResult.value : null;
+        if (tokenResult.status === 'rejected') {
+          console.warn('No se pudo restaurar la sesión:', tokenResult.reason);
         }
+
+        if (pickerResult.status === 'rejected') {
+          console.error('No se pudo recuperar el resultado de la cámara:', pickerResult.reason);
+          Alert.alert('Error', 'No se pudo recuperar la foto tomada.');
+        } else if (pickerResult.value && typeof pickerResult.value === 'object' && 'code' in pickerResult.value) {
+          Alert.alert('Error al recuperar la foto', pickerResult.value.message);
+        } else if (pickerResult.value && !pickerResult.value.canceled) {
+          pendingPhoto = pickerResult.value.assets?.[0] ?? null;
+        }
+
+        if (token) setAuthToken(token);
       } catch (error) {
-        console.warn('No se pudo restaurar la sesión:', error);
+        console.warn('Error restaurando el inicio:', error);
       } finally {
-        setIsLoading(false);
+        setStartup({
+          initialRoute: token ? 'Home' : 'Login',
+          pendingPhoto: token ? pendingPhoto : null,
+        });
       }
     };
 
-    restoreSession();
+    restoreStartup();
   }, []);
 
-  if (isLoading) {
+  if (!startup) {
     return <WelcomeScreen />;
   }
 
+  const initialState = startup.pendingPhoto
+    ? {
+        index: 1,
+        routes: [
+          { name: 'Home' },
+          { name: 'NewReport', params: { pendingPhoto: startup.pendingPhoto } },
+        ],
+      }
+    : undefined;
+
   return (
-    <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator initialRouteName={initialRoute}>
+    <NavigationContainer ref={navigationRef} initialState={initialState}>
+      <Stack.Navigator initialRouteName={startup.initialRoute}>
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />

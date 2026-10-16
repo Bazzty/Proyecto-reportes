@@ -65,6 +65,19 @@ export default function HomeScreen({ navigation, route }) {
     navigation.setParams({ newReport: undefined });
   }, [route.params?.newReport]);
 
+  useEffect(() => {
+  const focus = route.params?.focusReport;
+  if (!focus) return;
+  setActiveFilters([]);
+  mapRef.current?.animateToRegion({
+    latitude: parseFloat(focus.latitude),
+    longitude: parseFloat(focus.longitude),
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  }, 600);
+  navigation.setParams({ focusReport: undefined });
+}, [route.params?.focusReport]);
+
   useFocusEffect(
     useCallback(() => {
       let active = true;
