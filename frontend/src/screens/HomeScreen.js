@@ -449,6 +449,7 @@ const styles = StyleSheet.create({
   offlineText: { color: '#fff', fontSize: 12, fontWeight: '600', flexShrink: 1 },
 
   container: { flex: 1 },
+  map: { flex: 1 },
 
   greetingCard: {
     position: 'absolute',
