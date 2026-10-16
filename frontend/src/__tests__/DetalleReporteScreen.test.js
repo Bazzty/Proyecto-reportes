@@ -149,6 +149,20 @@ describe('DetalleReporteScreen', () => {
     expect(screen.queryByText('Lo vi ayer también')).toBeNull();
   });
 
+  it('sin reportId no hace peticiones y muestra "Reporte no encontrado"', async () => {
+    api.get.mockClear();
+    await render(<DetalleReporteScreen route={{ params: {} }} />);
+    expect(await screen.findByText('Reporte no encontrado.')).toBeTruthy();
+    expect(api.get).not.toHaveBeenCalled();
+  });
+
+  it('no muestra la ubicación si una coordenada es hexadecimal', async () => {
+    mockGet({ report: { ...REPORT, latitude: '0x10' } });
+    await setup();
+    await screen.findByText('Basura acumulada');
+    expect(screen.queryByText(/Lat /)).toBeNull();
+  });
+
   it('si el reporte no existe (404) muestra "Reporte no encontrado" sin alerta', async () => {
     api.get.mockImplementation(() => Promise.reject({ response: { status: 404 } }));
     await setup();

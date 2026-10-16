@@ -26,7 +26,7 @@ const formatDate = (iso) => {
 // Coordenada válida: número finito; null, '' o texto no numérico no cuentan.
 const toCoord = (value) => {
   if (typeof value === 'number') return value;
-  if (typeof value === 'string' && value.trim() !== '') return Number(value);
+  if (typeof value === 'string' && /^\s*-?\d+(\.\d+)?\s*$/.test(value)) return Number(value);
   return NaN;
 };
 
@@ -57,6 +57,12 @@ function DetalleReporte({ route }) {
   }, []);
 
   useEffect(() => {
+    if (reportId == null) {
+      setNotFound(true);
+      setLoading(false);
+      return undefined;
+    }
+
     let cancelled = false;
 
     // Resuelve true si el reporte cargó; los comentarios solo alertan en ese caso
@@ -142,7 +148,8 @@ function DetalleReporte({ route }) {
   const confirmed  = report.confirmed_by_me;
   const lat = toCoord(report.latitude);
   const lng = toCoord(report.longitude);
-  const hasLocation = Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  const hasLocation = Number.isFinite(lat) && Number.isFinite(lng) &&
+                      Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
   const isOwner    = myUserId && report.user?.id === myUserId;
 
   const Header = (
