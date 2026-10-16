@@ -23,6 +23,8 @@ const formatDate = (iso) => {
   return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
+const DECIMAL = /^\s*[-+]?\d+(\.\d+)?([eE][-+]?\d+)?\s*$/;
+const toCoord = (value) => (typeof value === 'string' && !DECIMAL.test(value) ? NaN : Number(value ?? NaN));
 export default function DetalleReporteScreen({ route, navigation }) {
   const { reportId } = route.params;
 
@@ -103,6 +105,9 @@ export default function DetalleReporteScreen({ route, navigation }) {
   }
 
   const confirmed  = report.confirmed_by_me;
+  const lat = toCoord(report.latitude);
+  const lng = toCoord(report.longitude);
+  const hasLocation = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
   const isOwner    = myUserId && report.user?.id === myUserId;
 
   const Header = (
@@ -143,16 +148,30 @@ export default function DetalleReporteScreen({ route, navigation }) {
           <Text style={styles.infoText}>{formatDate(report.created_at)}</Text>
         </View>
 
-        <TouchableOpacity
-          style={styles.mapBtn}
-          activeOpacity={0.75}
-          onPress={() => navigation.popTo('Home', {
-            focusReport: { id: report.id, latitude: report.latitude, longitude: report.longitude },
-          }, { merge: true })}
-        >
-          <Ionicons name="map-outline" size={20} color="#fff" />
-          <Text style={styles.mapBtnText}>Ver en el mapa</Text>
-        </TouchableOpacity>
+
+          {hasLocation && (
+          <View style={styles.infoRow}>
+            <Ionicons name="location-outline" size={14} color="#9ca3af" />
+            <Text style={styles.infoText}>
+              {`Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`}
+            </Text>
+          </View>
+        )}
+
+        {hasLocation && (
+          <TouchableOpacity
+            style={styles.mapBtn}
+            activeOpacity={0.75}
+            onPress={() => navigation.popTo('Home', {
+              focusReport: { id: report.id, latitude: report.latitude, longitude: report.longitude },
+            }, { merge: true })}
+          >
+            <Ionicons name="map-outline" size={20} color="#fff" />
+            <Text style={styles.mapBtnText}>Ver en el mapa</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Confirmaciones — oculto si es tu propio reporte */}
 
         {!isOwner && <TouchableOpacity
           style={[styles.confirmBtn, confirmed && styles.confirmBtnActive]}
