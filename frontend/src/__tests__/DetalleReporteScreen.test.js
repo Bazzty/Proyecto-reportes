@@ -1,5 +1,5 @@
 import { Alert } from 'react-native';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DetalleReporteScreen from '../screens/DetalleReporteScreen';
 import api from '../services/api';
@@ -126,6 +126,27 @@ describe('DetalleReporteScreen', () => {
 
     expect(await screen.findByText('Reporte no encontrado.')).toBeTruthy();
     expect(screen.queryByText('Basura acumulada')).toBeNull();
+  });
+
+  it('ignora la respuesta tardía del reporte anterior al cambiar de reporte', async () => {
+    let resolveOld;
+    const OTHER = { ...REPORT, id: 6, description: 'Escombros en la vereda' };
+    api.get.mockImplementation((url) => {
+      if (url === '/reports/5') return new Promise((resolve) => { resolveOld = resolve; });
+      if (url === '/reports/5/comments') return Promise.resolve({ data: COMMENTS });
+      if (url === '/reports/6') return Promise.resolve({ data: OTHER });
+      return Promise.resolve({ data: [] });
+    });
+    await AsyncStorage.clear();
+    const view = await render(<DetalleReporteScreen route={{ params: { reportId: 5 } }} />);
+    await view.rerender(<DetalleReporteScreen route={{ params: { reportId: 6 } }} />);
+    expect(await screen.findByText('Escombros en la vereda')).toBeTruthy();
+
+    await act(async () => { resolveOld({ data: REPORT }); });
+
+    expect(screen.queryByText('Basura acumulada')).toBeNull();
+    expect(screen.getByText('Escombros en la vereda')).toBeTruthy();
+    expect(screen.queryByText('Lo vi ayer también')).toBeNull();
   });
 
   it('si el reporte no existe (404) muestra "Reporte no encontrado" sin alerta', async () => {

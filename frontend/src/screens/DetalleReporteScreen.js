@@ -24,17 +24,20 @@ const formatDate = (iso) => {
 };
 
 // Coordenada válida: número finito; null, '' o texto no numérico no cuentan.
-const toCoord = (value) =>
-  value == null || (typeof value === 'string' && value.trim() === '') ? NaN : Number(value);
+const toCoord = (value) => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() !== '') return Number(value);
+  return NaN;
+};
 
 // Se remonta al cambiar de reporte, así el estado (reporte, comentarios, errores,
 // respuestas en vuelo) nunca se mezcla entre reportes.
 export default function DetalleReporteScreen(props) {
-  return <DetalleReporte key={props.route.params.reportId} {...props} />;
+  return <DetalleReporte key={props.route?.params?.reportId} {...props} />;
 }
 
 function DetalleReporte({ route }) {
-  const { reportId } = route.params;
+  const { reportId } = route?.params ?? {};
 
   const [report, setReport]         = useState(null);
   const [loading, setLoading]       = useState(true);
