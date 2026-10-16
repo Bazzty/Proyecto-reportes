@@ -172,7 +172,7 @@ class ReportApiTest extends TestCase
             ->assertJsonFragment(['description' => 'Detalle público']);
     }
 
-    public function test_heatmap_returns_only_coordinates()
+    public function test_heatmap_returns_individual_points()
     {
         $user = User::factory()->create();
         $category = Category::create(['name' => 'basura']);
@@ -197,16 +197,13 @@ class ReportApiTest extends TestCase
             'status' => 'Resuelto',
         ]);
 
-        Sanctum::actingAs($user, ['*']);
-
         $response = $this->getJson('/api/reports/heatmap');
 
-        $response->assertStatus(200)
+        $response->assertOk()
             ->assertJsonCount(2)
             ->assertJsonFragment(['latitude' => -33.4489, 'longitude' => -70.6693])
             ->assertJsonFragment(['latitude' => -33.4600, 'longitude' => -70.6800]);
 
-        // Solo coordenadas, sin description ni status
         $first = $response->json()[0];
         $this->assertArrayHasKey('latitude', $first);
         $this->assertArrayHasKey('longitude', $first);

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Report;
+use App\Services\ZoneResolver;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
@@ -25,7 +27,7 @@ class ReportController extends Controller
         return response()->json($this->formatReport($report, $uid));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ZoneResolver $zones)
     {
         $data = $request->validate([
             'description' => 'required|string|max:1000',
@@ -40,6 +42,7 @@ class ReportController extends Controller
         $report = Report::create([
             'user_id' => $request->user()->id,
             'category_id' => $data['category_id'],
+            'zone_id' => $zones->resolve((float) $data['latitude'], (float) $data['longitude'])?->id,
             'description' => $data['description'],
             'latitude' => $data['latitude'],
             'longitude' => $data['longitude'],
@@ -63,12 +66,18 @@ class ReportController extends Controller
 
     public function heatmap()
     {
-        $points = Report::select('latitude', 'longitude')->get()->map(fn (Report $report) => [
-            'latitude' => (float) $report->latitude,
-            'longitude' => (float) $report->longitude,
-        ]);
+        // Filas planas con join: evita hidratar modelos (y el GeoJSON de cada zona) en un endpoint público.
+        $points = DB::table('reports')
+            ->leftJoin('zones', 'zones.id', '=', 'reports.zone_id')
+            ->get(['reports.latitude', 'reports.longitude', 'zones.id as zone_id', 'zones.name as zone_name']);
 
-        return response()->json($points);
+        return response()->json($points->map(fn ($point) => [
+            'latitude' => (float) $point->latitude,
+            'longitude' => (float) $point->longitude,
+            'zone' => $point->zone_id !== null
+                ? ['id' => (int) $point->zone_id, 'name' => $point->zone_name]
+                : null,
+        ]));
     }
 
     private function withReportData(Builder|Relation $query, ?int $authUserId): Builder|Relation
