@@ -230,20 +230,21 @@ No requiere token (si se envía, se calcula `confirmed_by_me`).
 
 ---
 
-### Puntos para el mapa de calor
+### Puntos del mapa de calor (con su zona)
 ```
 GET /reports/heatmap
 ```
-No requiere token. Devuelve solo coordenadas — el frontend las usa para pintar el heatmap.
+No requiere token. Devuelve **un punto por reporte** (`latitude`, `longitude`) junto con su `zone` (`{ id, name }`, o `null` si el reporte no cae en ninguna zona). No agrupa: se mantiene la densidad y la agrupación visual por zona, si se necesita, la resuelve el cliente.
 
 **Response 200:**
 ```json
 [
-  { "latitude": -33.4569, "longitude": -70.6483 },
-  { "latitude": -33.4580, "longitude": -70.6500 },
-  { "latitude": -33.4601, "longitude": -70.6512 }
+  { "latitude": -41.3198, "longitude": -72.9833, "zone": { "id": 1, "name": "Puerto Varas" } },
+  { "latitude": -41.2030, "longitude": -72.5700, "zone": { "id": 7, "name": "Ensenada" } },
+  { "latitude": -33.4569, "longitude": -70.6483, "zone": null }
 ]
 ```
+> Para asignar `zone` a los reportes ya existentes, ejecutá una vez tras el deploy: `php artisan db:seed --class=ZoneSeeder` (carga las zonas) y luego `php artisan zones:assign` (backfill).
 
 ---
 
