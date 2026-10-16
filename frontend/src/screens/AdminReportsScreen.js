@@ -33,24 +33,47 @@ const formatDate = (iso) => {
 export default function AdminReportsScreen() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState('pendiente');
+  const [page, setPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [rejecting, setRejecting] = useState(null);
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
 
   const keyboardHeight = useKeyboardHeight();
 
-  const load = useCallback(() => {
-    setLoading(true);
-    setError(false);
-    api.get('/admin/reports', { params: filter ? { validation_status: filter } : {} })
-      .then(res => setReports(res.data.data))
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+  const load = useCallback((pageToLoad = 1) => {
+    if (pageToLoad === 1) {
+      setLoading(true);
+      setError(false);
+    } else {
+      setLoadingMore(true);
+    }
+
+    api.get('/admin/reports', {
+      params: { ...(filter ? { validation_status: filter } : {}), page: pageToLoad },
+    })
+      .then((res) => {
+        const rows = res.data.data ?? [];
+        const meta = res.data.meta ?? {};
+        setReports(prev => (pageToLoad === 1 ? rows : [...prev, ...rows]));
+        setPage(meta.current_page ?? 1);
+        setLastPage(meta.last_page ?? 1);
+        setTotal(meta.total ?? rows.length);
+      })
+      .catch(() => { if (pageToLoad === 1) setError(true); })
+      .finally(() => { setLoading(false); setLoadingMore(false); });
   }, [filter]);
 
-  useFocusEffect(load);
+  useFocusEffect(useCallback(() => { load(1); }, [load]));
+
+  const loadMore = () => {
+    if (loading || loadingMore || page >= lastPage) return;
+    load(page + 1);
+  };
 
   const applyValidation = async (id, validationStatus, rejectionReason) => {
     const { data } = await api.patch(`/admin/reports/${id}/validation`, {
@@ -60,6 +83,7 @@ export default function AdminReportsScreen() {
     setReports(prev => (filter
       ? prev.filter(r => r.id !== id)
       : prev.map(r => (r.id === id ? data : r))));
+    if (filter) setTotal(t => Math.max(0, t - 1));
   };
 
   const handleValidate = async (id) => {
@@ -138,7 +162,9 @@ export default function AdminReportsScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Revisión de Reportes</Text>
-      <Text style={styles.subtitle}>Valida o rechaza los reportes recibidos</Text>
+      <Text style={styles.subtitle}>
+        Valida o rechaza los reportes recibidos{total > 0 ? ` · ${total} en total` : ''}
+      </Text>
 
       <View style={styles.filters}>
         {FILTERS.map(f => (
@@ -158,7 +184,7 @@ export default function AdminReportsScreen() {
         <View style={styles.emptyState}>
           <Ionicons name="cloud-offline-outline" size={44} color="#fca5a5" />
           <Text style={styles.emptyText}>No se pudieron cargar los reportes.</Text>
-          <TouchableOpacity onPress={load}><Text style={styles.emptyLink}>Reintentar</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => load(1)}><Text style={styles.emptyLink}>Reintentar</Text></TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -167,6 +193,9 @@ export default function AdminReportsScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={loadingMore ? <ActivityIndicator color="#0e7490" style={{ marginVertical: 16 }} /> : null}
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Ionicons name="checkmark-done-outline" size={44} color="#99f6e4" />

@@ -213,6 +213,26 @@ class ReportApiTest extends TestCase
         $this->assertArrayNotHasKey('status', $first);
     }
 
+    public function test_client_uuid_lookup_is_scoped_to_the_authenticated_user()
+    {
+        Storage::fake('public');
+        $uuid = (string) Str::uuid();
+        $category = Category::create(['name' => 'basura']);
+
+        $owner = User::factory()->create();
+        Sanctum::actingAs($owner, ['*']);
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['client_uuid' => $uuid]))
+            ->assertCreated();
+
+        // Otro usuario reutilizando el mismo client_uuid no debe acceder al reporte del primero.
+        $other = User::factory()->create();
+        Sanctum::actingAs($other, ['*']);
+        $response = $this->postJson('/api/reports', $this->validReportPayload($category, ['client_uuid' => $uuid]));
+
+        $this->assertNotSame(200, $response->status());
+        $this->assertDatabaseMissing('reports', ['user_id' => $other->id, 'client_uuid' => $uuid]);
+    }
+
     private function validReportPayload(Category $category, array $overrides = []): array
     {
         return array_merge([

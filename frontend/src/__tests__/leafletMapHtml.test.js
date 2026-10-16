@@ -93,6 +93,13 @@ describe('leafletMapHtml', () => {
     expect(HTML).toContain('pinch: true');
   });
 
+  it('escapa el HTML de los popups (esc/safeUrl) para evitar XSS', () => {
+    expect(HTML).toContain('function esc(value)');
+    expect(HTML).toContain('function safeUrl(url)');
+    expect(HTML).toContain('esc(r.description');
+    expect(HTML).toContain('safeUrl(r.photo_url)');
+  });
+
   it('statusColor mapea los estados', () => {
     expect(statusColor('Resuelto')).toBe('#16a34a');
     expect(statusColor('Pendiente')).toBe('#f59e0b');

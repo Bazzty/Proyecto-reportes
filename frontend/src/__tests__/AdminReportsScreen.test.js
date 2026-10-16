@@ -41,7 +41,7 @@ describe('AdminReportsScreen', () => {
   it('carga y muestra los reportes pendientes', async () => {
     await setup();
 
-    expect(api.get).toHaveBeenCalledWith('/admin/reports', { params: { validation_status: 'pendiente' } });
+    expect(api.get).toHaveBeenCalledWith('/admin/reports', { params: { validation_status: 'pendiente', page: 1 } });
     expect(await screen.findByText('Basura en la plaza')).toBeTruthy();
     expect(screen.getByText('PENDIENTE')).toBeTruthy();
     expect(screen.getByText('📍 Puerto Varas · Ana')).toBeTruthy();
@@ -54,7 +54,7 @@ describe('AdminReportsScreen', () => {
     await fireEvent.press(screen.getByText('Válidos'));
 
     await waitFor(() =>
-      expect(api.get).toHaveBeenLastCalledWith('/admin/reports', { params: { validation_status: 'valido' } })
+      expect(api.get).toHaveBeenLastCalledWith('/admin/reports', { params: { validation_status: 'valido', page: 1 } })
     );
   });
 

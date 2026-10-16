@@ -5,9 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\FormatsReports;
 use App\Models\Report;
 use App\Services\ZoneResolver;
-use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class ReportController extends Controller
@@ -57,6 +58,7 @@ class ReportController extends Controller
         // de la cola offline), devolvemos el existente en lugar de duplicarlo.
         if ($clientUuid !== null) {
             $existing = $this->withReportData(Report::query(), $uid)
+                ->where('user_id', $uid)
                 ->where('client_uuid', $clientUuid)
                 ->first();
 
@@ -79,13 +81,15 @@ class ReportController extends Controller
                 'photo_path' => $path,
                 'status' => 'Pendiente',
             ]);
-        } catch (QueryException $exception) {
+        } catch (UniqueConstraintViolationException $exception) {
             if ($clientUuid === null) {
                 throw $exception;
             }
 
-            // Carrera: otro request con el mismo client_uuid lo creó primero.
-            $report = Report::where('client_uuid', $clientUuid)->firstOrFail();
+            // Carrera: otro request con el mismo client_uuid del mismo usuario lo creó primero.
+            // Se descarta la foto recién subida y se devuelve el reporte existente.
+            Storage::disk('public')->delete($path);
+            $report = Report::where('user_id', $uid)->where('client_uuid', $clientUuid)->firstOrFail();
         }
 
         $report = $this->withReportData(Report::query(), $uid)->findOrFail($report->id);

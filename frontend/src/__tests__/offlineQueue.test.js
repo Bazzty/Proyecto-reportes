@@ -82,6 +82,30 @@ describe('offlineQueue', () => {
     expect(result.remaining).toBe(2);
   });
 
+  it('reutiliza el clientUuid provisto (evita duplicados online/offline)', async () => {
+    await enqueue(report({ clientUuid: '11111111-1111-4111-8111-111111111111' }));
+    api.post.mockResolvedValue({ data: { id: 10 } });
+
+    await syncPending();
+
+    expect(api.post.mock.calls[0][1].get('client_uuid')).toBe('11111111-1111-4111-8111-111111111111');
+  });
+
+  it('marca como fallido un error 4xx y no lo reintenta', async () => {
+    await enqueue(report());
+    api.post.mockRejectedValue({ response: { status: 422, data: { message: 'inválido' } } });
+
+    const result = await syncPending();
+
+    const pending = await getPending();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].failed).toBe(true);
+    expect(pending[0].failedReason).toBe('inválido');
+    expect(await getPendingCount()).toBe(0);
+    expect(result.remaining).toBe(0);
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+  });
+
   it('notifica a los suscriptores cuando cambia la cola', async () => {
     const listener = jest.fn();
     const unsubscribe = subscribe(listener);

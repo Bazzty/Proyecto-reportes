@@ -10,7 +10,7 @@ trait FormatsReports
 {
     protected function withReportData(Builder|Relation $query, ?int $authUserId): Builder|Relation
     {
-        $query->with(['category', 'user', 'zone'])->withCount('confirmations');
+        $query->with(['category', 'user', 'zone:id,name'])->withCount('confirmations');
 
         return $authUserId === null
             ? $query

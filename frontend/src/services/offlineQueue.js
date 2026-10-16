@@ -52,19 +52,42 @@ const removePhoto = async (uri) => {
   }
 };
 
+// Relee el storage antes de escribir: un `enqueue` ocurrido durante un sync no se pierde.
+const removeFromQueue = async (localId) => {
+  const fresh = await readQueue();
+  const item = fresh.find((q) => q.localId === localId);
+  await writeQueue(fresh.filter((q) => q.localId !== localId));
+  if (item) await removePhoto(item.photoUri);
+};
+
+const markFailed = async (localId, reason) => {
+  const fresh = await readQueue();
+  await writeQueue(fresh.map((q) => (
+    q.localId === localId ? { ...q, failed: true, failedReason: reason } : q
+  )));
+};
+
 export const getPending = () => readQueue();
 
-export const getPendingCount = async () => (await readQueue()).length;
+export const getPendingCount = async () => (await readQueue()).filter((q) => !q.failed).length;
 
-export const enqueue = async ({ description, latitude, longitude, categoryId, photoUri }) => {
+export const removeItem = (localId) => removeFromQueue(localId);
+
+export const clearQueue = async () => {
+  const fresh = await readQueue();
+  await Promise.all(fresh.map((q) => removePhoto(q.photoUri)));
+  await writeQueue([]);
+};
+
+export const enqueue = async ({ description, latitude, longitude, categoryId, photoUri, clientUuid }) => {
   const localId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const clientUuid = randomUUID();
+  const uuid = clientUuid || randomUUID();
   const storedPhotoUri = await persistPhoto(localId, photoUri);
 
   const queue = await readQueue();
   queue.push({
     localId,
-    clientUuid,
+    clientUuid: uuid,
     description,
     latitude,
     longitude,
@@ -78,15 +101,17 @@ export const enqueue = async ({ description, latitude, longitude, categoryId, ph
 };
 
 export const syncPending = async () => {
-  if (syncing) return { synced: 0, remaining: (await readQueue()).length };
+  if (syncing) return { synced: 0, remaining: (await readQueue()).filter((q) => !q.failed).length };
 
   syncing = true;
   emit();
   let synced = 0;
-  let queue = await readQueue();
+  const initial = await readQueue();
 
   try {
-    for (const item of [...queue]) {
+    for (const item of initial) {
+      if (item.failed) continue;
+
       try {
         const form = new FormData();
         form.append('description', item.description);
@@ -102,13 +127,20 @@ export const syncPending = async () => {
 
         await api.post('/reports', form, { headers: { 'Content-Type': 'multipart/form-data' } });
 
-        queue = queue.filter((q) => q.localId !== item.localId);
-        await writeQueue(queue);
-        await removePhoto(item.photoUri);
+        await removeFromQueue(item.localId);
         synced += 1;
       } catch (error) {
+        const status = error.response?.status;
+
         // Sin sesión válida no tiene sentido seguir intentando: se reintenta tras iniciar sesión.
-        if (error.response?.status === 401) break;
+        if (status === 401) break;
+
+        // Error de datos (422/413/400…): reintentar nunca lo va a resolver → se marca fallido.
+        if (status && status >= 400 && status < 500) {
+          await markFailed(item.localId, error.response?.data?.message || `Error ${status}`);
+        }
+
+        // Errores de red o 5xx: se dejan en la cola para reintentar más tarde.
       }
     }
   } finally {
@@ -116,5 +148,5 @@ export const syncPending = async () => {
     emit();
   }
 
-  return { synced, remaining: queue.length };
+  return { synced, remaining: (await readQueue()).filter((q) => !q.failed).length };
 };

@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { randomUUID } from 'expo-crypto';
 import api from '../services/api';
 import useAutoLocation from '../hooks/useAutoLocation';
 import useNetworkStatus from '../hooks/useNetworkStatus';
@@ -107,7 +108,7 @@ export default function NewReportScreen({ navigation }) {
     if (!result.canceled) setPhoto(await toJpeg(result.assets[0]));
   };
 
-  const saveOffline = async () => {
+  const saveOffline = async (clientUuid) => {
     try {
       await enqueue({
         description,
@@ -115,6 +116,7 @@ export default function NewReportScreen({ navigation }) {
         longitude: effectiveLocation.longitude,
         categoryId,
         photoUri: photo.uri,
+        clientUuid,
       });
       Alert.alert(
         'Guardado sin conexión',
@@ -132,8 +134,12 @@ export default function NewReportScreen({ navigation }) {
     if (!description.trim()){ Alert.alert('Falta descripción', 'Escribe una descripción.'); return; }
     if (!categoryId)        { Alert.alert('Falta categoría', 'Selecciona una categoría.');   return; }
 
+    // Se genera una sola vez para el intento online y su eventual reenvío offline,
+    // así el backend deduplica con client_uuid si el POST falla sin respuesta.
+    const clientUuid = randomUUID();
+
     if (!isConnected) {
-      await saveOffline();
+      await saveOffline(clientUuid);
       return;
     }
 
@@ -144,6 +150,7 @@ export default function NewReportScreen({ navigation }) {
       form.append('latitude',    String(effectiveLocation.latitude));
       form.append('longitude',   String(effectiveLocation.longitude));
       form.append('category_id', String(categoryId));
+      form.append('client_uuid', clientUuid);
       form.append('photo', {
         uri:  photo.uri,
         type: 'image/jpeg',
@@ -160,7 +167,7 @@ export default function NewReportScreen({ navigation }) {
     } catch (error) {
       // Sin respuesta del servidor: probablemente falla de red -> guardar sin conexión.
       if (!error.response) {
-        await saveOffline();
+        await saveOffline(clientUuid);
         return;
       }
       const message = error.response?.data?.message

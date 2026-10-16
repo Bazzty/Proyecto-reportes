@@ -40,7 +40,7 @@ export const HTML = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
 <style>@font-face{font-family:'Ionicons';src:url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@15.1.1/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf');}
 html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
 #fallback{display:none;align-items:center;justify-content:center;height:100%;font:14px sans-serif;color:#6b7280;text-align:center;padding:0 24px;}</style>
@@ -48,13 +48,23 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
 <body>
 <div id="map"></div>
 <div id="fallback">No se pudo cargar el mapa. Revisá tu conexión a internet.</div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" integrity="sha384-mFKkGiGvT5vo1fEyGCD3hshDdKmW3wzXW/x+fWriYJArD0R3gawT6lMvLboM22c0" crossorigin="anonymous"></script>
 <script>
   function post(obj) {
     var s = JSON.stringify(obj);
     if (window.ReactNativeWebView) { window.ReactNativeWebView.postMessage(s); }
     else if (window.parent && window.parent !== window) { window.parent.postMessage(s, '*'); }
+  }
+
+  function esc(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function safeUrl(url) {
+    return /^https?:\\/\\//i.test(String(url == null ? '' : url)) ? esc(url) : '';
   }
 
   if (typeof L === 'undefined') {
@@ -151,16 +161,17 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
         data.heat.forEach(function (p) {
           var popup;
           if (p.reportId != null) {
+            var photo = safeUrl(p.photo_url);
             popup = '<div style="min-width:150px">'
-              + (p.photo_url ? '<img src="' + p.photo_url + '" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:6px;" />' : '')
-              + '<div style="font-weight:bold;color:#0e7490">' + (p.category || 'Sin categoría') + '</div>'
-              + '<div style="font-size:12px;color:#374151;margin:4px 0">' + (p.description || '') + '</div>'
-              + '<div style="font-size:11px;color:#9ca3af">' + (p.user || '') + '</div>'
+              + (photo ? '<img src="' + photo + '" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:6px;" />' : '')
+              + '<div style="font-weight:bold;color:#0e7490">' + esc(p.category || 'Sin categoría') + '</div>'
+              + '<div style="font-size:12px;color:#374151;margin:4px 0">' + esc(p.description || '') + '</div>'
+              + '<div style="font-size:11px;color:#9ca3af">' + esc(p.user || '') + '</div>'
               + '<a href="#" onclick="select(' + p.reportId + ');return false;" style="color:#0e7490;font-weight:600;font-size:12px">Ver detalle &rarr;</a></div>';
           } else {
             var n = p.count || 0;
             popup = '<div style="min-width:120px">'
-              + '<div style="font-weight:bold;color:#0e7490">' + (p.zoneName || 'Sin zona') + '</div>'
+              + '<div style="font-weight:bold;color:#0e7490">' + esc(p.zoneName || 'Sin zona') + '</div>'
               + '<div style="font-size:12px;color:#374151;margin-top:4px">' + n + ' reporte' + (n === 1 ? '' : 's') + '</div></div>';
           }
           L.circleMarker([p.latitude, p.longitude], { radius: 14, opacity: 0, fillOpacity: 0 }).bindPopup(popup).addTo(heatClickLayer);
@@ -171,19 +182,21 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
       if (data.showMarkers !== false) {
         (data.reports || []).forEach(function (r) {
           var color = r.color || '#0e7490';
-          var glyph = r.iconCode
-            ? '<span style="font-family:Ionicons;font-size:20px;color:#fff;line-height:1;">&#x' + r.iconCode + ';</span>'
+          var code = /^[0-9a-fA-F]+$/.test(String(r.iconCode || '')) ? r.iconCode : null;
+          var glyph = code
+            ? '<span style="font-family:Ionicons;font-size:20px;color:#fff;line-height:1;">&#x' + code + ';</span>'
             : '<span style="font-size:16px;line-height:1;">&#x1F4CD;</span>';
           var icon = L.divIcon({
             className: '',
             html: '<div style="width:36px;height:36px;border:2px solid ' + color + ';border-radius:8px;background:' + color + ';display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)">' + glyph + '</div>',
             iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -36],
           });
+          var photo = safeUrl(r.photo_url);
           var popup = '<div style="min-width:150px">'
-            + (r.photo_url ? '<img src="' + r.photo_url + '" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:6px;" />' : '')
-            + '<div style="font-weight:bold;color:#0e7490">' + (r.category || 'Sin categoría') + '</div>'
-            + '<div style="font-size:12px;color:#374151;margin:4px 0">' + (r.description || '') + '</div>'
-            + '<div style="font-size:11px;color:#9ca3af">' + (r.user || '') + '</div>'
+            + (photo ? '<img src="' + photo + '" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:6px;" />' : '')
+            + '<div style="font-weight:bold;color:#0e7490">' + esc(r.category || 'Sin categoría') + '</div>'
+            + '<div style="font-size:12px;color:#374151;margin:4px 0">' + esc(r.description || '') + '</div>'
+            + '<div style="font-size:11px;color:#9ca3af">' + esc(r.user || '') + '</div>'
             + '<a href="#" onclick="select(' + r.id + ');return false;" style="color:#0e7490;font-weight:600;font-size:12px">Ver detalle &rarr;</a></div>';
           L.marker([r.latitude, r.longitude], { icon: icon }).bindPopup(popup).addTo(markersLayer);
         });

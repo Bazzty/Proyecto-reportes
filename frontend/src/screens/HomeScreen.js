@@ -8,7 +8,7 @@ import api, { clearAuthToken } from '../services/api';
 import LeafletMap from '../components/LeafletMap';
 import useOfflineSync from '../hooks/useOfflineSync';
 import useNotifications from '../hooks/useNotifications';
-import { subscribe as subscribeQueue, getPendingCount, isSyncing } from '../services/offlineQueue';
+import { subscribe as subscribeQueue, getPendingCount, isSyncing, clearQueue } from '../services/offlineQueue';
 import { syncStatusNotifications, markAllRead } from '../services/notifications';
 
 // El endpoint /reports/heatmap devuelve un punto por reporte (con su zona).
@@ -176,7 +176,10 @@ export default function HomeScreen({ navigation, route }) {
         style: 'destructive',
         onPress: async () => {
           try { await api.post('/logout'); } catch {}
-          await AsyncStorage.multiRemove(['token', 'userName', 'userId', 'isAdmin']);
+          // La cola y el snapshot son por usuario: no deben sobrevivir al cierre de sesión
+          // (si no, el reporte pendiente de A se subiría con el token de B).
+          await clearQueue();
+          await AsyncStorage.multiRemove(['token', 'userName', 'userId', 'isAdmin', 'reportStatusSnapshot']);
           clearAuthToken();
           navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
         },

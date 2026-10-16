@@ -30,6 +30,7 @@ jest.mock('../services/offlineQueue', () => ({
   subscribe: jest.fn(() => jest.fn()),
   getPendingCount: jest.fn(async () => 0),
   isSyncing: jest.fn(() => false),
+  clearQueue: jest.fn(async () => {}),
 }));
 jest.mock('../components/LeafletMap', () => {
   const React = require('react');

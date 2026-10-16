@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
-import { subscribe as subscribeQueue, getPending } from '../services/offlineQueue';
+import { subscribe as subscribeQueue, getPending, isSyncing, removeItem } from '../services/offlineQueue';
 
 const getStatusStyle = (status) => {
   const s = (status ?? '').toLowerCase();
@@ -61,7 +61,8 @@ export default function MyReportsScreen({ navigation }) {
   useEffect(() => {
     const unsubscribe = subscribeQueue(() => {
       loadPending();
-      loadReports();
+      // Recargar el listado solo cuando terminó la sincronización (no en cada item).
+      if (!isSyncing()) loadReports();
     });
     return unsubscribe;
   }, [loadPending, loadReports]);
@@ -73,12 +74,15 @@ export default function MyReportsScreen({ navigation }) {
 
   const pendingItems = pending.map(item => ({
     id: `pending-${item.localId}`,
+    localId: item.localId,
     isPending: true,
+    failed: !!item.failed,
+    failedReason: item.failedReason ?? null,
     description: item.description,
     latitude: item.latitude,
     longitude: item.longitude,
     photo_url: item.photoUri,
-    status: 'Sin sincronizar',
+    status: item.failed ? 'No se pudo enviar' : 'Sin sincronizar',
     category: { name: categoryName(item.categoryId) },
     created_at: item.createdAt,
   }));
@@ -86,12 +90,27 @@ export default function MyReportsScreen({ navigation }) {
   const combined = [...pendingItems, ...reports];
 
   const renderReportCard = ({ item }) => {
-    const statusColors = item.isPending
-      ? { bg: '#e5e7eb', text: '#374151', accent: '#6b7280' }
-      : getStatusStyle(item.status);
-    const onPress = item.isPending
-      ? () => Alert.alert('Pendiente de envío', 'Este reporte se enviará automáticamente cuando recuperes la conexión.')
-      : () => navigation.navigate('DetalleReporte', { reportId: item.id });
+    const statusColors = item.failed
+      ? { bg: '#fee2e2', text: '#991b1b', accent: '#b91c1c' }
+      : item.isPending
+        ? { bg: '#e5e7eb', text: '#374151', accent: '#6b7280' }
+        : getStatusStyle(item.status);
+    const onPress = item.failed
+      ? () => Alert.alert(
+          'No se pudo enviar',
+          item.failedReason || 'El servidor rechazó este reporte.',
+          [
+            { text: 'Cerrar', style: 'cancel' },
+            {
+              text: 'Eliminar',
+              style: 'destructive',
+              onPress: async () => { await removeItem(item.localId); loadPending(); },
+            },
+          ]
+        )
+      : item.isPending
+        ? () => Alert.alert('Pendiente de envío', 'Este reporte se enviará automáticamente cuando recuperes la conexión.')
+        : () => navigation.navigate('DetalleReporte', { reportId: item.id });
     return (
       <TouchableOpacity
         style={[styles.card, { borderLeftColor: statusColors.accent }]}
