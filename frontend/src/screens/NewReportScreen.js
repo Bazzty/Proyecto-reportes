@@ -31,17 +31,22 @@ export default function NewReportScreen({ navigation, route = {} }) {
   }, []);
 
   useEffect(() => {
-  const asset = route?.params?.pendingPhoto;
-  if (!asset) return;
-  (async () => {
-    try {
-      setPhoto(await toJpeg(asset));
-    } catch {
-      setPhoto({ ...asset, mimeType: asset.mimeType || 'image/jpeg' });
-    }
-  })();
-  navigation.setParams({ pendingPhoto: undefined });
-}, [navigation, route?.params?.pendingPhoto]);
+    const asset = route?.params?.pendingPhoto;
+    if (!asset) return;
+    let cancelled = false;
+    (async () => {
+      let next;
+      try {
+        next = await toJpeg(asset);
+      } catch {
+        Alert.alert('Error', 'No se pudo procesar la foto tomada. Intenta de nuevo.');
+        return;
+      }
+      if (!cancelled) setPhoto(next);
+    })();
+    navigation.setParams({ pendingPhoto: undefined });
+    return () => { cancelled = true; };
+  }, [navigation, route?.params?.pendingPhoto]);
 
   const toJpeg = async (asset) => {
     const manipulated = await ImageManipulator.manipulateAsync(
@@ -63,7 +68,7 @@ export default function NewReportScreen({ navigation, route = {} }) {
       quality: 0.7,
     });
     if (!result.canceled) setPhoto(await toJpeg(result.assets[0]));
-    };
+  };
 
   const handlePickFromGallery = async () => {
     const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -111,7 +116,7 @@ export default function NewReportScreen({ navigation, route = {} }) {
       form.append('category_id', String(categoryId));
       form.append('photo', {
         uri:  photo.uri,
-        type: photo.mimeType || 'image/jpeg',
+        type: 'image/jpeg',
         name: 'reporte.jpg',
       });
 

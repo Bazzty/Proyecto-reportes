@@ -61,6 +61,10 @@ export default function MyReportsScreen({ navigation }) {
     if (hasMore) setVisible((v) => v + PAGE_SIZE);
   };
 
+  const hasCoords = (item) =>
+    item.latitude != null && item.latitude !== '' && Number.isFinite(Number(item.latitude)) &&
+    item.longitude != null && item.longitude !== '' && Number.isFinite(Number(item.longitude));
+
   const goToMap = (item) =>
     navigation.popTo('Home', {
       focusReport: { id: item.id, latitude: item.latitude, longitude: item.longitude },
@@ -107,10 +111,12 @@ export default function MyReportsScreen({ navigation }) {
             {item.description}
           </Text>
 
-          <TouchableOpacity style={styles.mapLink} onPress={() => goToMap(item)}>
-            <Ionicons name="map-outline" size={15} color="#0e7490" />
-            <Text style={styles.mapLinkText}>Ver en el mapa</Text>
-          </TouchableOpacity>
+          {hasCoords(item) && (
+            <TouchableOpacity style={styles.mapLink} onPress={() => goToMap(item)}>
+              <Ionicons name="map-outline" size={15} color="#0e7490" />
+              <Text style={styles.mapLinkText}>Ver en el mapa</Text>
+            </TouchableOpacity>
+          )}
 
           <View style={styles.metaRow}>
             <View style={styles.metaItem}>
@@ -156,10 +162,12 @@ export default function MyReportsScreen({ navigation }) {
             <Text style={styles.categoryText} numberOfLines={1}>{categoryLabel(item)}</Text>
           </View>
           <Text style={styles.gridDescription} numberOfLines={2}>{item.description}</Text>
-          <TouchableOpacity style={styles.mapLink} onPress={() => goToMap(item)}>
-            <Ionicons name="map-outline" size={14} color="#0e7490" />
-            <Text style={styles.mapLinkText}>Ver en el mapa</Text>
-          </TouchableOpacity>
+          {hasCoords(item) && (
+            <TouchableOpacity style={styles.mapLink} onPress={() => goToMap(item)}>
+              <Ionicons name="map-outline" size={14} color="#0e7490" />
+              <Text style={styles.mapLinkText}>Ver en el mapa</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </TouchableOpacity>
     );

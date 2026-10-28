@@ -66,17 +66,21 @@ export default function HomeScreen({ navigation, route }) {
   }, [route.params?.newReport]);
 
   useEffect(() => {
-  const focus = route.params?.focusReport;
-  if (!focus) return;
-  setActiveFilters([]);
-  mapRef.current?.animateToRegion({
-    latitude: parseFloat(focus.latitude),
-    longitude: parseFloat(focus.longitude),
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  }, 600);
-  navigation.setParams({ focusReport: undefined });
-}, [route.params?.focusReport]);
+    const focus = route.params?.focusReport;
+    if (!focus) return;
+    const latitude = parseFloat(focus.latitude);
+    const longitude = parseFloat(focus.longitude);
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      setActiveFilters([]);
+      mapRef.current?.animateToRegion({
+        latitude,
+        longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 600);
+    }
+    navigation.setParams({ focusReport: undefined });
+  }, [route.params?.focusReport]);
 
   useFocusEffect(
     useCallback(() => {

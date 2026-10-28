@@ -57,6 +57,7 @@ export default function App() {
         }
 
         if (token) setAuthToken(token);
+        else if (pendingPhoto) Alert.alert('Sesión requerida', 'Inicia sesión para guardar la foto que tomaste.');
       } catch (error) {
         console.warn('Error restaurando el inicio:', error);
       } finally {

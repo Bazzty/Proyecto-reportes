@@ -82,12 +82,12 @@ function DetalleReporte({ route, navigation }) {
       .finally(() => { if (!cancelled) setLoading(false); });
 
     api.get(`/reports/${reportId}/comments`)
-      .then(({ data }) => {
+      .then(async ({ data }) => {
         if (cancelled) return;
         if (!Array.isArray(data)) {
           setComments([]);
           setCommentsError(true);
-          Alert.alert('Error', 'No se pudieron cargar los comentarios.');
+          if (await reportLoaded && !cancelled) Alert.alert('Error', 'No se pudieron cargar los comentarios.');
           return;
         }
         setComments(data);
@@ -114,8 +114,8 @@ function DetalleReporte({ route, navigation }) {
         confirmed_by_me:     data.confirmed,
       }));
     } catch {
-  Alert.alert('Error', 'No se pudo registrar tu confirmación.');
-}
+      Alert.alert('Error', 'No se pudo registrar tu confirmación.');
+    }
   };
 
   const handleSendComment = async () => {
@@ -248,10 +248,10 @@ function DetalleReporte({ route, navigation }) {
           <View style={styles.ownerConfirmRow}>
             <Ionicons name="people-outline" size={16} color="#6b7280" />
             <Text style={styles.ownerConfirmText}>
-            {report.confirmations_count === 1
-              ? '1 persona confirmó este reporte'
-              : `${report.confirmations_count} personas confirmaron este reporte`}
-          </Text>
+              {report.confirmations_count === 1
+                ? '1 persona confirmó este reporte'
+                : `${report.confirmations_count} personas confirmaron este reporte`}
+            </Text>
           </View>
         )}
 
