@@ -54,7 +54,7 @@ export default function LoginScreen({ navigation }) {
       <View style={[styles.imageWrapper, { height: Math.min(initialHeight * 0.42, 340) }]}>
         <Image source={require('../../assets/lake.png')} style={styles.image} />
         <LinearGradient
-          colors={['transparent', '#0284c7']}
+          colors={['transparent', '#0e7490']}
           style={styles.fade}
         />
       </View>
@@ -105,9 +105,9 @@ export default function LoginScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  wrapper:      { flex: 1, backgroundColor: '#0284c7' },
-  scrollView:   { backgroundColor: '#0284c7' },
-  container:    { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40, backgroundColor: '#0284c7' },
+  wrapper:      { flex: 1, backgroundColor: '#0e7490' },
+  scrollView:   { backgroundColor: '#0e7490' },
+  container:    { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40, backgroundColor: '#0e7490' },
   imageWrapper: { marginHorizontal: -24 },
   image:        { width: '100%', height: '100%', resizeMode: 'cover' },
   fade: {
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   title:          { fontSize: 28, fontWeight: 'bold', marginTop: 24, marginBottom: 4, color: '#ffffff' },
   subtitle:       { fontSize: 15, color: '#ccfbf1', marginBottom: 32 },
   input: {
-    borderWidth: 1.5, borderColor: '#7dd3fc', borderRadius: 12,
+    borderWidth: 1.5, borderColor: '#5eead4', borderRadius: 12,
     padding: 14, marginBottom: 14, backgroundColor: 'rgba(255,255,255,0.15)',
     color: '#ffffff', fontSize: 15,
   },

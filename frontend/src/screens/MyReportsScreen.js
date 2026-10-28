@@ -45,6 +45,7 @@ export default function MyReportsScreen({ navigation }) {
   const loadReports = useCallback(() => {
     setLoading(true);
     setError(false);
+    setVisible(PAGE_SIZE);
     api.get('/user/reports')
       .then(res => setAllReports(res.data))
       .catch(() => { setAllReports([]); setError(true); })
@@ -229,8 +230,6 @@ export default function MyReportsScreen({ navigation }) {
           renderItem={viewMode === 'grid' ? renderGridCard : renderReportCard}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.3}
           ListFooterComponent={
             hasMore ? (
               <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore}>
