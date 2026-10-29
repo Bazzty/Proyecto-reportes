@@ -142,4 +142,22 @@ class AdminReportTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors('validation_status');
     }
+
+    public function test_update_validation_rejects_stale_expected_status()
+    {
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->makeReport(User::factory()->create(), $category, 'valido');
+        Sanctum::actingAs($this->makeAdmin(), ['*']);
+
+        $this->patchJson("/api/admin/reports/{$report->id}/validation", [
+            'validation_status' => 'rechazado',
+            'rejection_reason' => 'Motivo',
+            'expected_validation_status' => 'pendiente',
+        ])->assertStatus(409);
+
+        $this->assertDatabaseHas('reports', [
+            'id' => $report->id,
+            'validation_status' => 'valido',
+        ]);
+    }
 }

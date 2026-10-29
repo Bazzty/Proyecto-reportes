@@ -153,13 +153,13 @@ export const syncPending = async () => {
         // Sin sesión válida no tiene sentido seguir intentando: se reintenta tras iniciar sesión.
         if (status === 401) break;
 
-        // Error de datos (422/413/400…): reintentar nunca lo va a resolver → se marca fallido.
-        // 408 (timeout) y 429 (rate limit) son transitorios: se reintentan.
-        if (status && status >= 400 && status < 500 && status !== 408 && status !== 429) {
+        // Solo los errores de datos (400/413/422) son permanentes: reintentar no los resuelve.
+        // 403/404/408/429 y los 5xx pueden ser transitorios: se reintentan.
+        if (status === 400 || status === 413 || status === 422) {
           await markFailed(item.localId, error.response?.data?.message || `Error ${status}`);
         }
 
-        // Errores de red o 5xx: se dejan en la cola para reintentar más tarde.
+        // El resto (red/403/404/408/429/5xx) se deja en la cola para reintentar más tarde.
       }
     }
   } finally {

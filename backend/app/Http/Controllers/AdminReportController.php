@@ -45,9 +45,18 @@ class AdminReportController extends Controller
         $data = $request->validate([
             'validation_status' => ['required', Rule::in(['valido', 'rechazado'])],
             'rejection_reason' => ['nullable', 'string', 'max:500', 'required_if:validation_status,rechazado'],
+            'expected_validation_status' => ['nullable', Rule::in(['pendiente', 'valido', 'rechazado'])],
         ]);
 
         $report = Report::findOrFail($id);
+
+        // Concurrencia optimista: si otro admin cambió el estado entretanto, se rechaza.
+        if (array_key_exists('expected_validation_status', $data)
+            && $data['expected_validation_status'] !== null
+            && $report->validation_status !== $data['expected_validation_status']) {
+            abort(409, 'El estado del reporte cambió; recargá la lista antes de volver a intentarlo.');
+        }
+
         $report->validation_status = $data['validation_status'];
         $report->rejection_reason = $data['validation_status'] === 'rechazado'
             ? ($data['rejection_reason'] ?? null)
@@ -56,10 +65,11 @@ class AdminReportController extends Controller
         $report->validated_at = now();
         $report->save();
 
+        // Respuesta liviana: se cargan solo las relaciones necesarias en vez de re-consultar todo.
         $uid = $request->user()->id;
-        $report = $this->withReportData(Report::query(), $uid)
-            ->with('validatedBy:id,name')
-            ->findOrFail($report->id);
+        $report->load(['category', 'user', 'zone:id,name', 'validatedBy:id,name']);
+        $report->loadCount('confirmations');
+        $report->confirmed_by_me = $report->confirmations()->where('user_id', $uid)->exists();
 
         return response()->json($this->formatAdminReport($report, $uid));
     }

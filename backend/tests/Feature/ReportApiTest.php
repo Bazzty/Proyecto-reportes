@@ -224,13 +224,14 @@ class ReportApiTest extends TestCase
         $this->postJson('/api/reports', $this->validReportPayload($category, ['client_uuid' => $uuid]))
             ->assertCreated();
 
-        // Otro usuario reutilizando el mismo client_uuid no debe acceder al reporte del primero.
+        // El client_uuid es único por usuario: otro usuario puede reutilizarlo y crea su propio reporte.
         $other = User::factory()->create();
         Sanctum::actingAs($other, ['*']);
-        $response = $this->postJson('/api/reports', $this->validReportPayload($category, ['client_uuid' => $uuid]));
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['client_uuid' => $uuid]))
+            ->assertCreated();
 
-        $this->assertNotSame(200, $response->status());
-        $this->assertDatabaseMissing('reports', ['user_id' => $other->id, 'client_uuid' => $uuid]);
+        $this->assertSame(1, Report::where('user_id', $owner->id)->where('client_uuid', $uuid)->count());
+        $this->assertSame(1, Report::where('user_id', $other->id)->where('client_uuid', $uuid)->count());
     }
 
     private function validReportPayload(Category $category, array $overrides = []): array
@@ -466,6 +467,7 @@ class ReportApiTest extends TestCase
             'longitude' => -70.65,
             'photo_path' => 'photos/test.jpg',
             'status' => 'Pendiente',
+            'validation_status' => 'valido',
         ]);
     }
 
@@ -519,6 +521,41 @@ class ReportApiTest extends TestCase
         Sanctum::actingAs($admin, ['*']);
 
         $this->patchJson('/api/reports/9999/status', ['status' => 'Resuelto'])->assertNotFound();
+    }
+
+    public function test_update_status_requires_a_validated_report()
+    {
+        $admin = $this->makeAdmin();
+        $category = Category::create(['name' => 'basura']);
+        $report = Report::create([
+            'user_id' => $admin->id,
+            'category_id' => $category->id,
+            'description' => 'Pendiente de validación',
+            'latitude' => -33.45,
+            'longitude' => -70.65,
+            'photo_path' => 'photos/test.jpg',
+            'status' => 'Pendiente',
+            'validation_status' => 'pendiente',
+        ]);
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson("/api/reports/{$report->id}/status", ['status' => 'Resuelto'])
+            ->assertStatus(409);
+    }
+
+    public function test_update_status_records_which_admin_changed_it()
+    {
+        $admin = $this->makeAdmin();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->sampleReport($category, $admin);
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson("/api/reports/{$report->id}/status", ['status' => 'Resuelto'])->assertOk();
+
+        $this->assertDatabaseHas('reports', [
+            'id' => $report->id,
+            'status_updated_by' => $admin->id,
+        ]);
     }
 
     public function test_reports_of_other_users_are_readable_but_not_listed_as_mine()

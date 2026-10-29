@@ -8,9 +8,10 @@ use Illuminate\Http\Request;
 
 class CommentController extends Controller
 {
-    public function index(int $id)
+    public function index(Request $request, int $id)
     {
         $report = Report::findOrFail($id);
+        abort_unless($report->isVisibleTo($request->user()), 404);
 
         return response()->json(
             $report->comments()->with('user:id,name')->latest()->get()
@@ -26,6 +27,7 @@ class CommentController extends Controller
     public function store(Request $request, int $id)
     {
         $report = Report::findOrFail($id);
+        abort_unless($report->isVisibleTo($request->user()), 404);
 
         $data = $request->validate(['body' => 'required|string|max:500']);
 

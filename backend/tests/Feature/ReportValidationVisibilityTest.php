@@ -92,4 +92,45 @@ class ReportValidationVisibilityTest extends TestCase
 
         $this->getJson("/api/reports/{$report->id}")->assertOk();
     }
+
+    public function test_rejected_report_comments_and_confirm_are_hidden_from_guest_and_other_users()
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->makeReport($owner, $category, 'rechazado');
+
+        // Invitado
+        $this->getJson("/api/reports/{$report->id}/comments")->assertNotFound();
+
+        // Otro usuario autenticado
+        Sanctum::actingAs($other, ['*']);
+        $this->getJson("/api/reports/{$report->id}/comments")->assertNotFound();
+        $this->postJson("/api/reports/{$report->id}/comments", ['body' => 'hola'])->assertNotFound();
+        $this->postJson("/api/reports/{$report->id}/confirm")->assertNotFound();
+    }
+
+    public function test_owner_can_read_and_comment_own_rejected_report()
+    {
+        $owner = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->makeReport($owner, $category, 'rechazado');
+        Sanctum::actingAs($owner, ['*']);
+
+        $this->getJson("/api/reports/{$report->id}/comments")->assertOk();
+        $this->postJson("/api/reports/{$report->id}/comments", ['body' => 'hola'])->assertCreated();
+    }
+
+    public function test_admin_can_confirm_rejected_report()
+    {
+        $owner = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->makeReport($owner, $category, 'rechazado');
+
+        $admin = User::factory()->create();
+        $admin->roles()->attach(Role::firstOrCreate(['name' => Role::ADMIN])->id);
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->postJson("/api/reports/{$report->id}/confirm")->assertOk();
+    }
 }

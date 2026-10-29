@@ -31,9 +31,7 @@ class ReportController extends Controller
         $report = $this->withReportData(Report::query(), $uid)->findOrFail($id);
 
         // Los reportes rechazados no son visibles públicamente (sí para el dueño o un admin).
-        if ($report->validation_status === 'rechazado'
-            && ! $request->user()?->isAdmin()
-            && $report->user_id !== $uid) {
+        if (! $report->isVisibleTo($request->user())) {
             abort(404);
         }
 
@@ -90,6 +88,11 @@ class ReportController extends Controller
             // Se descarta la foto recién subida y se devuelve el reporte existente.
             Storage::disk('public')->delete($path);
             $report = Report::where('user_id', $uid)->where('client_uuid', $clientUuid)->firstOrFail();
+        } catch (\Throwable $exception) {
+            // Cualquier otro fallo al insertar deja la foto sin reporte: se borra.
+            Storage::disk('public')->delete($path);
+
+            throw $exception;
         }
 
         $report = $this->withReportData(Report::query(), $uid)->findOrFail($report->id);
@@ -112,7 +115,15 @@ class ReportController extends Controller
         ]);
 
         $report = Report::findOrFail($id);
+
+        // Solo se cambia el estado de un reporte validado (no rechazado ni pendiente de validación).
+        if ($report->validation_status !== 'valido') {
+            abort(409, 'Solo se puede cambiar el estado de un reporte validado.');
+        }
+
         $report->status = $data['status'];
+        $report->status_updated_by = $request->user()->id;
+        $report->status_updated_at = now();
         $report->save();
 
         $uid = $request->user()->id;

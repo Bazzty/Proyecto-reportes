@@ -20,13 +20,28 @@ class Report extends Model
         'validated_by',
         'validated_at',
         'rejection_reason',
+        'status_updated_by',
+        'status_updated_at',
     ];
 
     protected function casts(): array
     {
         return [
             'validated_at' => 'datetime',
+            'status_updated_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Un reporte rechazado solo es visible para su dueño o un administrador.
+     */
+    public function isVisibleTo(?User $user): bool
+    {
+        if ($this->validation_status !== 'rechazado') {
+            return true;
+        }
+
+        return $user !== null && ($user->isAdmin() || $user->id === $this->user_id);
     }
 
     public function user()

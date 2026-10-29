@@ -123,6 +123,20 @@ describe('offlineQueue', () => {
     expect(await getPending()).toHaveLength(0);
   });
 
+  it('reintenta 403/404 (transitorios) en vez de marcarlos fallidos', async () => {
+    await enqueue(report());
+    api.post.mockRejectedValue({ response: { status: 403 } });
+
+    const result = await syncPending();
+
+    const pending = await getPending();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].failed).toBeFalsy();
+    expect(await getPendingCount()).toBe(1);
+    expect(result.remaining).toBe(1);
+    expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+  });
+
   it('notifica a los suscriptores cuando cambia la cola', async () => {
     const listener = jest.fn();
     const unsubscribe = subscribe(listener);
