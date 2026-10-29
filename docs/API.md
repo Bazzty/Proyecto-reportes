@@ -291,16 +291,40 @@ No requiere token.
 
 ---
 
-### Confirmar / quitar confirmación de un reporte
+### Confirmar / quitar confirmación de un reporte ("Yo también lo vi")
 ```
 POST /reports/{id}/confirm
 ```
-Requiere token. Alterna la confirmación del usuario.
+Requiere token. Sin body. Alterna la confirmación del usuario sobre el reporte.
 
-**Response 200:**
+**Reglas acordadas por el equipo:**
+- Cada usuario confirma un reporte **una sola vez** (restricción `unique(user_id, report_id)` en la tabla `confirmations`).
+- La confirmación **se puede deshacer**: llamar de nuevo al mismo endpoint la quita (`confirmed: false`).
+- **No se puede confirmar el propio reporte** (403). La app tampoco muestra el botón al dueño; en su lugar le muestra cuántas personas lo confirmaron.
+
+`confirmed` indica el estado del usuario después de la llamada y `count` el total de confirmaciones del reporte. Es el mismo valor que `confirmations_count` en el detalle y en el listado, donde `confirmed_by_me` solo vale `true` si la petición envía el token.
+
+**Response 200 — Confirmado:**
 ```json
 { "confirmed": true, "count": 3 }
 ```
+
+**Response 200 — Confirmación quitada:**
+```json
+{ "confirmed": false, "count": 2 }
+```
+
+**Response 401 — Sin token o token inválido:**
+```json
+{ "message": "Unauthenticated." }
+```
+
+**Response 403 — Es tu propio reporte:**
+```json
+{ "message": "No puedes confirmar tu propio reporte." }
+```
+
+**Response 404 — El reporte no existe.**
 
 ---
 
@@ -359,6 +383,7 @@ Requiere token.
 | 200 | OK — consulta exitosa |
 | 201 | Created — recurso creado |
 | 401 | Unauthorized — token inválido o credenciales incorrectas |
+| 403 | Forbidden — acción no permitida (ej: confirmar tu propio reporte) |
 | 404 | Not Found — recurso no existe |
 | 422 | Unprocessable — datos de entrada inválidos |
 | 429 | Too Many Requests — límite de intentos en login/registro |
