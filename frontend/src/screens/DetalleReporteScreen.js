@@ -9,7 +9,6 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
-import Spinner from '../components/Spinner';
 
 // Gris del botón "Yo también lo vi" mientras espera la respuesta del servidor.
 const BUSY_COLOR = '#6b7280';
@@ -240,9 +239,10 @@ function DetalleReporte({ route, navigation }) {
           activeOpacity={0.75}
           accessibilityState={{ disabled: confirming, busy: confirming }}
         >
-          {/* Mientras espera la respuesta el botón pasa a grises y el ícono se vuelve un indicador de carga */}
+          {/* Mientras espera la respuesta el botón pasa a grises y el ícono se vuelve el indicador
+              de carga nativo de cada plataforma (rayitas en iOS, círculo en Android) */}
           {confirming ? (
-            <Spinner size={20} color={BUSY_COLOR} accessibilityLabel="Enviando confirmación" />
+            <ActivityIndicator size="small" color={BUSY_COLOR} accessibilityLabel="Enviando confirmación" />
           ) : (
             <Ionicons
               name={confirmed ? 'checkmark-circle' : 'checkmark-circle-outline'}
