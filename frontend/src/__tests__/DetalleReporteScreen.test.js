@@ -214,6 +214,52 @@ describe('DetalleReporteScreen', () => {
     expect(screen.getByText('2')).toBeTruthy();
   });
 
+  it('si ya confirmé el reporte el botón aparece marcado con el contador', async () => {
+    mockGet({ report: { ...REPORT, confirmations_count: 4, confirmed_by_me: true } });
+    await setup();
+
+    expect(await screen.findByText('Lo confirmaste')).toBeTruthy();
+    expect(screen.getByText('icon:checkmark-circle')).toBeTruthy();
+    expect(screen.getByText('4')).toBeTruthy();
+    expect(screen.queryByText('Yo también lo vi')).toBeNull();
+  });
+
+  it('un usuario puede deshacer su confirmación y baja el contador', async () => {
+    mockGet({ report: { ...REPORT, confirmations_count: 2, confirmed_by_me: true } });
+    api.post.mockResolvedValue({ data: { confirmed: false, count: 1 } });
+    await setup();
+    await fireEvent.press(await screen.findByText('Lo confirmaste'));
+
+    expect(await screen.findByText('Yo también lo vi')).toBeTruthy();
+    expect(api.post).toHaveBeenCalledWith('/reports/5/confirm');
+    expect(screen.getByText('1')).toBeTruthy();
+  });
+
+  it('sin confirmaciones el botón no muestra contador', async () => {
+    mockGet({ report: { ...REPORT, confirmations_count: 0 } });
+    await setup();
+
+    expect(await screen.findByText('Yo también lo vi')).toBeTruthy();
+    expect(screen.queryByText('0')).toBeNull();
+  });
+
+  it('mientras se envía la confirmación ignora toques repetidos', async () => {
+    let resolvePost;
+    api.post.mockImplementation(() => new Promise((resolve) => { resolvePost = resolve; }));
+    await setup();
+    const button = await screen.findByText('Yo también lo vi');
+
+    // Sin await: la petición queda pendiente a propósito y press esperaría al handler.
+    const firstPress = fireEvent.press(button);
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1));
+    await fireEvent.press(screen.getByText('Yo también lo vi'));
+    expect(api.post).toHaveBeenCalledTimes(1);
+
+    resolvePost({ data: { confirmed: true, count: 2 } });
+    await firstPress;
+    expect(await screen.findByText('Lo confirmaste')).toBeTruthy();
+  });
+
   it('el dueño del reporte no ve el botón de confirmar sino el resumen', async () => {
     await setup({ userId: '2' });
     await screen.findByText('Basura acumulada');

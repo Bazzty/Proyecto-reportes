@@ -43,6 +43,7 @@ function DetalleReporte({ route, navigation }) {
   const [commentsError, setCommentsError] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [sending, setSending]       = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [isGuest, setIsGuest]       = useState(false);
   const [myUserId, setMyUserId]     = useState(null);
   const listRef = useRef(null);
@@ -106,6 +107,10 @@ function DetalleReporte({ route, navigation }) {
       Alert.alert('Inicia sesión', 'Necesitas una cuenta para confirmar reportes.');
       return;
     }
+    // El endpoint alterna: un segundo toque en vuelo desharía la confirmación recién enviada.
+    if (confirming) return;
+
+    setConfirming(true);
     try {
       const { data } = await api.post(`/reports/${reportId}/confirm`);
       setReport(prev => ({
@@ -115,6 +120,8 @@ function DetalleReporte({ route, navigation }) {
       }));
     } catch {
       Alert.alert('Error', 'No se pudo registrar tu confirmación.');
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -225,6 +232,7 @@ function DetalleReporte({ route, navigation }) {
         {!isOwner && <TouchableOpacity
           style={[styles.confirmBtn, confirmed && styles.confirmBtnActive]}
           onPress={handleConfirm}
+          disabled={confirming}
           activeOpacity={0.75}
         >
           <Ionicons
