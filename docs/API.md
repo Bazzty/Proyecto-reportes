@@ -158,6 +158,9 @@ Requiere token. Se envía como `multipart/form-data` porque incluye una foto.
 | longitude | number | Sí |
 | category_id | integer | Sí |
 | photo | file (jpg/png, max 5MB) | Sí |
+| client_uuid | uuid | No |
+
+> **Idempotencia:** si se repite el mismo `client_uuid` (p. ej. reintento de la cola offline), el endpoint devuelve **200** con el reporte original en lugar de crear otro distinto; no compara el resto del payload. Con un `client_uuid` nuevo responde **201**.
 
 **Response 201:**
 ```json

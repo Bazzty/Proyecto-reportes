@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import api from '../services/api';
-import { enqueue, getPending, getPendingCount, syncPending, subscribe } from '../services/offlineQueue';
+import { enqueue, getPending, getPendingCount, syncPending, subscribe, clearQueue } from '../services/offlineQueue';
 
 jest.mock('../services/api', () => ({
   __esModule: true,
@@ -104,6 +104,23 @@ describe('offlineQueue', () => {
     expect(await getPendingCount()).toBe(0);
     expect(result.remaining).toBe(0);
     expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+  });
+
+  it('aborta el sync si se limpia la cola (logout) en medio', async () => {
+    await enqueue(report({ description: 'Uno' }));
+    await enqueue(report({ description: 'Dos' }));
+
+    // En el primer envío simulamos un logout: clearQueue() vacía la cola y cambia la sesión.
+    api.post.mockImplementationOnce(async () => {
+      await clearQueue();
+      return { data: { id: 1 } };
+    });
+    api.post.mockResolvedValue({ data: { id: 2 } });
+
+    await syncPending();
+
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(await getPending()).toHaveLength(0);
   });
 
   it('notifica a los suscriptores cuando cambia la cola', async () => {

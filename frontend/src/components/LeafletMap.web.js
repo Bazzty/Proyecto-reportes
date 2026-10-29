@@ -29,7 +29,7 @@ const LeafletMap = forwardRef(function LeafletMap(
     }
 
     const handleMessage = (event) => {
-      if (iframeRef.current && event.source && event.source !== iframeRef.current.contentWindow) return;
+      if (event.source !== iframeRef.current?.contentWindow) return;
       try {
         const message = JSON.parse(event.data);
         if (message.type === 'ready') {
@@ -54,6 +54,7 @@ const LeafletMap = forwardRef(function LeafletMap(
         ref={iframeRef}
         title="mapa"
         srcDoc={HTML}
+        sandbox="allow-scripts allow-popups"
         style={{ border: 0, width: '100%', height: '100%' }}
       />
     </View>

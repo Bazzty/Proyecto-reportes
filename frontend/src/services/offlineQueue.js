@@ -7,6 +7,8 @@ const STORAGE_KEY = 'offlineReports';
 const PHOTO_DIR = `${FileSystem.documentDirectory}pending-reports/`;
 
 let syncing = false;
+let session = 0; // cambia al limpiar la cola (logout): aborta syncs en curso
+let writeChain = Promise.resolve();
 const listeners = new Set();
 
 const emit = () => { listeners.forEach((listener) => listener()); };
@@ -27,9 +29,19 @@ const readQueue = async () => {
   }
 };
 
-const writeQueue = async (queue) => {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
-  emit();
+// Serializa cualquier read-modify-write de la cola mediante una cadena de promesas:
+// un `enqueue` concurrente con el fin de un sync no se pierde ni pisa escrituras.
+const mutateQueue = (mutator) => {
+  const op = async () => {
+    const fresh = await readQueue();
+    const next = await mutator(fresh);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    emit();
+    return next;
+  };
+  const run = writeChain.then(op, op);
+  writeChain = run.then(() => undefined, () => undefined);
+  return run;
 };
 
 const persistPhoto = async (localId, uri) => {
@@ -52,20 +64,18 @@ const removePhoto = async (uri) => {
   }
 };
 
-// Relee el storage antes de escribir: un `enqueue` ocurrido durante un sync no se pierde.
 const removeFromQueue = async (localId) => {
-  const fresh = await readQueue();
-  const item = fresh.find((q) => q.localId === localId);
-  await writeQueue(fresh.filter((q) => q.localId !== localId));
-  if (item) await removePhoto(item.photoUri);
+  let removed = null;
+  await mutateQueue((queue) => {
+    removed = queue.find((q) => q.localId === localId) ?? null;
+    return queue.filter((q) => q.localId !== localId);
+  });
+  if (removed) await removePhoto(removed.photoUri);
 };
 
-const markFailed = async (localId, reason) => {
-  const fresh = await readQueue();
-  await writeQueue(fresh.map((q) => (
-    q.localId === localId ? { ...q, failed: true, failedReason: reason } : q
-  )));
-};
+const markFailed = (localId, reason) => mutateQueue((queue) => queue.map((q) => (
+  q.localId === localId ? { ...q, failed: true, failedReason: reason } : q
+)));
 
 export const getPending = () => readQueue();
 
@@ -74,9 +84,10 @@ export const getPendingCount = async () => (await readQueue()).filter((q) => !q.
 export const removeItem = (localId) => removeFromQueue(localId);
 
 export const clearQueue = async () => {
-  const fresh = await readQueue();
-  await Promise.all(fresh.map((q) => removePhoto(q.photoUri)));
-  await writeQueue([]);
+  session += 1;
+  let items = [];
+  await mutateQueue((queue) => { items = queue; return []; });
+  await Promise.all(items.map((q) => removePhoto(q.photoUri)));
 };
 
 export const enqueue = async ({ description, latitude, longitude, categoryId, photoUri, clientUuid }) => {
@@ -84,8 +95,7 @@ export const enqueue = async ({ description, latitude, longitude, categoryId, ph
   const uuid = clientUuid || randomUUID();
   const storedPhotoUri = await persistPhoto(localId, photoUri);
 
-  const queue = await readQueue();
-  queue.push({
+  await mutateQueue((queue) => [...queue, {
     localId,
     clientUuid: uuid,
     description,
@@ -94,8 +104,7 @@ export const enqueue = async ({ description, latitude, longitude, categoryId, ph
     categoryId,
     photoUri: storedPhotoUri,
     createdAt: new Date().toISOString(),
-  });
-  await writeQueue(queue);
+  }]);
 
   return localId;
 };
@@ -105,12 +114,19 @@ export const syncPending = async () => {
 
   syncing = true;
   emit();
+  const mySession = session;
   let synced = 0;
   const initial = await readQueue();
 
   try {
     for (const item of initial) {
+      // Logout (clearQueue) durante el sync: se aborta para no enviar con otra sesión.
+      if (session !== mySession) break;
       if (item.failed) continue;
+
+      // El ítem pudo haberse quitado mientras se iteraba el snapshot inicial.
+      const stillQueued = (await readQueue()).some((q) => q.localId === item.localId && !q.failed);
+      if (!stillQueued) continue;
 
       try {
         const form = new FormData();
@@ -130,6 +146,8 @@ export const syncPending = async () => {
         await removeFromQueue(item.localId);
         synced += 1;
       } catch (error) {
+        if (session !== mySession) break;
+
         const status = error.response?.status;
 
         // Sin sesión válida no tiene sentido seguir intentando: se reintenta tras iniciar sesión.
