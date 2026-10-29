@@ -55,5 +55,6 @@ export default function Spinner({ size = 20, color = '#6b7280', accessibilityLab
 }
 
 const styles = StyleSheet.create({
-  slot: { ...StyleSheet.absoluteFillObject, alignItems: 'center' },
+  // Posición explícita: StyleSheet.absoluteFillObject ya no existe en React Native 0.88.
+  slot: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center' },
 });
