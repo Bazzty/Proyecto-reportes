@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback,
-  StyleSheet, ActivityIndicator, Alert, Image, Dimensions, ScrollView,
-  KeyboardAvoidingView, Platform
+  StyleSheet, ActivityIndicator, Alert, Image, ScrollView,
+  KeyboardAvoidingView, useWindowDimensions, Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,9 +10,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { setAuthToken } from '../services/api';
 import useKeyboardHeight from '../hooks/useKeyboardHeight';
 
-const { height } = Dimensions.get('window');
-
 export default function RegisterScreen({ navigation }) {
+  const { height } = useWindowDimensions();
+  const initialHeight = useRef(height).current;
   const [name, setName]                       = useState('');
   const [email, setEmail]                     = useState('');
   const [password, setPassword]               = useState('');
@@ -73,19 +73,21 @@ export default function RegisterScreen({ navigation }) {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-    <View style={styles.wrapper}>
-      <View style={styles.imageWrapper}>
-        <Image source={require('../../assets/lake.png')} style={styles.image} />
-        <LinearGradient colors={['transparent', '#0e7490']} style={styles.fade} />
-      </View>
-
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={styles.wrapper}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={[styles.container, { paddingBottom: Platform.OS === 'android' ? keyboardHeight + 40 : 40 }]}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
       >
+      <View style={[styles.imageWrapper, { height: Math.min(initialHeight * 0.28, 240) }]}>
+        <Image source={require('../../assets/lake.png')} style={styles.image} />
+        <LinearGradient colors={['transparent', '#0e7490']} style={styles.fade} />
+      </View>
+
         <Text style={styles.title}>Crear Cuenta</Text>
         <Text style={styles.subtitle}>Únete a la comunidad</Text>
 
@@ -159,8 +161,7 @@ export default function RegisterScreen({ navigation }) {
           <Text style={styles.link}>¿Ya tienes cuenta? Inicia sesión</Text>
         </TouchableOpacity>
       </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+    </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   );
 }
@@ -168,10 +169,10 @@ export default function RegisterScreen({ navigation }) {
 const styles = StyleSheet.create({
   flex:         { flex: 1 },
   wrapper:      { flex: 1, backgroundColor: '#0e7490' },
-  imageWrapper: { height: height * 0.28, marginHorizontal: 0 },
+  imageWrapper: { marginHorizontal: 0 },
   image:        { width: '100%', height: '100%', resizeMode: 'cover' },
   fade:         { position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' },
-  container:    { paddingHorizontal: 24, paddingBottom: 40 },
+  container:    { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40 },
   title:        { fontSize: 28, fontWeight: 'bold', marginBottom: 4, color: '#ffffff' },
   subtitle:     { fontSize: 15, color: '#ccfbf1', marginBottom: 24 },
   input: {

@@ -32,12 +32,12 @@ const mockGet = ({ report = REPORT, comments = COMMENTS } = {}) => {
   });
 };
 
-const setup = async ({ session = true, userId = '9', admin = false } = {}) => {
+const setup = async ({ session = true, userId = '9', admin = false, navigation } = {}) => {
   await AsyncStorage.clear();
   if (session) {
     await AsyncStorage.multiSet([['token', 'tok'], ['userId', userId], ['isAdmin', admin ? '1' : '0']]);
   }
-  await render(<DetalleReporteScreen route={{ params: { reportId: 5 } }} />);
+  await render(<DetalleReporteScreen route={{ params: { reportId: 5 } }} navigation={navigation} />);
 };
 
 describe('DetalleReporteScreen', () => {
@@ -61,6 +61,17 @@ describe('DetalleReporteScreen', () => {
   it('muestra la ubicación del reporte', async () => {
     await setup();
     expect(await screen.findByText('Lat -33.43720, Lng -70.65060')).toBeTruthy();
+  });
+
+  it('el botón del mapa navega a Home enfocando el reporte', async () => {
+    const navigation = { popTo: jest.fn() };
+    await setup({ navigation });
+
+    await fireEvent.press(await screen.findByText('Ver en el mapa'));
+
+    expect(navigation.popTo).toHaveBeenCalledWith('Home', {
+      focusReport: { id: 5, latitude: -33.4372, longitude: -70.6506 },
+    }, { merge: true });
   });
 
   it.each([
@@ -171,6 +182,14 @@ describe('DetalleReporteScreen', () => {
     mockGet({ comments: [] });
     await setup();
     expect(await screen.findByText('Sé el primero en comentar.')).toBeTruthy();
+  });
+
+  it('si la API devuelve comentarios null muestra error en vez de fallar', async () => {
+    mockGet({ comments: null });
+    await setup();
+
+    expect(await screen.findByText('No se pudieron cargar los comentarios.')).toBeTruthy();
+    expect(Alert.alert).toHaveBeenCalledWith('Error', 'No se pudieron cargar los comentarios.');
   });
 
   it('un invitado no puede confirmar: pide iniciar sesión y no llama a la API', async () => {

@@ -22,7 +22,7 @@ const LOCATION_ERRORS = {
   unavailable: 'No se pudo obtener tu ubicación.',
 };
 
-export default function NewReportScreen({ navigation }) {
+export default function NewReportScreen({ navigation, route = {} }) {
   const [photo, setPhoto]             = useState(null);
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId]   = useState(null);
@@ -67,6 +67,24 @@ export default function NewReportScreen({ navigation }) {
       });
   }, []);
 
+  useEffect(() => {
+    const asset = route?.params?.pendingPhoto;
+    if (!asset) return;
+    let cancelled = false;
+    (async () => {
+      let next;
+      try {
+        next = await toJpeg(asset);
+      } catch {
+        Alert.alert('Error', 'No se pudo procesar la foto tomada. Intenta de nuevo.');
+        return;
+      }
+      if (!cancelled) setPhoto(next);
+    })();
+    navigation.setParams({ pendingPhoto: undefined });
+    return () => { cancelled = true; };
+  }, [navigation, route?.params?.pendingPhoto]);
+
   const toJpeg = async (asset) => {
     const manipulated = await ImageManipulator.manipulateAsync(
       asset.uri,
@@ -84,7 +102,7 @@ export default function NewReportScreen({ navigation }) {
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
-      quality: 1,
+      quality: 0.7,
     });
     if (!result.canceled) setPhoto(await toJpeg(result.assets[0]));
   };

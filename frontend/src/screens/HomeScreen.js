@@ -124,6 +124,18 @@ export default function HomeScreen({ navigation, route }) {
     navigation.setParams({ newReport: undefined });
   }, [route.params?.newReport]);
 
+  useEffect(() => {
+    const focus = route.params?.focusReport;
+    if (!focus) return;
+    const latitude = parseFloat(focus.latitude);
+    const longitude = parseFloat(focus.longitude);
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      setActiveFilters([]);
+      leafletRef.current?.centerOn(latitude, longitude, 16);
+    }
+    navigation.setParams({ focusReport: undefined });
+  }, [route.params?.focusReport]);
+
   useFocusEffect(
     useCallback(() => {
       let active = true;

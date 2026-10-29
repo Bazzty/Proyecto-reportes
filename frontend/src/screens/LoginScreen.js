@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback,
-  StyleSheet, ActivityIndicator, Alert, Image, Dimensions,
-  KeyboardAvoidingView, Platform, ScrollView
+  StyleSheet, ActivityIndicator, Alert, Image,
+  KeyboardAvoidingView, Platform, ScrollView, useWindowDimensions
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,9 +10,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { setAuthToken } from '../services/api';
 import useKeyboardHeight from '../hooks/useKeyboardHeight';
 
-const { height } = Dimensions.get('window');
-
 export default function LoginScreen({ navigation }) {
+  const { height } = useWindowDimensions();
+  const initialHeight = useRef(height).current;
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -58,16 +58,17 @@ export default function LoginScreen({ navigation }) {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
     <KeyboardAvoidingView
-      style={styles.flex}
+      style={styles.wrapper}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
     <ScrollView
       ref={scrollRef}
+      style={styles.scrollView}
       contentContainerStyle={[styles.container, { paddingBottom: Platform.OS === 'android' ? keyboardHeight + 40 : 40 }]}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
     >
-      <View style={styles.imageWrapper}>
+      <View style={[styles.imageWrapper, { height: Math.min(initialHeight * 0.42, 340) }]}>
         <Image source={require('../../assets/lake.png')} style={styles.image} />
         <LinearGradient
           colors={['transparent', '#0e7490']}
@@ -133,9 +134,10 @@ export default function LoginScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  flex:         { flex: 1 },
-  container:    { flexGrow: 1, backgroundColor: '#0e7490', paddingHorizontal: 24, paddingBottom: 40 },
-  imageWrapper: { height: height * 0.42, marginHorizontal: -24 },
+  wrapper:      { flex: 1, backgroundColor: '#0e7490' },
+  scrollView:   { backgroundColor: '#0e7490' },
+  container:    { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40, backgroundColor: '#0e7490' },
+  imageWrapper: { marginHorizontal: -24 },
   image:        { width: '100%', height: '100%', resizeMode: 'cover' },
   fade: {
     position: 'absolute', bottom: 0, left: 0, right: 0, height: '50%',
