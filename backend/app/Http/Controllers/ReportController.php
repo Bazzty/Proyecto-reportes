@@ -11,9 +11,11 @@ use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
+    // index y show son rutas públicas (sin auth:sanctum): hay que pedir el guard sanctum explícitamente,
+    // porque el guard por defecto (web) no lee el Bearer token y confirmed_by_me saldría siempre false.
     public function index(Request $request)
     {
-        $uid = $request->user()?->id;
+        $uid = $request->user('sanctum')?->id;
         $reports = $this->withReportData(Report::query(), $uid)->latest()->latest('id')->get();
 
         return response()->json($reports->map(fn (Report $report) => $this->formatReport($report, $uid)));
@@ -21,7 +23,7 @@ class ReportController extends Controller
 
     public function show(Request $request, int $id)
     {
-        $uid = $request->user()?->id;
+        $uid = $request->user('sanctum')?->id;
         $report = $this->withReportData(Report::query(), $uid)->findOrFail($id);
 
         return response()->json($this->formatReport($report, $uid));

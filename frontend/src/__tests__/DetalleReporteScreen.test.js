@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DetalleReporteScreen from '../screens/DetalleReporteScreen';
@@ -212,6 +212,81 @@ describe('DetalleReporteScreen', () => {
     await waitFor(() => expect(screen.getByText('Lo confirmaste')).toBeTruthy());
     expect(api.post).toHaveBeenCalledWith('/reports/5/confirm');
     expect(screen.getByText('2')).toBeTruthy();
+  });
+
+  it('si ya confirmé el reporte el botón aparece marcado con el contador', async () => {
+    mockGet({ report: { ...REPORT, confirmations_count: 4, confirmed_by_me: true } });
+    await setup();
+
+    expect(await screen.findByText('Lo confirmaste')).toBeTruthy();
+    expect(screen.getByText('icon:checkmark-circle')).toBeTruthy();
+    expect(screen.getByText('4')).toBeTruthy();
+    expect(screen.queryByText('Yo también lo vi')).toBeNull();
+  });
+
+  it('un usuario puede deshacer su confirmación y baja el contador', async () => {
+    mockGet({ report: { ...REPORT, confirmations_count: 2, confirmed_by_me: true } });
+    api.post.mockResolvedValue({ data: { confirmed: false, count: 1 } });
+    await setup();
+    await fireEvent.press(await screen.findByText('Lo confirmaste'));
+
+    expect(await screen.findByText('Yo también lo vi')).toBeTruthy();
+    expect(api.post).toHaveBeenCalledWith('/reports/5/confirm');
+    expect(screen.getByText('1')).toBeTruthy();
+  });
+
+  it('sin confirmaciones el botón no muestra contador', async () => {
+    mockGet({ report: { ...REPORT, confirmations_count: 0 } });
+    await setup();
+
+    expect(await screen.findByText('Yo también lo vi')).toBeTruthy();
+    expect(screen.queryByText('0')).toBeNull();
+  });
+
+  it('mientras se envía la confirmación ignora toques repetidos', async () => {
+    let resolvePost;
+    api.post.mockImplementation(() => new Promise((resolve) => { resolvePost = resolve; }));
+    await setup();
+    const button = await screen.findByText('Yo también lo vi');
+
+    // Sin await: la petición queda pendiente a propósito y press esperaría al handler.
+    const firstPress = fireEvent.press(button);
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1));
+    await fireEvent.press(screen.getByText('Yo también lo vi'));
+    expect(api.post).toHaveBeenCalledTimes(1);
+
+    resolvePost({ data: { confirmed: true, count: 2 } });
+    await firstPress;
+    expect(await screen.findByText('Lo confirmaste')).toBeTruthy();
+  });
+
+  it('mientras espera la respuesta el botón pasa a grises con indicador de carga', async () => {
+    let resolvePost;
+    api.post.mockImplementation(() => new Promise((resolve) => { resolvePost = resolve; }));
+    await setup();
+    expect(screen.queryByLabelText('Enviando confirmación')).toBeNull();
+
+    const press = fireEvent.press(await screen.findByText('Yo también lo vi'));
+
+    expect(await screen.findByLabelText('Enviando confirmación')).toBeTruthy();
+    expect(screen.queryByText('icon:checkmark-circle-outline')).toBeNull();
+    expect(StyleSheet.flatten(screen.getByText('Yo también lo vi').props.style).color).toBe('#6b7280');
+
+    await act(async () => { resolvePost({ data: { confirmed: true, count: 2 } }); });
+    await press;
+    expect(await screen.findByText('icon:checkmark-circle')).toBeTruthy();
+    expect(screen.queryByLabelText('Enviando confirmación')).toBeNull();
+    expect(StyleSheet.flatten(screen.getByText('Lo confirmaste').props.style).color).toBe('#fff');
+  });
+
+  it('si falla la confirmación el botón vuelve a su color normal', async () => {
+    api.post.mockRejectedValue(new Error('fail'));
+    await setup();
+    await fireEvent.press(await screen.findByText('Yo también lo vi'));
+
+    await waitFor(() => expect(Alert.alert).toHaveBeenCalled());
+    expect(screen.queryByLabelText('Enviando confirmación')).toBeNull();
+    expect(StyleSheet.flatten(screen.getByText('Yo también lo vi').props.style).color).toBe('#0e7490');
   });
 
   it('el dueño del reporte no ve el botón de confirmar sino el resumen', async () => {

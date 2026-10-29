@@ -10,6 +10,9 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
 
+// Gris del botón "Yo también lo vi" mientras espera la respuesta del servidor.
+const BUSY_COLOR = '#6b7280';
+
 const statusColor = (status) => {
   if (!status) return '#0e7490';
   const s = status.toLowerCase();
@@ -43,6 +46,7 @@ function DetalleReporte({ route, navigation }) {
   const [commentsError, setCommentsError] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [sending, setSending]       = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [isGuest, setIsGuest]       = useState(false);
   const [myUserId, setMyUserId]     = useState(null);
   const listRef = useRef(null);
@@ -106,6 +110,10 @@ function DetalleReporte({ route, navigation }) {
       Alert.alert('Inicia sesión', 'Necesitas una cuenta para confirmar reportes.');
       return;
     }
+    // El endpoint alterna: un segundo toque en vuelo desharía la confirmación recién enviada.
+    if (confirming) return;
+
+    setConfirming(true);
     try {
       const { data } = await api.post(`/reports/${reportId}/confirm`);
       setReport(prev => ({
@@ -115,6 +123,8 @@ function DetalleReporte({ route, navigation }) {
       }));
     } catch {
       Alert.alert('Error', 'No se pudo registrar tu confirmación.');
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -223,21 +233,29 @@ function DetalleReporte({ route, navigation }) {
         {/* Confirmaciones — oculto si es tu propio reporte */}
 
         {!isOwner && <TouchableOpacity
-          style={[styles.confirmBtn, confirmed && styles.confirmBtnActive]}
+          style={[styles.confirmBtn, confirmed && styles.confirmBtnActive, confirming && styles.confirmBtnBusy]}
           onPress={handleConfirm}
+          disabled={confirming}
           activeOpacity={0.75}
+          accessibilityState={{ disabled: confirming, busy: confirming }}
         >
-          <Ionicons
-            name={confirmed ? 'checkmark-circle' : 'checkmark-circle-outline'}
-            size={20}
-            color={confirmed ? '#fff' : '#0e7490'}
-          />
-          <Text style={[styles.confirmText, confirmed && styles.confirmTextActive]}>
+          {/* Mientras espera la respuesta el botón pasa a grises y el ícono se vuelve el indicador
+              de carga nativo de cada plataforma (rayitas en iOS, círculo en Android) */}
+          {confirming ? (
+            <ActivityIndicator size="small" color={BUSY_COLOR} accessibilityLabel="Enviando confirmación" />
+          ) : (
+            <Ionicons
+              name={confirmed ? 'checkmark-circle' : 'checkmark-circle-outline'}
+              size={20}
+              color={confirmed ? '#fff' : '#0e7490'}
+            />
+          )}
+          <Text style={[styles.confirmText, confirmed && styles.confirmTextActive, confirming && styles.confirmTextBusy]}>
             {confirmed ? 'Lo confirmaste' : 'Yo también lo vi'}
           </Text>
           {report.confirmations_count > 0 && (
-            <View style={[styles.confirmCount, confirmed && styles.confirmCountActive]}>
-              <Text style={[styles.confirmCountText, confirmed && { color: '#0e7490' }]}>
+            <View style={[styles.confirmCount, confirmed && styles.confirmCountActive, confirming && styles.confirmCountBusy]}>
+              <Text style={[styles.confirmCountText, confirmed && { color: '#0e7490' }, confirming && styles.confirmTextBusy]}>
                 {report.confirmations_count}
               </Text>
             </View>
@@ -365,6 +383,9 @@ const styles = StyleSheet.create({
   },
   confirmCountActive:   { backgroundColor: 'rgba(255,255,255,0.25)' },
   confirmCountText:     { fontSize: 12, fontWeight: 'bold', color: '#0e7490' },
+  confirmBtnBusy:       { borderColor: '#d1d5db', backgroundColor: '#f3f4f6' },
+  confirmTextBusy:      { color: BUSY_COLOR },
+  confirmCountBusy:     { backgroundColor: '#e5e7eb' },
 
   ownerConfirmRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 24 },
   ownerConfirmText: { fontSize: 13, color: '#6b7280' },
