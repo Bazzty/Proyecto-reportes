@@ -14,6 +14,8 @@ class ConfirmationController extends Controller
         $report = Report::findOrFail($id);
         $userId = $request->user()->id;
 
+        abort_if((int) $report->user_id === (int) $userId, 403, 'No puedes confirmar tu propio reporte.');
+
         $confirmed = DB::transaction(function () use ($userId, $report) {
             $existing = Confirmation::where('user_id', $userId)
                 ->where('report_id', $report->id)

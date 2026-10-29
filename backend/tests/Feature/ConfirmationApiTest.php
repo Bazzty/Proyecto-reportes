@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Confirmation;
 use App\Models\Report;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -117,6 +118,45 @@ class ConfirmationApiTest extends TestCase
             ->assertJson(['confirmed' => false, 'count' => 0]);
 
         $this->assertDatabaseCount('confirmations', 0);
+    }
+
+    public function test_owner_cannot_confirm_own_report()
+    {
+        $owner = User::factory()->create();
+        $report = $this->makeReport($owner);
+        Sanctum::actingAs($owner);
+
+        $this->postJson("/api/reports/{$report->id}/confirm")
+            ->assertForbidden()
+            ->assertJson(['message' => 'No puedes confirmar tu propio reporte.']);
+
+        $this->assertDatabaseCount('confirmations', 0);
+    }
+
+    public function test_database_rejects_duplicate_confirmation()
+    {
+        $owner = User::factory()->create();
+        $reporter = User::factory()->create();
+        $report = $this->makeReport($owner);
+        Confirmation::create(['user_id' => $reporter->id, 'report_id' => $report->id]);
+
+        $this->expectException(QueryException::class);
+        Confirmation::create(['user_id' => $reporter->id, 'report_id' => $report->id]);
+    }
+
+    public function test_count_includes_confirmations_from_other_users()
+    {
+        $owner = User::factory()->create();
+        $first = User::factory()->create();
+        $second = User::factory()->create();
+        $report = $this->makeReport($owner);
+        Confirmation::create(['user_id' => $first->id, 'report_id' => $report->id]);
+
+        Sanctum::actingAs($second);
+
+        $this->postJson("/api/reports/{$report->id}/confirm")
+            ->assertOk()
+            ->assertJson(['confirmed' => true, 'count' => 2]);
     }
 
     public function test_public_report_endpoints_read_confirmed_by_me_from_bearer_token()
