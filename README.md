@@ -23,8 +23,9 @@ Para poder ejecutar la aplicacion, primero se debe levantar el servidor del back
 cp backend/.env.example backend/.env
 # Debes completar el DB_PASSWORD y DB_ROOT_PASSWORD en backend/.env con una contraseña.
 # Puede ser cualquiera, solo deben estar y ser iguales
-# Si surgiera algun error (ej: no anotaste la contraseña al levantar el servidor), para hacer que el cambio afecte, ejecuta estos dos:
-
+# Si surgiera algun error (ej: no anotaste la contraseña al levantar el servidor), para que el cambio afecte ejecuta estos dos:
+docker compose down
+docker compose up -d --build
 
 # 2. Construir y levantar
 cd backend
@@ -70,7 +71,6 @@ npx expo start
 Escanear el QR con **Expo Go**. El dispositivo y la computadora deben estar en la misma red WiFi.
 
 ---
-### 172.30.80.1
 ## Usuarios de prueba (seeder)
 
 | Email | Contraseña |
@@ -88,10 +88,15 @@ Escanear el QR con **Expo Go**. El dispositivo y la computadora deben estar en l
 - Modo invitado (solo lectura, sin registro)
 - Mapa con marcadores coloreados por estado (Pendiente / En Progreso / Resuelto)
 - Filtros por categoría (basura, escombros, aguas, otro)
-- Heatmap de densidad: cada reporte es un punto con su zona (comuna/sector). Tras el deploy, correr `php artisan db:seed --class=ZoneSeeder` (carga las zonas) y luego `php artisan zones:assign` para asignar la zona a los reportes existentes (backfill)
-- Crear reporte con foto (cámara o galería), GPS y categoría
+- Mapa interactivo (Leaflet + tiles de Esri, sin Google Maps) con heatmap de densidad (cada reporte es un punto con su zona) y marcadores
+- Para asignar la zona a los reportes existentes tras el deploy: `php artisan db:seed --class=ZoneSeeder` y luego `php artisan zones:assign` (backfill)
+- Crear reporte con foto (cámara o galería), georreferenciación GPS automática y categoría
+- Modo sin conexión: los reportes se guardan localmente y se sincronizan al recuperar la conexión
 - Mis Reportes con foto, estado y lightbox de imagen
 - Detalle de reporte con botón "Yo también lo vi" y comentarios
+- Cambio de estado del reporte (Pendiente / En Progreso / Resuelto) por administradores
+- Panel de administración: recibir reportes y validarlos o rechazarlos (con motivo)
+- Novedades in-app: aviso cuando cambia el estado de tus reportes
 - Polling automático cada 5 segundos para mantener el mapa actualizado
 
 ---

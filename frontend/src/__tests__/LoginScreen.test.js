@@ -71,6 +71,17 @@ describe('LoginScreen', () => {
     );
   });
 
+  it('el botón ojo muestra la contraseña solo mientras se mantiene presionado', async () => {
+    await setup();
+    expect(screen.getByPlaceholderText('Contraseña').props.secureTextEntry).toBe(true);
+
+    await fireEvent(screen.getByTestId('toggle-password'), 'pressIn');
+    expect(screen.getByPlaceholderText('Contraseña').props.secureTextEntry).toBe(false);
+
+    await fireEvent(screen.getByTestId('toggle-password'), 'pressOut');
+    expect(screen.getByPlaceholderText('Contraseña').props.secureTextEntry).toBe(true);
+  });
+
   it('"Regístrate" navega a Register', async () => {
     const navigation = await setup();
     await fireEvent.press(screen.getByText('¿No tienes cuenta? Regístrate'));

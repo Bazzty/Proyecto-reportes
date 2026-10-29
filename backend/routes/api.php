@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminReportController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CommentController;
@@ -27,4 +28,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/reports/{id}/confirm', [ConfirmationController::class, 'toggle']);
 
     Route::post('/reports/{id}/comments', [CommentController::class, 'store']);
+
+    // Solo administradores pueden cambiar el estado de un reporte.
+    Route::middleware('admin')->patch('/reports/{id}/status', [ReportController::class, 'updateStatus']);
+
+    // Panel de administración: recibir y validar/rechazar reportes.
+    Route::middleware('admin')->group(function () {
+        Route::get('/admin/reports', [AdminReportController::class, 'index']);
+        Route::patch('/admin/reports/{id}/validation', [AdminReportController::class, 'updateValidation']);
+    });
 });

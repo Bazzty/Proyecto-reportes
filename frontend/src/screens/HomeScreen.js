@@ -1,40 +1,104 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Platform } from 'react-native';
-import { Image } from 'expo-image';
-import MapView, { Marker, Callout, Heatmap } from 'react-native-maps';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Modal, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { clearAuthToken } from '../services/api';
+import LeafletMap from '../components/LeafletMap';
+import useOfflineSync from '../hooks/useOfflineSync';
+import useNotifications from '../hooks/useNotifications';
+import { subscribe as subscribeQueue, getPendingCount, isSyncing, clearQueue } from '../services/offlineQueue';
+import { syncStatusNotifications, markAllRead } from '../services/notifications';
 
+// El endpoint /reports/heatmap devuelve un punto por reporte (con su zona).
+// Para el heat "por zona" agrupamos los reportes con zona en su centroide; los
+// que no caen en ninguna zona se muestran individuales (no hay centroide representativo).
+const groupHeatByZone = (points) => {
+  const zones = new Map();
+  const unzoned = [];
 
-const statusColor = (status) => {
-  if (!status) return '#0e7490';
-  const s = status.toLowerCase();
-  if (s === 'resuelto') return '#16a34a';
-  if (s === 'pendiente') return '#f59e0b';
-  return '#0e7490';
+  points.forEach((p) => {
+    const latitude = parseFloat(p.latitude);
+    const longitude = parseFloat(p.longitude);
+
+    if (p.zone?.id != null) {
+      const group = zones.get(p.zone.id) ?? { name: p.zone.name, lat: 0, lng: 0, count: 0 };
+      group.lat += latitude;
+      group.lng += longitude;
+      group.count += 1;
+      zones.set(p.zone.id, group);
+    } else {
+      unzoned.push({ latitude, longitude, weight: 1, zoneName: 'Sin zona', count: 1 });
+    }
+  });
+
+  const zoned = Array.from(zones.values()).map((g) => ({
+    latitude: g.lat / g.count,
+    longitude: g.lng / g.count,
+    weight: g.count,
+    zoneName: g.name,
+    count: g.count,
+  }));
+
+  return [...zoned, ...unzoned];
 };
+
 
 export default function HomeScreen({ navigation, route }) {
   const isGuest = route.params?.guest === true;
 
-  const mapRef = useRef(null);
+  const leafletRef = useRef(null);
   const [userLocation, setUserLocation]   = useState(null);
   const [userName, setUserName]           = useState('');
+  const [isAdmin, setIsAdmin]             = useState(false);
   const [reports, setReports]             = useState([]);
   const [myReports, setMyReports]         = useState([]);
   const [activeFilters, setActiveFilters] = useState([]); // ids de categoría; vacío = "Todos"
   const [categories, setCategories]       = useState([]);
-  const [heatmapPoints, setHeatmapPoints] = useState([]);
+  const [zoneHeatPoints, setZoneHeatPoints] = useState([]);
+  const [heatMode, setHeatMode]         = useState('zona');
+  const [mapView, setMapView]           = useState('ambos');
   const [offline, setOffline]           = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [syncing, setSyncing]           = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const { isConnected } = useOfflineSync();
+  const { notifications, unreadCount } = useNotifications();
 
   useEffect(() => {
-    AsyncStorage.getItem('userName').then(name => { if (name) setUserName(name); });
+    AsyncStorage.multiGet(['userName', 'isAdmin', 'heatMode', 'mapView']).then(([[, name], [, admin], [, mode], [, view]]) => {
+      if (name) setUserName(name);
+      setIsAdmin(admin === '1');
+      if (mode === 'foco' || mode === 'zona') setHeatMode(mode);
+      if (view === 'marcadores' || view === 'calor' || view === 'ambos') setMapView(view);
+    });
     api.get('/categories')
       .then(res => setCategories(res.data))
       .catch(() => setCategories([]));
+  }, []);
+
+  const changeHeatMode = (mode) => {
+    setHeatMode(mode);
+    AsyncStorage.setItem('heatMode', mode).catch(() => {});
+  };
+
+  const changeMapView = (view) => {
+    setMapView(view);
+    AsyncStorage.setItem('mapView', view).catch(() => {});
+  };
+
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      if (!active) return;
+      setPendingCount(await getPendingCount());
+      setSyncing(isSyncing());
+    };
+    refresh();
+    const unsubscribe = subscribeQueue(refresh);
+    return () => { active = false; unsubscribe(); };
   }, []);
 
   useEffect(() => {
@@ -43,12 +107,7 @@ export default function HomeScreen({ navigation, route }) {
       if (status !== 'granted') return;
       const loc = await Location.getCurrentPositionAsync({});
       setUserLocation(loc.coords);
-      mapRef.current?.animateToRegion({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      }, 1000);
+      leafletRef.current?.centerOn(loc.coords.latitude, loc.coords.longitude, 14);
     })();
   }, []);
 
@@ -72,12 +131,7 @@ export default function HomeScreen({ navigation, route }) {
     const longitude = parseFloat(focus.longitude);
     if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
       setActiveFilters([]);
-      mapRef.current?.animateToRegion({
-        latitude,
-        longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }, 600);
+      leafletRef.current?.centerOn(latitude, longitude, 16);
     }
     navigation.setParams({ focusReport: undefined });
   }, [route.params?.focusReport]);
@@ -99,16 +153,13 @@ export default function HomeScreen({ navigation, route }) {
             const next = allRes.data;
             return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
           });
-          setHeatmapPoints(heatRes.data.map(p => ({
-            latitude: parseFloat(p.latitude),
-            longitude: parseFloat(p.longitude),
-            weight: 1,
-          })));
+          setZoneHeatPoints(groupHeatByZone(heatRes.data));
           if (!isGuest && myRes) {
             setMyReports(prev => {
               const next = myRes.data;
               return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
             });
+            syncStatusNotifications(myRes.data).catch(() => {});
           }
           failures = 0;
           setOffline(false);
@@ -137,7 +188,10 @@ export default function HomeScreen({ navigation, route }) {
         style: 'destructive',
         onPress: async () => {
           try { await api.post('/logout'); } catch {}
-          await AsyncStorage.multiRemove(['token', 'userName', 'userId']);
+          // La cola y el snapshot son por usuario: no deben sobrevivir al cierre de sesión
+          // (si no, el reporte pendiente de A se subiría con el token de B).
+          await clearQueue();
+          await AsyncStorage.multiRemove(['token', 'userName', 'userId', 'isAdmin', 'reportStatusSnapshot']);
           clearAuthToken();
           navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
         },
@@ -170,113 +224,102 @@ export default function HomeScreen({ navigation, route }) {
     ? reports.filter(r => activeFilters.includes(r.category?.id))
     : reports;
 
+  const iconCodeFor = (categoryName) => {
+    const cat = categories.find(c => c.name === categoryName);
+    const code = Ionicons.glyphMap?.[cat?.icon || 'ellipsis-horizontal'];
+    return code ? code.toString(16) : null;
+  };
+  const mapReports = visibleReports.map(r => ({ ...r, iconCode: iconCodeFor(r.category?.name) }));
+
+  const focusHeatPoints = visibleReports.map(r => ({
+    latitude: r.latitude,
+    longitude: r.longitude,
+    weight: 1,
+    reportId: r.id,
+    description: r.description,
+    category: r.category?.name ?? null,
+    user: r.user?.name ?? null,
+    photo_url: r.photo_url ?? null,
+  }));
+  const heatPoints = heatMode === 'foco' ? focusHeatPoints : zoneHeatPoints;
+  const showMarkers = mapView !== 'calor';
+  const showHeat = mapView !== 'marcadores';
+
+  const offlineBanner = !isConnected
+    ? { icon: 'cloud-offline-outline', text: 'Sin conexión: los datos pueden estar desactualizados' }
+    : syncing
+      ? { icon: 'cloud-upload-outline', text: 'Sincronizando reportes pendientes…' }
+      : pendingCount > 0
+        ? { icon: 'cloud-upload-outline', text: `${pendingCount} reporte${pendingCount !== 1 ? 's' : ''} pendiente${pendingCount !== 1 ? 's' : ''} de sincronizar` }
+        : offline
+          ? { icon: 'cloud-offline-outline', text: 'Sin conexión: los datos pueden estar desactualizados' }
+          : null;
+
   return (
     <View style={styles.container}>
-      {offline && (
+      {offlineBanner && (
         <View style={styles.offlineBanner}>
-          <Ionicons name="cloud-offline-outline" size={16} color="#fff" />
-          <Text style={styles.offlineText}>Sin conexión: los datos pueden estar desactualizados</Text>
+          <Ionicons name={offlineBanner.icon} size={16} color="#fff" />
+          <Text style={styles.offlineText}>{offlineBanner.text}</Text>
         </View>
       )}
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        showsUserLocation
-        showsMyLocationButton={false}
-        showsCompass={false}
-        initialRegion={{
-          latitude: -41.31946,
-          longitude: -72.98356,
-          latitudeDelta: 0.08,
-          longitudeDelta: 0.08,
-        }}
-      >
-        {Platform.OS === 'android' && heatmapPoints.length > 0 && (
-          <Heatmap points={heatmapPoints} radius={40} opacity={0.6} />
-        )}
-
-        {visibleReports.map(report => {
-          const color = statusColor(report.status);
-          return (
-            <Marker
-              key={report.id}
-              identifier={String(report.id)}
-              coordinate={{ latitude: report.latitude, longitude: report.longitude }}
-              anchor={{ x: 0.5, y: 1 }}
-              recyclingKey={`report-${report.id}`}
-            >
-              <View style={styles.markerWrapper}>
-                <View style={[styles.markerBubble, { borderColor: color }]}>
-                  {report.photo_url ? (
-                    <Image
-                      source={report.photo_url}
-                      style={styles.markerImage}
-                      contentFit="cover"
-                      cachePolicy="disk"
-                      transition={150}
-                    />
-                  ) : (
-                    <View style={[styles.markerPlaceholder, { backgroundColor: color }]}>
-                      <Ionicons name="leaf" size={16} color="white" />
-                    </View>
-                  )}
-                </View>
-                <View style={[styles.markerArrow, { borderTopColor: color }]} />
-              </View>
-              <Callout tooltip onPress={() => navigation.navigate('DetalleReporte', { reportId: report.id })}>
-                <View style={styles.callout}>
-                  {report.photo_url && (
-                    <Image
-                      source={report.photo_url}
-                      style={styles.calloutImage}
-                      contentFit="cover"
-                      cachePolicy="disk"
-                    />
-                  )}
-                  <View style={styles.calloutBody}>
-                    <View style={styles.calloutHeader}>
-                      <Text style={styles.calloutCategory}>
-                        {report.category?.name ?? 'Sin categoría'}
-                      </Text>
-                      <View style={[styles.statusDot, { backgroundColor: color }]} />
-                    </View>
-                    <Text style={styles.calloutDescription} numberOfLines={2}>
-                      {report.description}
-                    </Text>
-                    <Text style={styles.calloutUser}>📍 {report.user?.name}</Text>
-                    <Text style={styles.calloutLink}>Ver detalle →</Text>
-                  </View>
-                </View>
-              </Callout>
-            </Marker>
-          );
-        })}
-      </MapView>
+      <LeafletMap
+        ref={leafletRef}
+        reports={mapReports}
+        heat={heatPoints}
+        userLocation={userLocation}
+        showMarkers={showMarkers}
+        showHeat={showHeat}
+        onSelectReport={(reportId) => navigation.navigate('DetalleReporte', { reportId })}
+      />
 
       {/* Greeting card */}
       <View style={styles.greetingCard}>
-        <Text style={styles.greetingTitle}>
-          {isGuest ? '¡Bienvenido!' : (userName ? `¡Bienvenido, ${userName.split(' ')[0]}!` : '¡Bienvenido!')}
-        </Text>
-        {isGuest ? (
-          <TouchableOpacity onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })}>
-            <Text style={styles.greetingGuestLink}>Inicia sesión para reportar →</Text>
+        <View style={styles.greetingBody}>
+          <Text style={styles.greetingTitle}>
+            {isGuest ? '¡Bienvenido!' : (userName ? `¡Bienvenido, ${userName.split(' ')[0]}!` : '¡Bienvenido!')}
+          </Text>
+          {isGuest ? (
+            <TouchableOpacity onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })}>
+              <Text style={styles.greetingGuestLink}>Inicia sesión para reportar →</Text>
+            </TouchableOpacity>
+          ) : myReports.length > 0 ? (
+            <View style={styles.badgeRow}>
+              <View style={styles.badge}>
+                <View style={[styles.badgeDot, { backgroundColor: '#f59e0b' }]} />
+                <Text style={styles.badgeText}>{pendientes} pendiente{pendientes !== 1 ? 's' : ''}</Text>
+              </View>
+              <Text style={styles.badgeSep}>·</Text>
+              <View style={styles.badge}>
+                <View style={[styles.badgeDot, { backgroundColor: '#16a34a' }]} />
+                <Text style={styles.badgeText}>{resueltos} resuelto{resueltos !== 1 ? 's' : ''}</Text>
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.greetingSubtitle}>Reporta incidencias ambientales en tu zona</Text>
+          )}
+        </View>
+        {isAdmin && (
+          <TouchableOpacity
+            style={styles.bell}
+            testID="admin-button"
+            onPress={() => navigation.navigate('AdminReports')}
+          >
+            <Ionicons name="shield-checkmark-outline" size={22} color="#0e7490" />
           </TouchableOpacity>
-        ) : myReports.length > 0 ? (
-          <View style={styles.badgeRow}>
-            <View style={styles.badge}>
-              <View style={[styles.badgeDot, { backgroundColor: '#f59e0b' }]} />
-              <Text style={styles.badgeText}>{pendientes} pendiente{pendientes !== 1 ? 's' : ''}</Text>
-            </View>
-            <Text style={styles.badgeSep}>·</Text>
-            <View style={styles.badge}>
-              <View style={[styles.badgeDot, { backgroundColor: '#16a34a' }]} />
-              <Text style={styles.badgeText}>{resueltos} resuelto{resueltos !== 1 ? 's' : ''}</Text>
-            </View>
-          </View>
-        ) : (
-          <Text style={styles.greetingSubtitle}>Reporta incidencias ambientales en tu zona</Text>
         )}
+        <TouchableOpacity
+          style={styles.bell}
+          testID="notifications-button"
+          onPress={() => { markAllRead(); setShowNotifications(true); }}
+        >
+          <Ionicons name="notifications-outline" size={22} color="#0e7490" />
+          {unreadCount > 0 && (
+            <View style={styles.bellBadge} testID="notifications-badge">
+              <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* Filtros de categoría */}
@@ -303,17 +346,54 @@ export default function HomeScreen({ navigation, route }) {
             );
           })}
         </ScrollView>
+
+        {/* Controles del mapa: qué ver y cómo ver el heat */}
+        <View style={styles.mapControls}>
+          <View style={styles.controlRow}>
+            <Text style={styles.controlLabel}>Ver</Text>
+            <View style={styles.segmented}>
+              {[
+                { key: 'marcadores', label: 'Marcadores' },
+                { key: 'calor', label: 'Calor' },
+                { key: 'ambos', label: 'Ambos' },
+              ].map(opt => (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[styles.segOption, mapView === opt.key && styles.segOptionActive]}
+                  onPress={() => changeMapView(opt.key)}
+                >
+                  <Text style={[styles.segOptionText, mapView === opt.key && styles.segOptionTextActive]}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {mapView !== 'marcadores' && (
+            <View style={styles.controlRow}>
+              <Text style={styles.controlLabel}>Heat</Text>
+              <View style={styles.segmented}>
+                {[
+                  { key: 'zona', label: 'Zona' },
+                  { key: 'foco', label: 'Foco' },
+                ].map(opt => (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[styles.segOption, heatMode === opt.key && styles.segOptionActive]}
+                    onPress={() => changeHeatMode(opt.key)}
+                  >
+                    <Text style={[styles.segOptionText, heatMode === opt.key && styles.segOptionTextActive]}>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+        </View>
       </View>
 
       {userLocation && (
         <TouchableOpacity
           style={styles.locationButton}
-          onPress={() => mapRef.current?.animateToRegion({
-            latitude: userLocation.latitude,
-            longitude: userLocation.longitude,
-            latitudeDelta: 0.02,
-            longitudeDelta: 0.02,
-          }, 800)}
+          onPress={() => leafletRef.current?.centerOn(userLocation.latitude, userLocation.longitude, 15)}
         >
           <Ionicons name="locate" size={22} color="#0e7490" />
         </TouchableOpacity>
@@ -343,6 +423,34 @@ export default function HomeScreen({ navigation, route }) {
           <Text style={styles.barLabel}>{isGuest ? 'Ingresar' : 'Salir'}</Text>
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={showNotifications}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowNotifications(false)}
+      >
+        <View style={styles.notifBackdrop}>
+          <View style={styles.notifPanel}>
+            <Text style={styles.notifPanelTitle}>Novedades</Text>
+            <FlatList
+              data={notifications}
+              keyExtractor={(item) => item.id}
+              style={styles.notifList}
+              renderItem={({ item }) => (
+                <View style={styles.notifItem}>
+                  <Ionicons name="notifications-outline" size={16} color="#0e7490" />
+                  <Text style={styles.notifText}>{item.message}</Text>
+                </View>
+              )}
+              ListEmptyComponent={<Text style={styles.notifEmpty}>No tienes novedades.</Text>}
+            />
+            <TouchableOpacity style={styles.notifClose} onPress={() => setShowNotifications(false)}>
+              <Text style={styles.notifCloseText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -361,6 +469,9 @@ const styles = StyleSheet.create({
   greetingCard: {
     position: 'absolute',
     top: 56, left: 16, right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     backgroundColor: 'rgba(255,255,255,0.93)',
     borderRadius: 16,
     paddingHorizontal: 16,
@@ -371,9 +482,16 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  greetingBody:      { flex: 1 },
   greetingTitle:     { fontSize: 16, fontWeight: 'bold', color: '#0e7490' },
   greetingSubtitle:  { fontSize: 12, color: '#6b7280', marginTop: 2 },
   greetingGuestLink: { fontSize: 12, color: '#0e7490', marginTop: 2, fontWeight: '500' },
+  bell:              { padding: 6 },
+  bellBadge: {
+    position: 'absolute', top: 0, right: 0, minWidth: 16, height: 16, borderRadius: 8,
+    backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+  },
+  bellBadgeText:     { color: '#ffffff', fontSize: 10, fontWeight: 'bold' },
   badgeRow:  { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 },
   badge:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
   badgeDot:  { width: 7, height: 7, borderRadius: 4 },
@@ -401,6 +519,18 @@ const styles = StyleSheet.create({
   chipActive:     { backgroundColor: '#0e7490', borderColor: '#0e7490' },
   chipText:       { fontSize: 12, color: '#6b7280', fontWeight: '500' },
   chipTextActive: { color: 'white' },
+
+  mapControls:  { alignItems: 'flex-end', paddingHorizontal: 16, marginTop: 8, gap: 6 },
+  controlRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  controlLabel: { fontSize: 11, color: '#6b7280', fontWeight: '600' },
+  segmented: {
+    flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.93)',
+    borderRadius: 20, borderWidth: 1, borderColor: '#e5e7eb', overflow: 'hidden',
+  },
+  segOption:           { paddingHorizontal: 12, paddingVertical: 5 },
+  segOptionActive:     { backgroundColor: '#0e7490' },
+  segOptionText:       { fontSize: 12, color: '#6b7280', fontWeight: '500' },
+  segOptionTextActive: { color: 'white' },
 
   locationButton: {
     position: 'absolute',
@@ -493,4 +623,22 @@ const styles = StyleSheet.create({
   calloutDescription: { fontSize: 12, color: '#374151', lineHeight: 17 },
   calloutUser:        { fontSize: 11, color: '#9ca3af', marginTop: 2 },
   calloutLink:        { fontSize: 11, color: '#0e7490', fontWeight: '600', marginTop: 6 },
+
+  notifBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
+  notifPanel: {
+    backgroundColor: '#ffffff', borderRadius: 16, padding: 16, maxHeight: '70%',
+  },
+  notifPanelTitle: { fontSize: 18, fontWeight: 'bold', color: '#0e7490', marginBottom: 12 },
+  notifList:       { flexGrow: 0 },
+  notifItem: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
+  },
+  notifText:       { flex: 1, fontSize: 13, color: '#374151', lineHeight: 18 },
+  notifEmpty:      { fontSize: 13, color: '#9ca3af', textAlign: 'center', paddingVertical: 16 },
+  notifClose: {
+    marginTop: 12, alignSelf: 'center',
+    backgroundColor: '#0e7490', borderRadius: 20, paddingHorizontal: 24, paddingVertical: 10,
+  },
+  notifCloseText:  { color: '#ffffff', fontWeight: '600' },
 });

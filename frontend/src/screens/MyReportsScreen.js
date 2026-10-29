@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Modal, StatusBar, useWindowDimensions } from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Modal, StatusBar, Alert, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
+import { subscribe as subscribeQueue, getPending, isSyncing, removeItem } from '../services/offlineQueue';
 
 const PAGE_SIZE = 4;
 
@@ -35,12 +36,18 @@ const categoryLabel = (item) =>
 export default function MyReportsScreen({ navigation }) {
   const [allReports, setAllReports]   = useState([]);
   const [visible, setVisible]         = useState(PAGE_SIZE);
+  const [pending, setPending]         = useState([]);
+  const [categories, setCategories]   = useState([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [viewMode, setViewMode]       = useState('list');
   const { width } = useWindowDimensions();
   const gridCardWidth = (width - 40 - 12) / 2;
+
+  const loadPending = useCallback(async () => {
+    setPending(await getPending());
+  }, []);
 
   const loadReports = useCallback(() => {
     setLoading(true);
@@ -52,11 +59,51 @@ export default function MyReportsScreen({ navigation }) {
       .finally(() => setLoading(false));
   }, []);
 
-  useFocusEffect(loadReports);
+  useFocusEffect(useCallback(() => {
+    loadReports();
+    loadPending();
+  }, [loadReports, loadPending]));
+
+  useEffect(() => {
+    api.get('/categories')
+      .then(res => setCategories(res.data))
+      .catch(() => setCategories([]));
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeQueue(() => {
+      loadPending();
+      // Recargar el listado solo cuando terminó la sincronización (no en cada item).
+      if (!isSyncing()) loadReports();
+    });
+    return unsubscribe;
+  }, [loadPending, loadReports]);
+
+  const categoryName = (categoryId) => {
+    const match = categories.find(cat => cat.id === categoryId);
+    return match ? match.name.charAt(0).toUpperCase() + match.name.slice(1) : 'Sin categoría';
+  };
+
+  const pendingItems = pending.map(item => ({
+    id: `pending-${item.localId}`,
+    localId: item.localId,
+    isPending: true,
+    failed: !!item.failed,
+    failedReason: item.failedReason ?? null,
+    description: item.description,
+    latitude: item.latitude,
+    longitude: item.longitude,
+    photo_url: item.photoUri,
+    status: item.failed ? 'No se pudo enviar' : 'Sin sincronizar',
+    category: { name: categoryName(item.categoryId) },
+    created_at: item.createdAt,
+  }));
 
   const total   = allReports.length;
   const reports = allReports.slice(0, visible);
   const hasMore = visible < total;
+  const combined = [...pendingItems, ...reports];
+  const combinedTotal = total + pendingItems.length;
 
   const loadMore = () => {
     if (hasMore) setVisible((v) => v + PAGE_SIZE);
@@ -72,12 +119,32 @@ export default function MyReportsScreen({ navigation }) {
     }, { merge: true });
 
   const renderReportCard = ({ item }) => {
-    const statusColors = getStatusStyle(item.status);
+    const statusColors = item.failed
+      ? { bg: '#fee2e2', text: '#991b1b', accent: '#b91c1c' }
+      : item.isPending
+        ? { bg: '#e5e7eb', text: '#374151', accent: '#6b7280' }
+        : getStatusStyle(item.status);
+    const onPress = item.failed
+      ? () => Alert.alert(
+          'No se pudo enviar',
+          item.failedReason || 'El servidor rechazó este reporte.',
+          [
+            { text: 'Cerrar', style: 'cancel' },
+            {
+              text: 'Eliminar',
+              style: 'destructive',
+              onPress: async () => { await removeItem(item.localId); loadPending(); },
+            },
+          ]
+        )
+      : item.isPending
+        ? () => Alert.alert('Pendiente de envío', 'Este reporte se enviará automáticamente cuando recuperes la conexión.')
+        : () => navigation.navigate('DetalleReporte', { reportId: item.id });
     return (
       <TouchableOpacity
         style={[styles.card, { borderLeftColor: statusColors.accent }]}
         activeOpacity={0.75}
-        onPress={() => navigation.navigate('DetalleReporte', { reportId: item.id })}
+        onPress={onPress}
       >
         {item.photo_url ? (
           <TouchableOpacity activeOpacity={0.9} onPress={() => setLightboxUrl(item.photo_url)}>
@@ -186,9 +253,9 @@ export default function MyReportsScreen({ navigation }) {
         <View style={styles.counter}>
           <Ionicons name="document-text-outline" size={14} color="#0e7490" />
           <Text style={styles.counterText}>
-            {total === 0
+            {combinedTotal === 0
               ? 'Sin reportes aún'
-              : `${total} reporte${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`}
+              : `${combinedTotal} reporte${combinedTotal !== 1 ? 's' : ''} encontrado${combinedTotal !== 1 ? 's' : ''}`}
           </Text>
         </View>
       )}
@@ -225,7 +292,7 @@ export default function MyReportsScreen({ navigation }) {
           key={viewMode}
           numColumns={viewMode === 'grid' ? 2 : 1}
           columnWrapperStyle={viewMode === 'grid' ? styles.gridRow : undefined}
-          data={reports}
+          data={viewMode === 'grid' ? reports : combined}
           keyExtractor={(item) => String(item.id)}
           renderItem={viewMode === 'grid' ? renderGridCard : renderReportCard}
           contentContainerStyle={styles.listContent}

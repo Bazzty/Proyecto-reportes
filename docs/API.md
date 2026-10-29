@@ -35,7 +35,8 @@ No requiere token.
   "user": {
     "id": 1,
     "name": "Bastian Contreras",
-    "email": "bastian@example.com"
+    "email": "bastian@example.com",
+    "is_admin": false
   },
   "token": "1|abc123..."
 }
@@ -75,7 +76,8 @@ No requiere token.
   "user": {
     "id": 1,
     "name": "Bastian Contreras",
-    "email": "bastian@example.com"
+    "email": "bastian@example.com",
+    "is_admin": false
   },
   "token": "2|xyz789..."
 }
@@ -156,6 +158,9 @@ Requiere token. Se envía como `multipart/form-data` porque incluye una foto.
 | longitude | number | Sí |
 | category_id | integer | Sí |
 | photo | file (jpg/png, max 5MB) | Sí |
+| client_uuid | uuid | No |
+
+> **Idempotencia:** si se repite el mismo `client_uuid` (p. ej. reintento de la cola offline), el endpoint devuelve **200** con el reporte original en lugar de crear otro distinto; no compara el resto del payload. Con un `client_uuid` nuevo responde **201**.
 
 **Response 201:**
 ```json
@@ -275,6 +280,64 @@ Requiere token. Devuelve solo los reportes del usuario que hace la petición.
 
 ---
 
+### Actualizar estado de un reporte (solo administradores)
+```
+PATCH /reports/{id}/status
+```
+Requiere token de un **usuario administrador** (investigadores de "Más Azul"). Un usuario normal recibe `403`.
+
+**Request:**
+```json
+{ "status": "En Progreso" }
+```
+`status`: uno de `Pendiente`, `En Progreso`, `Resuelto`.
+
+**Response 200:** mismo formato que el detalle de un reporte, con el `status` actualizado.
+
+**Response 403:** el usuario no es administrador.
+
+---
+
+### Panel de administración — listar reportes
+```
+GET /admin/reports
+```
+Requiere token de **administrador**. Lista los reportes paginados (20 por página), incluyendo `validation_status`, `zone` y el validador. Filtros opcionales por query string: `validation_status` (`pendiente`|`valido`|`rechazado`), `zone_id`, `category_id`.
+
+**Response 200:**
+```json
+{
+  "data": [
+    { "id": 1, "validation_status": "pendiente", "zone": { "id": 5, "name": "Puerto Varas" } }
+  ],
+  "meta": { "current_page": 1, "last_page": 1, "per_page": 20, "total": 21 }
+}
+```
+
+---
+
+### Panel de administración — validar / rechazar un reporte
+```
+PATCH /admin/reports/{id}/validation
+```
+Requiere token de **administrador**.
+
+**Request (validar):**
+```json
+{ "validation_status": "valido" }
+```
+**Request (rechazar):**
+```json
+{ "validation_status": "rechazado", "rejection_reason": "No corresponde a contaminación." }
+```
+`rejection_reason` es obligatorio al rechazar.
+
+**Response 200:** el reporte actualizado (incluye `validation_status`, `rejection_reason`, `validated_at` y `validated_by`).
+
+> **Visibilidad:** los reportes con `validation_status = "pendiente"` **sí** son públicos (aparecen en `GET /reports` y en el heatmap; esto es intencional para no perder reportes aún no moderados). Los reportes `"rechazado"` **no** aparecen en `GET /reports` ni en el heatmap, y su detalle (`GET /reports/{id}`), sus comentarios (`GET/POST /reports/{id}/comments`) y su confirmación (`POST /reports/{id}/confirm`) devuelven `404` salvo para el autor o un administrador.
+
+---
+
 ### Listar categorías
 ```
 GET /categories
@@ -284,10 +347,21 @@ No requiere token.
 **Response 200:**
 ```json
 [
-  { "id": 1, "name": "basura" },
-  { "id": 2, "name": "escombros" }
+  {
+    "id": 1,
+    "name": "Basura",
+    "description": "Residuos sólidos domésticos o de consumo: bolsas, plásticos, envases y similares.",
+    "icon": "trash-outline"
+  },
+  {
+    "id": 2,
+    "name": "Escombros",
+    "description": "Restos de construcción o demolición: hormigón, maderas, cerámicas y escombros en general.",
+    "icon": "construct-outline"
+  }
 ]
 ```
+`description` e `icon` son opcionales (pueden venir en `null`). `icon` es el nombre de un ícono de Ionicons.
 
 ---
 
