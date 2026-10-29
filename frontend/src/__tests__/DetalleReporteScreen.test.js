@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DetalleReporteScreen from '../screens/DetalleReporteScreen';
@@ -258,6 +258,35 @@ describe('DetalleReporteScreen', () => {
     resolvePost({ data: { confirmed: true, count: 2 } });
     await firstPress;
     expect(await screen.findByText('Lo confirmaste')).toBeTruthy();
+  });
+
+  it('mientras espera la respuesta el botón pasa a grises con indicador de carga', async () => {
+    let resolvePost;
+    api.post.mockImplementation(() => new Promise((resolve) => { resolvePost = resolve; }));
+    await setup();
+    expect(screen.queryByLabelText('Enviando confirmación')).toBeNull();
+
+    const press = fireEvent.press(await screen.findByText('Yo también lo vi'));
+
+    expect(await screen.findByLabelText('Enviando confirmación')).toBeTruthy();
+    expect(screen.queryByText('icon:checkmark-circle-outline')).toBeNull();
+    expect(StyleSheet.flatten(screen.getByText('Yo también lo vi').props.style).color).toBe('#6b7280');
+
+    await act(async () => { resolvePost({ data: { confirmed: true, count: 2 } }); });
+    await press;
+    expect(await screen.findByText('icon:checkmark-circle')).toBeTruthy();
+    expect(screen.queryByLabelText('Enviando confirmación')).toBeNull();
+    expect(StyleSheet.flatten(screen.getByText('Lo confirmaste').props.style).color).toBe('#fff');
+  });
+
+  it('si falla la confirmación el botón vuelve a su color normal', async () => {
+    api.post.mockRejectedValue(new Error('fail'));
+    await setup();
+    await fireEvent.press(await screen.findByText('Yo también lo vi'));
+
+    await waitFor(() => expect(Alert.alert).toHaveBeenCalled());
+    expect(screen.queryByLabelText('Enviando confirmación')).toBeNull();
+    expect(StyleSheet.flatten(screen.getByText('Yo también lo vi').props.style).color).toBe('#0e7490');
   });
 
   it('el dueño del reporte no ve el botón de confirmar sino el resumen', async () => {
