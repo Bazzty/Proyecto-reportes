@@ -8,9 +8,11 @@ use Illuminate\Http\Request;
 
 class CommentController extends Controller
 {
-    public function index(int $id)
+    public function index(Request $request, int $id)
     {
+        // Ruta pública: el guard por defecto (web) no lee el Bearer.
         $report = Report::findOrFail($id);
+        abort_unless($report->isVisibleTo($request->user('sanctum')), 404);
 
         return response()->json(
             $report->comments()->with('user:id,name')->latest()->get()
@@ -25,12 +27,14 @@ class CommentController extends Controller
 
     public function store(Request $request, int $id)
     {
+        $user = $request->user('sanctum');
         $report = Report::findOrFail($id);
+        abort_unless($report->isVisibleTo($user), 404);
 
         $data = $request->validate(['body' => 'required|string|max:500']);
 
         $comment = Comment::create([
-            'user_id' => $request->user()->id,
+            'user_id' => $user->id,
             'report_id' => $report->id,
             'body' => $data['body'],
         ]);

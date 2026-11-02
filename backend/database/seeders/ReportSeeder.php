@@ -35,6 +35,12 @@ class ReportSeeder extends Seeder
             $createdUsers[] = $user;
         }
 
+        // Un usuario administrador de ejemplo (investigador de "Más Azul").
+        $adminUser = User::where('email', 'bastian@demo.cl')->first();
+        if ($adminUser) {
+            $adminUser->roles()->syncWithoutDetaching([Role::firstOrCreate(['name' => Role::ADMIN])->id]);
+        }
+
         $categories = Category::all()->keyBy(fn ($c) => strtolower($c->name));
 
         // Reportes distribuidos por el Lago Llanquihue y comunas aledañas

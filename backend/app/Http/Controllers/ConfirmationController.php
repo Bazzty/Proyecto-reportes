@@ -11,8 +11,10 @@ class ConfirmationController extends Controller
 {
     public function toggle(Request $request, int $id)
     {
+        $user = $request->user('sanctum');
         $report = Report::findOrFail($id);
-        $userId = $request->user()->id;
+        abort_unless($report->isVisibleTo($user), 404);
+        $userId = $user->id;
 
         $confirmed = DB::transaction(function () use ($userId, $report) {
             $existing = Confirmation::where('user_id', $userId)

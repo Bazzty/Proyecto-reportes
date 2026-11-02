@@ -1,10 +1,16 @@
+import { Alert } from 'react-native';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import MyReportsScreen from '../screens/MyReportsScreen';
 import api from '../services/api';
+import { getPending } from '../services/offlineQueue';
 
 jest.mock('../services/api', () => ({
   __esModule: true,
   default: { get: jest.fn() },
+}));
+jest.mock('../services/offlineQueue', () => ({
+  getPending: jest.fn(async () => []),
+  subscribe: jest.fn(() => jest.fn()),
 }));
 // useFocusEffect se comporta como un useEffect: corre al montar la pantalla
 jest.mock('@react-navigation/native', () => {
@@ -33,7 +39,11 @@ const setup = async (reports) => {
 };
 
 describe('MyReportsScreen', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    getPending.mockResolvedValue([]);
+  });
 
   it('pide /user/reports y muestra los datos de cada reporte', async () => {
     await setup([report()]);
@@ -100,5 +110,45 @@ describe('MyReportsScreen', () => {
 
     await fireEvent.press(screen.getByText('Volver'));
     expect(navigation.goBack).toHaveBeenCalled();
+  });
+
+  it('muestra los reportes pendientes de sincronizar con su badge', async () => {
+    getPending.mockResolvedValue([
+      {
+        localId: 'a1',
+        description: 'Basura sin conexión',
+        latitude: -41.3,
+        longitude: -72.9,
+        categoryId: 1,
+        photoUri: 'file:///doc/a1.jpg',
+        createdAt: '2026-10-05T12:00:00.000Z',
+      },
+    ]);
+
+    await setup([]);
+
+    expect(await screen.findByText('Basura sin conexión')).toBeTruthy();
+    expect(screen.getByText('SIN SINCRONIZAR')).toBeTruthy();
+    expect(screen.getByText('1 reporte encontrado')).toBeTruthy();
+  });
+
+  it('tocar un pendiente avisa y no navega al detalle', async () => {
+    getPending.mockResolvedValue([
+      {
+        localId: 'a2',
+        description: 'Pendiente local',
+        latitude: -41.3,
+        longitude: -72.9,
+        categoryId: 1,
+        photoUri: 'file:///doc/a2.jpg',
+        createdAt: '2026-10-05T12:00:00.000Z',
+      },
+    ]);
+    const navigation = await setup([]);
+
+    await fireEvent.press(await screen.findByText('Pendiente local'));
+
+    expect(navigation.navigate).not.toHaveBeenCalledWith('DetalleReporte', expect.anything());
+    expect(Alert.alert).toHaveBeenCalledWith('Pendiente de envío', expect.any(String));
   });
 });
