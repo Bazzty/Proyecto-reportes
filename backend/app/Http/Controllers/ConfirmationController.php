@@ -16,6 +16,8 @@ class ConfirmationController extends Controller
         abort_unless($report->isVisibleTo($user), 404);
         $userId = $user->id;
 
+        abort_if((int) $report->user_id === (int) $userId, 403, 'No puedes confirmar tu propio reporte.');
+
         $confirmed = DB::transaction(function () use ($userId, $report) {
             $existing = Confirmation::where('user_id', $userId)
                 ->where('report_id', $report->id)
