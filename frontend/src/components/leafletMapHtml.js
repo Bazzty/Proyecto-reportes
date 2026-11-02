@@ -51,10 +51,21 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" integrity="sha384-mFKkGiGvT5vo1fEyGCD3hshDdKmW3wzXW/x+fWriYJArD0R3gawT6lMvLboM22c0" crossorigin="anonymous"></script>
 <script>
+  // Origen de la app que embebe el iframe; LeafletMap.web.js lo reemplaza al armar el srcDoc.
+  // En nativo no se usa: la comunicación va por ReactNativeWebView.
+  var PARENT_ORIGIN = '__PARENT_ORIGIN__';
+
+  function isNative() {
+    return !!window.ReactNativeWebView;
+  }
+
   function post(obj) {
     var s = JSON.stringify(obj);
-    if (window.ReactNativeWebView) { window.ReactNativeWebView.postMessage(s); }
-    else if (window.parent && window.parent !== window) { window.parent.postMessage(s, '*'); }
+    if (isNative()) { window.ReactNativeWebView.postMessage(s); }
+    else if (window.parent && window.parent !== window) {
+      // El iframe es sandbox (origen opaco): el destino válido es el origen real del padre.
+      window.parent.postMessage(s, PARENT_ORIGIN === '__PARENT_ORIGIN__' ? '*' : PARENT_ORIGIN);
+    }
   }
 
   function esc(value) {
@@ -227,6 +238,11 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
     }
 
     function onMessage(e) {
+      // Web: solo aceptar mensajes de la ventana padre (y de su origen, si se conoce).
+      if (!isNative()) {
+        if (e.source !== window.parent) { return; }
+        if (PARENT_ORIGIN !== '__PARENT_ORIGIN__' && e.origin !== PARENT_ORIGIN) { return; }
+      }
       try {
         var msg = JSON.parse(e.data);
         if (msg.type === 'update') { render(msg); }

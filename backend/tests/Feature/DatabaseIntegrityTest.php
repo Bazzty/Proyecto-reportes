@@ -181,4 +181,36 @@ class DatabaseIntegrityTest extends TestCase
         $this->assertSame('-72.9833123', $report->longitude);
         $this->assertTrue(Schema::hasIndex('reports', ['latitude', 'longitude']));
     }
+
+    public function test_status_updated_by_must_reference_existing_user()
+    {
+        $this->expectException(QueryException::class);
+        $this->makeReport(User::factory()->create(), Category::create(['name' => 'basura']), [
+            'status_updated_by' => 9999,
+        ]);
+    }
+
+    public function test_status_updated_by_is_nulled_when_user_is_deleted()
+    {
+        $editor = User::factory()->create();
+        $report = $this->makeReport(User::factory()->create(), Category::create(['name' => 'basura']), [
+            'status_updated_by' => $editor->id,
+        ]);
+
+        $editor->delete();
+
+        $this->assertNull($report->fresh()->status_updated_by);
+    }
+
+    public function test_validated_by_is_nulled_when_user_is_deleted()
+    {
+        $validator = User::factory()->create();
+        $report = $this->makeReport(User::factory()->create(), Category::create(['name' => 'basura']), [
+            'validated_by' => $validator->id,
+        ]);
+
+        $validator->delete();
+
+        $this->assertNull($report->fresh()->validated_by);
+    }
 }

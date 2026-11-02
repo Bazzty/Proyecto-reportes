@@ -66,7 +66,10 @@ describe('AdminReportsScreen', () => {
     await fireEvent.press(screen.getByText('Validar'));
 
     await waitFor(() =>
-      expect(api.patch).toHaveBeenCalledWith('/admin/reports/1/validation', expect.objectContaining({ validation_status: 'valido' }))
+      expect(api.patch).toHaveBeenCalledWith(
+        '/admin/reports/1/validation',
+        expect.objectContaining({ validation_status: 'valido', expected_validation_status: 'pendiente' })
+      )
     );
   });
 
@@ -83,7 +86,11 @@ describe('AdminReportsScreen', () => {
     await waitFor(() =>
       expect(api.patch).toHaveBeenCalledWith(
         '/admin/reports/1/validation',
-        expect.objectContaining({ validation_status: 'rechazado', rejection_reason: 'No aplica' })
+        expect.objectContaining({
+          validation_status: 'rechazado',
+          expected_validation_status: 'pendiente',
+          rejection_reason: 'No aplica',
+        })
       )
     );
   });

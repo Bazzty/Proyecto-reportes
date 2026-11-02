@@ -24,6 +24,16 @@ FROM reports r LEFT JOIN categories c ON c.id = r.category_id
 WHERE c.id IS NULL;
 
 INSERT INTO audit_findings
+SELECT 'reportes con validated_by inexistente', COUNT(*)
+FROM reports r LEFT JOIN users u ON u.id = r.validated_by
+WHERE r.validated_by IS NOT NULL AND u.id IS NULL;
+
+INSERT INTO audit_findings
+SELECT 'reportes con status_updated_by inexistente', COUNT(*)
+FROM reports r LEFT JOIN users u ON u.id = r.status_updated_by
+WHERE r.status_updated_by IS NOT NULL AND u.id IS NULL;
+
+INSERT INTO audit_findings
 SELECT 'coordenadas nulas o fuera de rango', COUNT(*)
 FROM reports
 WHERE latitude IS NULL OR longitude IS NULL

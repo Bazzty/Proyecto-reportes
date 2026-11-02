@@ -11,7 +11,13 @@ const LeafletMap = forwardRef(function LeafletMap(
 ) {
   const iframeRef = useRef(null);
 
+  const parentOrigin = typeof window !== 'undefined' && window.location
+    ? window.location.origin
+    : '__PARENT_ORIGIN__';
+
   const send = (message) => {
+    // El iframe va con sandbox sin allow-same-origin (origen opaco), por lo que el destino
+    // del padre→iframe solo puede ser '*'. La dirección inversa sí fija el origen.
     iframeRef.current?.contentWindow?.postMessage(JSON.stringify(message), '*');
   };
 
@@ -53,7 +59,7 @@ const LeafletMap = forwardRef(function LeafletMap(
       <iframe
         ref={iframeRef}
         title="mapa"
-        srcDoc={HTML}
+        srcDoc={HTML.replace('__PARENT_ORIGIN__', parentOrigin)}
         sandbox="allow-scripts allow-popups"
         style={{ border: 0, width: '100%', height: '100%' }}
       />

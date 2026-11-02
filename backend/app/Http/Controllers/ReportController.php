@@ -17,7 +17,8 @@ class ReportController extends Controller
 
     public function index(Request $request)
     {
-        $uid = $request->user()?->id;
+        // index y show son rutas públicas: el guard por defecto (web) no lee el Bearer.
+        $uid = $request->user('sanctum')?->id;
         $reports = $this->withReportData(Report::query(), $uid)
             ->where('validation_status', '!=', 'rechazado')
             ->latest()->latest('id')->get();
@@ -27,11 +28,12 @@ class ReportController extends Controller
 
     public function show(Request $request, int $id)
     {
-        $uid = $request->user()?->id;
+        $user = $request->user('sanctum');
+        $uid = $user?->id;
         $report = $this->withReportData(Report::query(), $uid)->findOrFail($id);
 
         // Los reportes rechazados no son visibles públicamente (sí para el dueño o un admin).
-        if (! $report->isVisibleTo($request->user())) {
+        if (! $report->isVisibleTo($user)) {
             abort(404);
         }
 

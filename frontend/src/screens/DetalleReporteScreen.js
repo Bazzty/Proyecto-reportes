@@ -166,6 +166,7 @@ function DetalleReporte({ route, navigation }) {
     try {
       const { data } = await api.patch(`/admin/reports/${reportId}/validation`, {
         validation_status: validationStatus,
+        expected_validation_status: report.validation_status,
         rejection_reason: rejectionReason,
       });
       setReport(prev => ({

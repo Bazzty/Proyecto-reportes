@@ -324,15 +324,17 @@ Requiere token de **administrador**.
 
 **Request (validar):**
 ```json
-{ "validation_status": "valido" }
+{ "validation_status": "valido", "expected_validation_status": "pendiente" }
 ```
 **Request (rechazar):**
 ```json
-{ "validation_status": "rechazado", "rejection_reason": "No corresponde a contaminación." }
+{ "validation_status": "rechazado", "rejection_reason": "No corresponde a contaminación.", "expected_validation_status": "pendiente" }
 ```
-`rejection_reason` es obligatorio al rechazar.
+`expected_validation_status` es **obligatorio**: es el estado que el cliente vio al cargar la lista (concurrencia optimista). `rejection_reason` es obligatorio al rechazar.
 
 **Response 200:** el reporte actualizado (incluye `validation_status`, `rejection_reason`, `validated_at` y `validated_by`).
+
+**Response 409 — El estado cambió mientras tanto:** otro admin ya modificó el reporte. El `UPDATE` es atómico (`WHERE id = ? AND validation_status = ?`), así que dos admins simultáneos no pueden pisarse; recargá la lista y reintentá.
 
 > **Visibilidad:** los reportes con `validation_status = "pendiente"` **sí** son públicos (aparecen en `GET /reports` y en el heatmap; esto es intencional para no perder reportes aún no moderados). Los reportes `"rechazado"` **no** aparecen en `GET /reports` ni en el heatmap, y su detalle (`GET /reports/{id}`), sus comentarios (`GET/POST /reports/{id}/comments`) y su confirmación (`POST /reports/{id}/confirm`) devuelven `404` salvo para el autor o un administrador.
 

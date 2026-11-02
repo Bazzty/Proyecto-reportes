@@ -133,4 +133,59 @@ class ReportValidationVisibilityTest extends TestCase
 
         $this->postJson("/api/reports/{$report->id}/confirm")->assertOk();
     }
+
+    // Las rutas públicas deben leer el token con el guard sanctum (no con el guard web).
+    // Se usa un Bearer real porque Sanctum::actingAs cambia el guard por defecto y enmascara el bug.
+
+    public function test_owner_can_see_own_rejected_report_with_bearer_token()
+    {
+        $owner = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->makeReport($owner, $category, 'rechazado');
+        $report->update(['rejection_reason' => 'No corresponde a contaminación.']);
+        $token = $owner->createToken('test')->plainTextToken;
+
+        $this->withToken($token)->getJson("/api/reports/{$report->id}")
+            ->assertOk()
+            ->assertJsonPath('validation_status', 'rechazado')
+            ->assertJsonPath('rejection_reason', 'No corresponde a contaminación.');
+    }
+
+    public function test_admin_can_see_rejected_report_with_bearer_token()
+    {
+        $owner = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->makeReport($owner, $category, 'rechazado');
+
+        $admin = User::factory()->create();
+        $admin->roles()->attach(Role::firstOrCreate(['name' => Role::ADMIN])->id);
+        $token = $admin->createToken('test')->plainTextToken;
+
+        $this->withToken($token)->getJson("/api/reports/{$report->id}")->assertOk();
+    }
+
+    public function test_other_user_gets_404_on_rejected_report_with_bearer_token()
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->makeReport($owner, $category, 'rechazado');
+        $token = $other->createToken('test')->plainTextToken;
+
+        $this->withToken($token)->getJson("/api/reports/{$report->id}")->assertNotFound();
+    }
+
+    public function test_owner_can_read_and_comment_own_rejected_report_with_bearer_token()
+    {
+        $owner = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->makeReport($owner, $category, 'rechazado');
+        $token = $owner->createToken('test')->plainTextToken;
+
+        $this->withToken($token)->getJson("/api/reports/{$report->id}/comments")->assertOk();
+
+        $this->withToken($token)
+            ->postJson("/api/reports/{$report->id}/comments", ['body' => 'hola'])
+            ->assertCreated();
+    }
 }

@@ -266,6 +266,19 @@ describe('HomeScreen', () => {
     expect(navigation.reset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Login' }] });
   });
 
+  it('al cerrar sesión limpia las notificaciones guardadas', async () => {
+    await AsyncStorage.setItem('token', 't');
+    await AsyncStorage.setItem('notifications', JSON.stringify([{ id: 'n1', message: 'x', read: false }]));
+    api.post.mockResolvedValue({});
+    await setup();
+
+    await fireEvent.press(screen.getByText('Salir'));
+    const buttons = Alert.alert.mock.calls.at(-1)[2];
+    await buttons.find((b) => b.text === 'Salir').onPress();
+
+    expect(JSON.parse(await AsyncStorage.getItem('notifications'))).toEqual([]);
+  });
+
   it('con permiso de ubicación centra el mapa y muestra el botón de ubicación', async () => {
     Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'granted' });
     Location.getCurrentPositionAsync.mockResolvedValue({ coords: { latitude: -41.3, longitude: -72.9 } });

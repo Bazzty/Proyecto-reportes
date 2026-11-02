@@ -12,6 +12,13 @@ describe('leafletMapHtml', () => {
     expect(HTML).toContain('window.parent.postMessage');
   });
 
+  it('valida el origen de los mensajes del padre y fija el targetOrigin', () => {
+    expect(HTML).toContain('var PARENT_ORIGIN');
+    expect(HTML).toContain('e.source !== window.parent');
+    expect(HTML).toContain('e.origin !== PARENT_ORIGIN');
+    expect(HTML).toContain("PARENT_ORIGIN === '__PARENT_ORIGIN__' ? '*' : PARENT_ORIGIN");
+  });
+
   it('buildPayload mapea los reportes al formato del mapa', () => {
     const payload = buildPayload(
       [{

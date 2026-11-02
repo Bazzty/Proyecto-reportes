@@ -75,9 +75,10 @@ export default function AdminReportsScreen() {
     load(page + 1);
   };
 
-  const applyValidation = async (id, validationStatus, rejectionReason) => {
+  const applyValidation = async (id, validationStatus, expectedValidationStatus, rejectionReason) => {
     const { data } = await api.patch(`/admin/reports/${id}/validation`, {
       validation_status: validationStatus,
+      expected_validation_status: expectedValidationStatus,
       rejection_reason: rejectionReason,
     });
     setReports(prev => (filter
@@ -86,9 +87,9 @@ export default function AdminReportsScreen() {
     if (filter) setTotal(t => Math.max(0, t - 1));
   };
 
-  const handleValidate = async (id) => {
+  const handleValidate = async (id, expectedValidationStatus) => {
     try {
-      await applyValidation(id, 'valido');
+      await applyValidation(id, 'valido', expectedValidationStatus);
     } catch {
       Alert.alert('Error', 'No se pudo validar el reporte.');
     }
@@ -102,7 +103,7 @@ export default function AdminReportsScreen() {
     }
     setSaving(true);
     try {
-      await applyValidation(rejecting, 'rechazado', trimmed);
+      await applyValidation(rejecting.id, 'rechazado', rejecting.validationStatus, trimmed);
       setRejecting(null);
       setReason('');
     } catch {
@@ -145,11 +146,11 @@ export default function AdminReportsScreen() {
           ) : null}
 
           <View style={styles.actions}>
-            <TouchableOpacity style={[styles.action, styles.validateBtn]} onPress={() => handleValidate(item.id)}>
+            <TouchableOpacity style={[styles.action, styles.validateBtn]} onPress={() => handleValidate(item.id, item.validation_status)}>
               <Ionicons name="checkmark-circle-outline" size={18} color="#166534" />
               <Text style={styles.validateText}>Validar</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.action, styles.rejectBtn]} onPress={() => { setRejecting(item.id); setReason(''); }}>
+            <TouchableOpacity style={[styles.action, styles.rejectBtn]} onPress={() => { setRejecting({ id: item.id, validationStatus: item.validation_status }); setReason(''); }}>
               <Ionicons name="close-circle-outline" size={18} color="#991b1b" />
               <Text style={styles.rejectText}>Rechazar</Text>
             </TouchableOpacity>

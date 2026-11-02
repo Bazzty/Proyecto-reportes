@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('reports', function (Blueprint $table) {
-            $table->foreignId('status_updated_by')->nullable();
+            $table->foreignId('status_updated_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('status_updated_at')->nullable();
         });
     }

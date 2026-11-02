@@ -91,8 +91,10 @@ class AdminReportTest extends TestCase
         $admin = $this->makeAdmin();
         Sanctum::actingAs($admin, ['*']);
 
-        $this->patchJson("/api/admin/reports/{$report->id}/validation", ['validation_status' => 'valido'])
-            ->assertOk()
+        $this->patchJson("/api/admin/reports/{$report->id}/validation", [
+            'validation_status' => 'valido',
+            'expected_validation_status' => 'pendiente',
+        ])->assertOk()
             ->assertJsonPath('validation_status', 'valido');
 
         $this->assertDatabaseHas('reports', [
@@ -109,8 +111,10 @@ class AdminReportTest extends TestCase
         $report = $this->makeReport(User::factory()->create(), $category);
         Sanctum::actingAs($this->makeAdmin(), ['*']);
 
-        $this->patchJson("/api/admin/reports/{$report->id}/validation", ['validation_status' => 'rechazado'])
-            ->assertUnprocessable()
+        $this->patchJson("/api/admin/reports/{$report->id}/validation", [
+            'validation_status' => 'rechazado',
+            'expected_validation_status' => 'pendiente',
+        ])->assertUnprocessable()
             ->assertJsonValidationErrors('rejection_reason');
     }
 
@@ -123,6 +127,7 @@ class AdminReportTest extends TestCase
         $this->patchJson("/api/admin/reports/{$report->id}/validation", [
             'validation_status' => 'rechazado',
             'rejection_reason' => 'No corresponde a contaminación.',
+            'expected_validation_status' => 'pendiente',
         ])->assertOk();
 
         $this->assertDatabaseHas('reports', [
@@ -138,8 +143,10 @@ class AdminReportTest extends TestCase
         $report = $this->makeReport(User::factory()->create(), $category);
         Sanctum::actingAs($this->makeAdmin(), ['*']);
 
-        $this->patchJson("/api/admin/reports/{$report->id}/validation", ['validation_status' => 'quizas'])
-            ->assertUnprocessable()
+        $this->patchJson("/api/admin/reports/{$report->id}/validation", [
+            'validation_status' => 'quizas',
+            'expected_validation_status' => 'pendiente',
+        ])->assertUnprocessable()
             ->assertJsonValidationErrors('validation_status');
     }
 
@@ -148,6 +155,53 @@ class AdminReportTest extends TestCase
         $category = Category::create(['name' => 'basura']);
         $report = $this->makeReport(User::factory()->create(), $category, 'valido');
         Sanctum::actingAs($this->makeAdmin(), ['*']);
+
+        $this->patchJson("/api/admin/reports/{$report->id}/validation", [
+            'validation_status' => 'rechazado',
+            'rejection_reason' => 'Motivo',
+            'expected_validation_status' => 'pendiente',
+        ])->assertStatus(409);
+
+        $this->assertDatabaseHas('reports', [
+            'id' => $report->id,
+            'validation_status' => 'valido',
+        ]);
+    }
+
+    public function test_update_validation_requires_expected_status()
+    {
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->makeReport(User::factory()->create(), $category);
+        Sanctum::actingAs($this->makeAdmin(), ['*']);
+
+        $this->patchJson("/api/admin/reports/{$report->id}/validation", ['validation_status' => 'valido'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('expected_validation_status');
+    }
+
+    public function test_update_validation_is_idempotent_for_same_status()
+    {
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->makeReport(User::factory()->create(), $category, 'valido');
+        Sanctum::actingAs($this->makeAdmin(), ['*']);
+
+        $this->patchJson("/api/admin/reports/{$report->id}/validation", [
+            'validation_status' => 'valido',
+            'expected_validation_status' => 'valido',
+        ])->assertOk()
+            ->assertJsonPath('validation_status', 'valido');
+    }
+
+    public function test_second_admin_with_stale_status_gets_409()
+    {
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->makeReport(User::factory()->create(), $category);
+        Sanctum::actingAs($this->makeAdmin(), ['*']);
+
+        $this->patchJson("/api/admin/reports/{$report->id}/validation", [
+            'validation_status' => 'valido',
+            'expected_validation_status' => 'pendiente',
+        ])->assertOk();
 
         $this->patchJson("/api/admin/reports/{$report->id}/validation", [
             'validation_status' => 'rechazado',

@@ -13,6 +13,7 @@ const REPORT = {
   id: 5,
   description: 'Basura acumulada',
   status: 'Pendiente',
+  validation_status: 'pendiente',
   photo_url: null,
   created_at: '2026-10-01T12:00:00.000Z',
   latitude: -33.4372,
@@ -322,7 +323,10 @@ describe('DetalleReporteScreen', () => {
     await fireEvent.press(screen.getByText('Validar'));
 
     await waitFor(() =>
-      expect(api.patch).toHaveBeenCalledWith('/admin/reports/5/validation', expect.objectContaining({ validation_status: 'valido' }))
+      expect(api.patch).toHaveBeenCalledWith(
+        '/admin/reports/5/validation',
+        expect.objectContaining({ validation_status: 'valido', expected_validation_status: 'pendiente' })
+      )
     );
   });
 

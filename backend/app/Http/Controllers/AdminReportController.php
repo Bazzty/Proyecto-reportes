@@ -45,29 +45,39 @@ class AdminReportController extends Controller
         $data = $request->validate([
             'validation_status' => ['required', Rule::in(['valido', 'rechazado'])],
             'rejection_reason' => ['nullable', 'string', 'max:500', 'required_if:validation_status,rechazado'],
-            'expected_validation_status' => ['nullable', Rule::in(['pendiente', 'valido', 'rechazado'])],
+            // Obligatorio: el cliente debe declarar el estado que vio (concurrencia optimista).
+            'expected_validation_status' => ['required', Rule::in(['pendiente', 'valido', 'rechazado'])],
         ]);
 
+        $uid = $request->user('sanctum')->id;
         $report = Report::findOrFail($id);
 
-        // Concurrencia optimista: si otro admin cambió el estado entretanto, se rechaza.
-        if (array_key_exists('expected_validation_status', $data)
-            && $data['expected_validation_status'] !== null
-            && $report->validation_status !== $data['expected_validation_status']) {
-            abort(409, 'El estado del reporte cambió; recargá la lista antes de volver a intentarlo.');
+        // UPDATE atómico: solo aplica si el estado sigue siendo el esperado. Si dos admins
+        // validan a la vez, el segundo afecta 0 filas y recibe 409.
+        $affected = Report::whereKey($id)
+            ->where('validation_status', $data['expected_validation_status'])
+            ->update([
+                'validation_status' => $data['validation_status'],
+                'rejection_reason' => $data['validation_status'] === 'rechazado'
+                    ? ($data['rejection_reason'] ?? null)
+                    : null,
+                'validated_by' => $uid,
+                'validated_at' => now(),
+            ]);
+
+        if ($affected === 0) {
+            // MySQL cuenta filas modificadas: un re-envío idempotente del mismo estado
+            // (expected == nuevo) puede dar 0 sin que exista un conflicto real.
+            $isIdempotent = $data['expected_validation_status'] === $data['validation_status']
+                && Report::whereKey($id)->where('validation_status', $data['expected_validation_status'])->exists();
+
+            if (! $isIdempotent) {
+                abort(409, 'El estado del reporte cambió; recargá la lista antes de volver a intentarlo.');
+            }
         }
 
-        $report->validation_status = $data['validation_status'];
-        $report->rejection_reason = $data['validation_status'] === 'rechazado'
-            ? ($data['rejection_reason'] ?? null)
-            : null;
-        $report->validated_by = $request->user()->id;
-        $report->validated_at = now();
-        $report->save();
-
         // Respuesta liviana: se cargan solo las relaciones necesarias en vez de re-consultar todo.
-        $uid = $request->user()->id;
-        $report->load(['category', 'user', 'zone:id,name', 'validatedBy:id,name']);
+        $report->refresh()->load(['category', 'user', 'zone:id,name', 'validatedBy:id,name']);
         $report->loadCount('confirmations');
         $report->confirmed_by_me = $report->confirmations()->where('user_id', $uid)->exists();
 
