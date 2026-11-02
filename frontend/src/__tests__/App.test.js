@@ -36,7 +36,6 @@ jest.mock('../screens/WelcomeScreen', () => () => null);
 jest.mock('../screens/LoginScreen', () => () => null);
 jest.mock('../screens/RegisterScreen', () => () => null);
 jest.mock('../screens/HomeScreen', () => () => null);
-jest.mock('../screens/MapScreen', () => () => null);
 jest.mock('../screens/DetalleReporteScreen', () => () => null);
 jest.mock('../screens/NewReportScreen', () => () => null);
 jest.mock('../screens/MyReportsScreen', () => () => null);

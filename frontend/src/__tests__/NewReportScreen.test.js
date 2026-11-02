@@ -2,12 +2,17 @@ import { Alert } from 'react-native';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import * as Network from 'expo-network';
 import NewReportScreen from '../screens/NewReportScreen';
 import api from '../services/api';
+import { enqueue } from '../services/offlineQueue';
 
 jest.mock('../services/api', () => ({
   __esModule: true,
   default: { get: jest.fn(), post: jest.fn() },
+}));
+jest.mock('../services/offlineQueue', () => ({
+  enqueue: jest.fn(),
 }));
 jest.mock('expo-image-picker', () => ({
   requestCameraPermissionsAsync: jest.fn(),
@@ -21,14 +26,38 @@ jest.mock('expo-image-manipulator', () => ({
 }));
 jest.mock('expo-location', () => ({
   requestForegroundPermissionsAsync: jest.fn(),
+  hasServicesEnabledAsync: jest.fn(),
+  getLastKnownPositionAsync: jest.fn(),
   getCurrentPositionAsync: jest.fn(),
   Accuracy: { High: 4 },
 }));
 
+let mockLeafletProps = {};
+const mockCenterOn = jest.fn();
+jest.mock('../components/LeafletMap', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const LeafletMap = React.forwardRef(function LeafletMap(props, ref) {
+    mockLeafletProps = props;
+    React.useImperativeHandle(ref, () => ({ centerOn: mockCenterOn }));
+    return <View testID="leaflet-map" />;
+  });
+  return { __esModule: true, default: LeafletMap };
+});
+
 const CATEGORIES = [
-  { id: 1, name: 'basura' },
-  { id: 2, name: 'aguas' },
+  { id: 1, name: 'basura', description: 'Residuos sólidos', icon: 'trash-outline' },
+  { id: 2, name: 'aguas', description: 'Vertidos líquidos', icon: 'water-outline' },
 ];
+
+const COORDS_TEXT = 'Lat: -41.31980, Lng: -72.98330';
+
+const grantLocation = () => {
+  Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'granted', canAskAgain: true });
+  Location.hasServicesEnabledAsync.mockResolvedValue(true);
+  Location.getLastKnownPositionAsync.mockResolvedValue(null);
+  Location.getCurrentPositionAsync.mockResolvedValue({ coords: { latitude: -41.3198, longitude: -72.9833 } });
+};
 
 const setup = async () => {
   api.get.mockResolvedValue({ data: CATEGORIES });
@@ -45,23 +74,56 @@ const takePhoto = async () => {
   await waitFor(() => expect(screen.queryByText('Ninguna imagen seleccionada')).toBeNull());
 };
 
-const getLocation = async () => {
-  Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'granted' });
-  Location.getCurrentPositionAsync.mockResolvedValue({ coords: { latitude: -41.3198, longitude: -72.9833 } });
-  await fireEvent.press(screen.getByText('Obtener mi ubicación actual'));
-  await screen.findByText('Lat: -41.31980, Lng: -72.98330');
-};
-
 describe('NewReportScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    grantLocation();
+    Network.getNetworkStateAsync.mockResolvedValue({ isConnected: true, isInternetReachable: true });
+    mockLeafletProps = {};
   });
+
+  const fillForm = async () => {
+    await takePhoto();
+    await screen.findByText(COORDS_TEXT);
+    await fireEvent.changeText(screen.getByPlaceholderText('Ej. Basura acumulada en la esquina...'), 'Basura en la vereda');
+    await fireEvent.press(screen.getByText('aguas'));
+  };
 
   it('carga y muestra las categorías', async () => {
     await setup();
     expect(api.get).toHaveBeenCalledWith('/categories');
     expect(screen.getByText('aguas')).toBeTruthy();
+  });
+
+  it('captura la ubicación automáticamente al montar', async () => {
+    await setup();
+    expect(await screen.findByText(COORDS_TEXT)).toBeTruthy();
+    expect(Location.getCurrentPositionAsync).toHaveBeenCalled();
+  });
+
+  it('muestra el ícono de cada categoría', async () => {
+    await setup();
+    expect(screen.getByText('icon:trash-outline')).toBeTruthy();
+    expect(screen.getByText('icon:water-outline')).toBeTruthy();
+  });
+
+  it('al seleccionar una categoría muestra su descripción', async () => {
+    await setup();
+    expect(screen.queryByText('Residuos sólidos')).toBeNull();
+
+    await fireEvent.press(screen.getByText('basura'));
+    expect(screen.getByText('Residuos sólidos')).toBeTruthy();
+  });
+
+  it('sin descripción no muestra la guía y usa un ícono por defecto', async () => {
+    api.get.mockResolvedValue({ data: [{ id: 3, name: 'otro', description: null, icon: null }] });
+    await render(<NewReportScreen navigation={{ navigate: jest.fn() }} />);
+    await screen.findByText('otro');
+
+    await fireEvent.press(screen.getByText('otro'));
+    expect(screen.getByText('icon:pricetag-outline')).toBeTruthy();
+    expect(screen.queryByText('Residuos sólidos')).toBeNull();
   });
 
   it('si falla la carga de categorías muestra el error', async () => {
@@ -73,7 +135,7 @@ describe('NewReportScreen', () => {
     );
   });
 
-  it('valida en orden: foto, ubicación, descripción y categoría', async () => {
+  it('valida en orden: foto, descripción y categoría', async () => {
     await setup();
     const submit = () => fireEvent.press(screen.getByText('Enviar Reporte'));
 
@@ -82,10 +144,6 @@ describe('NewReportScreen', () => {
 
     await takePhoto();
     await submit();
-    expect(Alert.alert).toHaveBeenLastCalledWith('Falta ubicación', 'Obtén tu ubicación GPS.');
-
-    await getLocation();
-    await submit();
     expect(Alert.alert).toHaveBeenLastCalledWith('Falta descripción', 'Escribe una descripción.');
 
     await fireEvent.changeText(screen.getByPlaceholderText('Ej. Basura acumulada en la esquina...'), 'Basura');
@@ -93,6 +151,38 @@ describe('NewReportScreen', () => {
     expect(Alert.alert).toHaveBeenLastCalledWith('Falta categoría', 'Selecciona una categoría.');
 
     expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('bloquea el envío si no hay ubicación', async () => {
+    Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'denied', canAskAgain: true });
+    await setup();
+    await takePhoto();
+    await fireEvent.press(screen.getByText('Enviar Reporte'));
+
+    expect(Alert.alert).toHaveBeenLastCalledWith('Falta ubicación', 'Espera a que se detecte tu ubicación o elige un punto en el mapa.');
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('si el permiso de ubicación se deniega muestra el mensaje y permite reintentar', async () => {
+    Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'denied', canAskAgain: true });
+    await setup();
+
+    expect(await screen.findByText('Permiso de ubicación denegado. Actívalo para continuar.')).toBeTruthy();
+    expect(screen.getByText('Reintentar GPS')).toBeTruthy();
+  });
+
+  it('si el permiso está denegado permanentemente ofrece abrir Ajustes', async () => {
+    Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'denied', canAskAgain: false });
+    await setup();
+
+    expect(await screen.findByText('Abrir Ajustes')).toBeTruthy();
+  });
+
+  it('si el GPS está apagado muestra el mensaje correspondiente', async () => {
+    Location.hasServicesEnabledAsync.mockResolvedValue(false);
+    await setup();
+
+    expect(await screen.findByText('Activa el GPS de tu dispositivo para continuar.')).toBeTruthy();
   });
 
   it('permiso de cámara denegado muestra la alerta y no abre la cámara', async () => {
@@ -106,22 +196,11 @@ describe('NewReportScreen', () => {
     expect(ImagePicker.launchCameraAsync).not.toHaveBeenCalled();
   });
 
-  it('permiso de ubicación denegado muestra la alerta', async () => {
-    await setup();
-    Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'denied' });
-    await fireEvent.press(screen.getByText('Obtener mi ubicación actual'));
-
-    await waitFor(() =>
-      expect(Alert.alert).toHaveBeenCalledWith('Permiso denegado', 'Se necesita acceso a la ubicación.')
-    );
-    expect(Location.getCurrentPositionAsync).not.toHaveBeenCalled();
-  });
-
   it('con todo completo envía el reporte como multipart y navega a Home', async () => {
     api.post.mockResolvedValue({ data: { id: 10 } });
     const navigation = await setup();
     await takePhoto();
-    await getLocation();
+    await screen.findByText(COORDS_TEXT);
     await fireEvent.changeText(screen.getByPlaceholderText('Ej. Basura acumulada en la esquina...'), 'Basura en la vereda');
     await fireEvent.press(screen.getByText('aguas'));
     await fireEvent.press(screen.getByText('Enviar Reporte'));
@@ -148,11 +227,61 @@ describe('NewReportScreen', () => {
     api.post.mockRejectedValue({ response: { data: { errors: { photo: ['La foto es muy pesada.'] } } } });
     await setup();
     await takePhoto();
-    await getLocation();
+    await screen.findByText(COORDS_TEXT);
     await fireEvent.changeText(screen.getByPlaceholderText('Ej. Basura acumulada en la esquina...'), 'Algo');
     await fireEvent.press(screen.getByText('basura'));
     await fireEvent.press(screen.getByText('Enviar Reporte'));
 
     await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Error', 'La foto es muy pesada.'));
+  });
+
+  it('sin conexión guarda el reporte en la cola y navega a Home', async () => {
+    Network.getNetworkStateAsync.mockResolvedValue({ isConnected: false, isInternetReachable: false });
+    const navigation = await setup();
+    await fillForm();
+    await fireEvent.press(screen.getByText('Enviar Reporte'));
+
+    await waitFor(() => expect(enqueue).toHaveBeenCalledTimes(1));
+    expect(api.post).not.toHaveBeenCalled();
+    expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({
+      description: 'Basura en la vereda',
+      categoryId: 2,
+      photoUri: 'file:///resized.jpg',
+    }));
+
+    const [title, , buttons] = Alert.alert.mock.calls.at(-1);
+    expect(title).toBe('Guardado sin conexión');
+    buttons[0].onPress();
+    expect(navigation.navigate).toHaveBeenCalledWith('Home');
+  });
+
+  it('si el envío falla por red guarda el reporte en la cola', async () => {
+    api.post.mockRejectedValue(new Error('Network Error'));
+    await setup();
+    await fillForm();
+    await fireEvent.press(screen.getByText('Enviar Reporte'));
+
+    await waitFor(() => expect(enqueue).toHaveBeenCalledTimes(1));
+    expect(Alert.alert).toHaveBeenCalledWith('Guardado sin conexión', expect.any(String), expect.any(Array));
+  });
+
+  it('permite elegir la ubicación en el mapa y usa esas coordenadas', async () => {
+    api.post.mockResolvedValue({ data: { id: 20 } });
+    await setup();
+    await takePhoto();
+    await screen.findByText(COORDS_TEXT);
+
+    await fireEvent.press(screen.getByText('Elegir ubicación en el mapa'));
+    mockLeafletProps.onPick({ latitude: -41.5, longitude: -73.1 });
+    await fireEvent.press(screen.getByText('Confirmar'));
+
+    await fireEvent.changeText(screen.getByPlaceholderText('Ej. Basura acumulada en la esquina...'), 'Manual');
+    await fireEvent.press(screen.getByText('aguas'));
+    await fireEvent.press(screen.getByText('Enviar Reporte'));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1));
+    const [, form] = api.post.mock.calls[0];
+    expect(form.get('latitude')).toBe('-41.5');
+    expect(form.get('longitude')).toBe('-73.1');
   });
 });

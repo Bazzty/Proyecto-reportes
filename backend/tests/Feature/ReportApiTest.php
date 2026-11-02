@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\Report;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -211,6 +213,27 @@ class ReportApiTest extends TestCase
         $this->assertArrayNotHasKey('status', $first);
     }
 
+    public function test_client_uuid_lookup_is_scoped_to_the_authenticated_user()
+    {
+        Storage::fake('public');
+        $uuid = (string) Str::uuid();
+        $category = Category::create(['name' => 'basura']);
+
+        $owner = User::factory()->create();
+        Sanctum::actingAs($owner, ['*']);
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['client_uuid' => $uuid]))
+            ->assertCreated();
+
+        // El client_uuid es único por usuario: otro usuario puede reutilizarlo y crea su propio reporte.
+        $other = User::factory()->create();
+        Sanctum::actingAs($other, ['*']);
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['client_uuid' => $uuid]))
+            ->assertCreated();
+
+        $this->assertSame(1, Report::where('user_id', $owner->id)->where('client_uuid', $uuid)->count());
+        $this->assertSame(1, Report::where('user_id', $other->id)->where('client_uuid', $uuid)->count());
+    }
+
     private function validReportPayload(Category $category, array $overrides = []): array
     {
         return array_merge([
@@ -220,6 +243,39 @@ class ReportApiTest extends TestCase
             'category_id' => $category->id,
             'photo' => UploadedFile::fake()->create('photo.jpg', 100, 'image/jpeg'),
         ], $overrides);
+    }
+
+    public function test_creating_report_is_idempotent_with_client_uuid()
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        Sanctum::actingAs($user, ['*']);
+
+        $payload = $this->validReportPayload($category, ['client_uuid' => (string) Str::uuid()]);
+
+        $first = $this->postJson('/api/reports', $payload);
+        $first->assertCreated();
+
+        $second = $this->postJson('/api/reports', $payload);
+        $second->assertOk()->assertJsonPath('id', $first->json('id'));
+
+        $this->assertDatabaseCount('reports', 1);
+        $this->assertDatabaseHas('reports', [
+            'id' => $first->json('id'),
+            'client_uuid' => $payload['client_uuid'],
+        ]);
+    }
+
+    public function test_creating_report_rejects_invalid_client_uuid()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $this->postJson('/api/reports', $this->validReportPayload($category, ['client_uuid' => 'no-es-uuid']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('client_uuid');
     }
 
     public function test_reports_are_listed_newest_first()
@@ -391,6 +447,115 @@ class ReportApiTest extends TestCase
     public function test_user_reports_requires_authentication()
     {
         $this->getJson('/api/user/reports')->assertUnauthorized();
+    }
+
+    private function makeAdmin(): User
+    {
+        $admin = User::factory()->create();
+        $admin->roles()->attach(Role::firstOrCreate(['name' => Role::ADMIN])->id);
+
+        return $admin;
+    }
+
+    private function sampleReport(Category $category, User $user): Report
+    {
+        return Report::create([
+            'user_id' => $user->id,
+            'category_id' => $category->id,
+            'description' => 'Reporte de prueba',
+            'latitude' => -33.45,
+            'longitude' => -70.65,
+            'photo_path' => 'photos/test.jpg',
+            'status' => 'Pendiente',
+            'validation_status' => 'valido',
+        ]);
+    }
+
+    public function test_admin_can_update_report_status()
+    {
+        $admin = $this->makeAdmin();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->sampleReport($category, $admin);
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson("/api/reports/{$report->id}/status", ['status' => 'Resuelto'])
+            ->assertOk()
+            ->assertJsonPath('status', 'Resuelto');
+
+        $this->assertDatabaseHas('reports', ['id' => $report->id, 'status' => 'Resuelto']);
+    }
+
+    public function test_non_admin_cannot_update_report_status()
+    {
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->sampleReport($category, $user);
+        Sanctum::actingAs($user, ['*']);
+
+        $this->patchJson("/api/reports/{$report->id}/status", ['status' => 'Resuelto'])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('reports', ['id' => $report->id, 'status' => 'Pendiente']);
+    }
+
+    public function test_update_status_rejects_invalid_value()
+    {
+        $admin = $this->makeAdmin();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->sampleReport($category, $admin);
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson("/api/reports/{$report->id}/status", ['status' => 'Invalido'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('status');
+    }
+
+    public function test_update_status_requires_authentication()
+    {
+        $this->patchJson('/api/reports/1/status', ['status' => 'Resuelto'])->assertUnauthorized();
+    }
+
+    public function test_update_status_returns_404_for_unknown_report()
+    {
+        $admin = $this->makeAdmin();
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson('/api/reports/9999/status', ['status' => 'Resuelto'])->assertNotFound();
+    }
+
+    public function test_update_status_requires_a_validated_report()
+    {
+        $admin = $this->makeAdmin();
+        $category = Category::create(['name' => 'basura']);
+        $report = Report::create([
+            'user_id' => $admin->id,
+            'category_id' => $category->id,
+            'description' => 'Pendiente de validación',
+            'latitude' => -33.45,
+            'longitude' => -70.65,
+            'photo_path' => 'photos/test.jpg',
+            'status' => 'Pendiente',
+            'validation_status' => 'pendiente',
+        ]);
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson("/api/reports/{$report->id}/status", ['status' => 'Resuelto'])
+            ->assertStatus(409);
+    }
+
+    public function test_update_status_records_which_admin_changed_it()
+    {
+        $admin = $this->makeAdmin();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->sampleReport($category, $admin);
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->patchJson("/api/reports/{$report->id}/status", ['status' => 'Resuelto'])->assertOk();
+
+        $this->assertDatabaseHas('reports', [
+            'id' => $report->id,
+            'status_updated_by' => $admin->id,
+        ]);
     }
 
     public function test_reports_of_other_users_are_readable_but_not_listed_as_mine()

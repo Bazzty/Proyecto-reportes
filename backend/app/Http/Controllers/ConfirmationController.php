@@ -11,8 +11,10 @@ class ConfirmationController extends Controller
 {
     public function toggle(Request $request, int $id)
     {
+        $user = $request->user('sanctum');
         $report = Report::findOrFail($id);
-        $userId = $request->user()->id;
+        abort_unless($report->isVisibleTo($user), 404);
+        $userId = $user->id;
 
         abort_if((int) $report->user_id === (int) $userId, 403, 'No puedes confirmar tu propio reporte.');
 

@@ -8,6 +8,7 @@ class Report extends Model
 {
     protected $fillable = [
         'user_id',
+        'client_uuid',
         'category_id',
         'zone_id',
         'description',
@@ -15,7 +16,33 @@ class Report extends Model
         'longitude',
         'photo_path',
         'status',
+        'validation_status',
+        'validated_by',
+        'validated_at',
+        'rejection_reason',
+        'status_updated_by',
+        'status_updated_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'validated_at' => 'datetime',
+            'status_updated_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * Un reporte rechazado solo es visible para su dueño o un administrador.
+     */
+    public function isVisibleTo(?User $user): bool
+    {
+        if ($this->validation_status !== 'rechazado') {
+            return true;
+        }
+
+        return $user !== null && ($user->isAdmin() || $user->id === $this->user_id);
+    }
 
     public function user()
     {
@@ -30,6 +57,11 @@ class Report extends Model
     public function zone()
     {
         return $this->belongsTo(Zone::class);
+    }
+
+    public function validatedBy()
+    {
+        return $this->belongsTo(User::class, 'validated_by');
     }
 
     public function confirmations()
