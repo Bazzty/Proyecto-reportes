@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Modal, FlatList } from 'react-native';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Modal, FlatList, AppState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
@@ -49,6 +49,16 @@ export default function HomeScreen({ navigation, route }) {
   const isGuest = route.params?.guest === true;
 
   const leafletRef = useRef(null);
+  const inFlightRef = useRef(false);
+  const failuresRef = useRef(0);
+  const mountedRef = useRef(true);
+  const [isFocused, setIsFocused] = useState(false);
+  const [appState, setAppState] = useState(() => {
+    // Al montar, "unknown"/null se trata como activo: solo pausamos si sabemos
+    // que la app está en segundo plano/inactiva.
+    const current = AppState.currentState;
+    return current === 'background' || current === 'inactive' ? current : 'active';
+  });
   const [userLocation, setUserLocation]   = useState(null);
   const [userName, setUserName]           = useState('');
   const [isAdmin, setIsAdmin]             = useState(false);
@@ -66,6 +76,16 @@ export default function HomeScreen({ navigation, route }) {
 
   const { isConnected } = useOfflineSync();
   const { notifications, unreadCount } = useNotifications();
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', setAppState);
+    return () => subscription?.remove?.();
+  }, []);
 
   useEffect(() => {
     AsyncStorage.multiGet(['userName', 'isAdmin', 'heatMode', 'mapView']).then(([[, name], [, admin], [, mode], [, view]]) => {
@@ -136,45 +156,60 @@ export default function HomeScreen({ navigation, route }) {
     navigation.setParams({ focusReport: undefined });
   }, [route.params?.focusReport]);
 
+  const shouldPoll = isFocused && appState === 'active';
+
+  const fetchReports = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    try {
+      const requests = [api.get('/reports'), api.get('/reports/heatmap')];
+      if (!isGuest) requests.push(api.get('/user/reports'));
+
+      const [allRes, heatRes, myRes] = await Promise.all(requests);
+      if (!mountedRef.current) return;
+
+      setReports(prev => {
+        const next = allRes.data;
+        return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+      });
+      setZoneHeatPoints(prev => {
+        const next = groupHeatByZone(heatRes.data);
+        return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+      });
+      if (!isGuest && myRes) {
+        setMyReports(prev => {
+          const next = myRes.data;
+          return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+        });
+        syncStatusNotifications(myRes.data).catch(() => {});
+      }
+      failuresRef.current = 0;
+      setOffline(false);
+    } catch {
+      // Un fallo aislado se ignora; dos seguidos indican que los datos mostrados están desactualizados
+      if (!mountedRef.current) return;
+      failuresRef.current += 1;
+      if (failuresRef.current >= 2) setOffline(true);
+    } finally {
+      inFlightRef.current = false;
+    }
+  }, [isGuest]);
+
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-      let timer = null;
-      let failures = 0;
-      const fetchReports = async () => {
-        try {
-          const requests = [api.get('/reports'), api.get('/reports/heatmap')];
-          if (!isGuest) requests.push(api.get('/user/reports'));
-
-          const [allRes, heatRes, myRes] = await Promise.all(requests);
-          if (!active) return;
-
-          setReports(prev => {
-            const next = allRes.data;
-            return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
-          });
-          setZoneHeatPoints(groupHeatByZone(heatRes.data));
-          if (!isGuest && myRes) {
-            setMyReports(prev => {
-              const next = myRes.data;
-              return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
-            });
-            syncStatusNotifications(myRes.data).catch(() => {});
-          }
-          failures = 0;
-          setOffline(false);
-        } catch {
-          // Un fallo aislado se ignora; dos seguidos indican que los datos mostrados están desactualizados
-          failures += 1;
-          if (active && failures >= 2) setOffline(true);
-        }
-        if (active) timer = setTimeout(fetchReports, 5000);
-      };
-
-      fetchReports();
-      return () => { active = false; clearTimeout(timer); };
-    }, [isGuest])
+      setIsFocused(true);
+      return () => setIsFocused(false);
+    }, [])
   );
+
+  // Polling cada 5s mientras la pantalla está enfocada y la app en primer plano.
+  // El guard inFlightRef evita solapar peticiones si una anterior aún no termina.
+  useEffect(() => {
+    if (!shouldPoll) return undefined;
+    fetchReports();
+    const interval = setInterval(fetchReports, 5000);
+    return () => clearInterval(interval);
+  }, [shouldPoll, fetchReports]);
 
   const handleLogout = () => {
     if (isGuest) {
@@ -221,28 +256,41 @@ export default function HomeScreen({ navigation, route }) {
 
   // Sin filtros se muestran todos los reportes; con filtros, solo los de las
   // categorías seleccionadas.
-  const visibleReports = activeFilters.length > 0
-    ? reports.filter(r => activeFilters.includes(r.category?.id))
-    : reports;
+  const visibleReports = useMemo(
+    () => (activeFilters.length > 0
+      ? reports.filter(r => activeFilters.includes(r.category?.id))
+      : reports),
+    [reports, activeFilters]
+  );
 
-  const iconCodeFor = (categoryName) => {
-    const cat = categories.find(c => c.name === categoryName);
-    const code = Ionicons.glyphMap?.[cat?.icon || 'ellipsis-horizontal'];
-    return code ? code.toString(16) : null;
-  };
-  const mapReports = visibleReports.map(r => ({ ...r, iconCode: iconCodeFor(r.category?.name) }));
+  // Se memoizan para no reenviar datos idénticos al mapa en cada render/poll (evita parpadeos).
+  const mapReports = useMemo(
+    () => visibleReports.map((r) => {
+      const cat = categories.find(c => c.name === r.category?.name);
+      const code = Ionicons.glyphMap?.[cat?.icon || 'ellipsis-horizontal'];
+      return { ...r, iconCode: code ? code.toString(16) : null };
+    }),
+    [visibleReports, categories]
+  );
 
-  const focusHeatPoints = visibleReports.map(r => ({
-    latitude: r.latitude,
-    longitude: r.longitude,
-    weight: 1,
-    reportId: r.id,
-    description: r.description,
-    category: r.category?.name ?? null,
-    user: r.user?.name ?? null,
-    photo_url: r.photo_url ?? null,
-  }));
-  const heatPoints = heatMode === 'foco' ? focusHeatPoints : zoneHeatPoints;
+  const focusHeatPoints = useMemo(
+    () => visibleReports.map(r => ({
+      latitude: r.latitude,
+      longitude: r.longitude,
+      weight: 1,
+      reportId: r.id,
+      description: r.description,
+      category: r.category?.name ?? null,
+      user: r.user?.name ?? null,
+      photo_url: r.photo_url ?? null,
+    })),
+    [visibleReports]
+  );
+
+  const heatPoints = useMemo(
+    () => (heatMode === 'foco' ? focusHeatPoints : zoneHeatPoints),
+    [heatMode, focusHeatPoints, zoneHeatPoints]
+  );
   const showMarkers = mapView !== 'calor';
   const showHeat = mapView !== 'marcadores';
 

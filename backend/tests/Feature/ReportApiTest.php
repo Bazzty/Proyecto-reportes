@@ -609,4 +609,25 @@ class ReportApiTest extends TestCase
 
         $this->assertDatabaseHas('reports', ['id' => $report->id, 'status' => 'Pendiente']);
     }
+
+    public function test_polling_sees_reports_created_after_previous_fetch()
+    {
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+
+        $first = $this->sampleReport($category, $user);
+
+        $this->getJson('/api/reports')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.id', $first->id);
+
+        $second = $this->sampleReport($category, $user);
+
+        $this->getJson('/api/reports')
+            ->assertOk()
+            ->assertJsonCount(2)
+            ->assertJsonPath('0.id', $second->id)
+            ->assertJsonFragment(['id' => $first->id]);
+    }
 }
