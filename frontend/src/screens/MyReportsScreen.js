@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
 import { subscribe as subscribeQueue, getPending, isSyncing, removeItem } from '../services/offlineQueue';
+import useCategories from '../hooks/useCategories';
 
 const PAGE_SIZE = 4;
 
@@ -37,7 +38,7 @@ export default function MyReportsScreen({ navigation }) {
   const [allReports, setAllReports]   = useState([]);
   const [visible, setVisible]         = useState(PAGE_SIZE);
   const [pending, setPending]         = useState([]);
-  const [categories, setCategories]   = useState([]);
+  const categories = useCategories();
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
@@ -63,12 +64,6 @@ export default function MyReportsScreen({ navigation }) {
     loadReports();
     loadPending();
   }, [loadReports, loadPending]));
-
-  useEffect(() => {
-    api.get('/categories')
-      .then(res => setCategories(res.data))
-      .catch(() => setCategories([]));
-  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeQueue(() => {

@@ -9,6 +9,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
+import { REPORT_STATUSES } from '../constants/reports';
 
 // Gris del botón "Yo también lo vi" mientras espera la respuesta del servidor.
 const BUSY_COLOR = '#6b7280';
@@ -297,22 +298,27 @@ function DetalleReporte({ route, navigation }) {
         {isAdmin && (
           <View style={styles.adminBlock}>
             <Text style={styles.adminTitle}>Estado del reporte (admin)</Text>
-            <View style={styles.statusOptions}>
-              {['Pendiente', 'En Progreso', 'Resuelto'].map(status => {
-                const active = report.status === status;
-                return (
-                  <TouchableOpacity
-                    key={status}
-                    style={[styles.statusOption, active && { backgroundColor: statusColor(status), borderColor: statusColor(status) }]}
-                    onPress={() => handleStatusChange(status)}
-                  >
-                    <Text style={[styles.statusOptionText, active && styles.statusOptionTextActive]}>
-                      {status}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            {/* El backend responde 409 si el reporte no está validado. */}
+            {report.validation_status === 'valido' ? (
+              <View style={styles.statusOptions}>
+                {REPORT_STATUSES.map(status => {
+                  const active = report.status === status;
+                  return (
+                    <TouchableOpacity
+                      key={status}
+                      style={[styles.statusOption, active && { backgroundColor: statusColor(status), borderColor: statusColor(status) }]}
+                      onPress={() => handleStatusChange(status)}
+                    >
+                      <Text style={[styles.statusOptionText, active && styles.statusOptionTextActive]}>
+                        {status}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : (
+              <Text style={styles.statusHint}>Valida el reporte para poder cambiar su estado.</Text>
+            )}
           </View>
         )}
 
@@ -498,6 +504,7 @@ const styles = StyleSheet.create({
 
   adminBlock:          { marginBottom: 20 },
   adminTitle:          { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 8 },
+  statusHint:          { fontSize: 12, color: '#6b7280', fontStyle: 'italic' },
   statusOptions:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   statusOption:        {
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
