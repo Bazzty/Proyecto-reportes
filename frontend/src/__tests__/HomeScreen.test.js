@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { Alert, AppState } from 'react-native';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
@@ -113,7 +113,7 @@ describe('HomeScreen', () => {
     expect(zoned.longitude).toBeCloseTo(-73, 5);
     expect(unzoned).toMatchObject({ latitude: -33.45, longitude: -70.65, weight: 1, zoneName: 'Sin zona', count: 1 });
 
-    expect(api.get).toHaveBeenCalledWith('/reports/heatmap');
+    expect(api.get).toHaveBeenCalledWith('/reports/heatmap', expect.any(Object));
   });
 
   it('el modo "Foco" usa los reportes individuales como heatmap', async () => {
@@ -359,6 +359,177 @@ describe('HomeScreen', () => {
       await advance(30000);
 
       expect(api.get.mock.calls.filter(([u]) => u === '/reports').length).toBe(callsAfterHang);
+    });
+
+    it('vuelve a pedir /reports cada 5 segundos', async () => {
+      await setup();
+      await settle();
+      const count = () => api.get.mock.calls.filter(([u]) => u === '/reports').length;
+      const initial = count();
+
+      await advance(5000);
+      expect(count()).toBe(initial + 1);
+
+      await advance(5000);
+      expect(count()).toBe(initial + 2);
+    });
+
+    it('limpia el intervalo al desmontar y no vuelve a pedir', async () => {
+      const navigation = { navigate: jest.fn(), reset: jest.fn(), setParams: jest.fn() };
+      const view = await render(<HomeScreen navigation={navigation} route={{ params: {} }} />);
+      await waitFor(() => expect(mockLeafletProps.reports?.length).toBeGreaterThan(0));
+      await settle();
+
+      await advance(5000);
+      const count = () => api.get.mock.calls.filter(([u]) => u === '/reports').length;
+      const beforeUnmount = count();
+
+      await view.unmount();
+      await advance(10000);
+
+      expect(count()).toBe(beforeUnmount);
+    });
+
+    it('pausa el polling en segundo plano y lo reanuda al volver', async () => {
+      const listeners = [];
+      const addSpy = jest.spyOn(AppState, 'addEventListener').mockImplementation((event, cb) => {
+        if (event === 'change') listeners.push(cb);
+        return { remove: jest.fn() };
+      });
+
+      try {
+        await setup();
+        await settle();
+        const count = () => api.get.mock.calls.filter(([u]) => u === '/reports').length;
+        const beforeBackground = count();
+
+        await act(async () => { listeners.forEach((cb) => cb('background')); });
+        await advance(10000);
+        expect(count()).toBe(beforeBackground);
+
+        await act(async () => { listeners.forEach((cb) => cb('active')); });
+        await settle();
+        expect(count()).toBe(beforeBackground + 1);
+      } finally {
+        addSpy.mockRestore();
+      }
+    });
+
+    it('envía timeout y señal de cancelación en las peticiones del polling', async () => {
+      await setup();
+      await settle();
+
+      const call = api.get.mock.calls.find(([u]) => u === '/reports');
+      expect(call[1].timeout).toBeGreaterThan(0);
+      expect(call[1].signal).toBeDefined();
+    });
+
+    it('cancela las peticiones en vuelo y descarta su respuesta al pausar', async () => {
+      const listeners = [];
+      const addSpy = jest.spyOn(AppState, 'addEventListener').mockImplementation((event, cb) => {
+        if (event === 'change') listeners.push(cb);
+        return { remove: jest.fn() };
+      });
+
+      try {
+        await setup();
+        await settle();
+        const ok = api.get.getMockImplementation();
+        let resolveLate;
+        api.get.mockImplementation((url) => (url === '/reports'
+          ? new Promise((resolve) => { resolveLate = resolve; })
+          : ok(url)));
+        await advance(5000);
+        const signal = api.get.mock.calls.filter(([u]) => u === '/reports').pop()[1].signal;
+
+        await act(async () => { listeners.forEach((cb) => cb('background')); });
+        expect(signal.aborted).toBe(true);
+
+        const before = mockLeafletProps.reports.map(r => r.id);
+        await act(async () => { resolveLate({ data: [] }); });
+        expect(mockLeafletProps.reports.map(r => r.id)).toEqual(before);
+      } finally {
+        addSpy.mockRestore();
+      }
+    });
+
+    it('tras reanudar, una petición colgada previa no bloquea el refresco', async () => {
+      const listeners = [];
+      const addSpy = jest.spyOn(AppState, 'addEventListener').mockImplementation((event, cb) => {
+        if (event === 'change') listeners.push(cb);
+        return { remove: jest.fn() };
+      });
+
+      try {
+        await setup();
+        await settle();
+        const ok = api.get.getMockImplementation();
+        api.get.mockImplementation((url) => (url === '/reports' ? new Promise(() => {}) : ok(url)));
+        await advance(5000);
+        const count = () => api.get.mock.calls.filter(([u]) => u === '/reports').length;
+
+        await act(async () => { listeners.forEach((cb) => cb('background')); });
+        await act(async () => { listeners.forEach((cb) => cb('active')); });
+        const before = count();
+        await settle();
+
+        expect(count()).toBe(before);
+        api.get.mockImplementation(ok);
+        await act(async () => { listeners.forEach((cb) => cb('background')); });
+        await act(async () => { listeners.forEach((cb) => cb('active')); });
+        await settle();
+        expect(count()).toBe(before + 1);
+      } finally {
+        addSpy.mockRestore();
+      }
+    });
+
+    it('un fallo antes de pausar no se suma a uno posterior a la reanudación', async () => {
+      const listeners = [];
+      const addSpy = jest.spyOn(AppState, 'addEventListener').mockImplementation((event, cb) => {
+        if (event === 'change') listeners.push(cb);
+        return { remove: jest.fn() };
+      });
+
+      try {
+        await setup();
+        await settle();
+        const ok = api.get.getMockImplementation();
+        failReports();
+        await advance(5000);
+
+        await act(async () => { listeners.forEach((cb) => cb('background')); });
+        await act(async () => { listeners.forEach((cb) => cb('active')); });
+        await settle();
+
+        expect(screen.queryByText(/Sin conexión/)).toBeNull();
+        api.get.mockImplementation(ok);
+      } finally {
+        addSpy.mockRestore();
+      }
+    });
+
+    it('mantiene el filtro de categoría tras el refresco', async () => {
+      await setup();
+      await settle();
+
+      await fireEvent.press(screen.getByText('Basura'));
+      await settle();
+      expect(mockLeafletProps.reports.map(r => r.id)).toEqual([1]);
+
+      await advance(5000);
+      expect(mockLeafletProps.reports.map(r => r.id)).toEqual([1]);
+    });
+
+    it('no recentra el mapa en cada refresco', async () => {
+      await setup();
+      await settle();
+      mockCenterOn.mockClear();
+
+      await advance(5000);
+      await advance(5000);
+
+      expect(mockCenterOn).not.toHaveBeenCalled();
     });
   });
 

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Modal, FlatList } from 'react-native';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Modal, FlatList, AppState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
@@ -10,6 +10,9 @@ import useOfflineSync from '../hooks/useOfflineSync';
 import useNotifications from '../hooks/useNotifications';
 import { subscribe as subscribeQueue, getPendingCount, isSyncing, clearQueue } from '../services/offlineQueue';
 import { syncStatusNotifications, markAllRead, clearNotifications } from '../services/notifications';
+
+// Tiempo máximo por petición del polling: una petición colgada no debe bloquear los refrescos.
+const POLL_TIMEOUT_MS = 10000;
 
 // El endpoint /reports/heatmap devuelve un punto por reporte (con su zona).
 // Para el heat "por zona" agrupamos los reportes con zona en su centroide; los
@@ -49,6 +52,13 @@ export default function HomeScreen({ navigation, route }) {
   const isGuest = route.params?.guest === true;
 
   const leafletRef = useRef(null);
+  const [isFocused, setIsFocused] = useState(false);
+  const [appState, setAppState] = useState(() => {
+    // Al montar, "unknown"/null se trata como activo: solo pausamos si sabemos
+    // que la app está en segundo plano/inactiva.
+    const current = AppState.currentState;
+    return current === 'background' || current === 'inactive' ? current : 'active';
+  });
   const [userLocation, setUserLocation]   = useState(null);
   const [userName, setUserName]           = useState('');
   const [isAdmin, setIsAdmin]             = useState(false);
@@ -66,6 +76,11 @@ export default function HomeScreen({ navigation, route }) {
 
   const { isConnected } = useOfflineSync();
   const { notifications, unreadCount } = useNotifications();
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', setAppState);
+    return () => subscription?.remove?.();
+  }, []);
 
   useEffect(() => {
     AsyncStorage.multiGet(['userName', 'isAdmin', 'heatMode', 'mapView']).then(([[, name], [, admin], [, mode], [, view]]) => {
@@ -136,45 +151,71 @@ export default function HomeScreen({ navigation, route }) {
     navigation.setParams({ focusReport: undefined });
   }, [route.params?.focusReport]);
 
+  const shouldPoll = isFocused && appState === 'active';
+
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-      let timer = null;
-      let failures = 0;
-      const fetchReports = async () => {
-        try {
-          const requests = [api.get('/reports'), api.get('/reports/heatmap')];
-          if (!isGuest) requests.push(api.get('/user/reports'));
+      setIsFocused(true);
+      return () => setIsFocused(false);
+    }, [])
+  );
 
-          const [allRes, heatRes, myRes] = await Promise.all(requests);
-          if (!active) return;
+  // Polling cada 5s mientras la pantalla está enfocada y la app en primer plano.
+  // Cada ejecución del efecto tiene su propio AbortController y guard de "en vuelo":
+  // al pausar/desmontar/cambiar isGuest se cancelan las peticiones y se descartan sus
+  // respuestas; el timeout evita que una petición colgada bloquee el polling.
+  useEffect(() => {
+    if (!shouldPoll) return undefined;
+    const controller = new AbortController();
+    const { signal } = controller;
+    const opts = { signal, timeout: POLL_TIMEOUT_MS };
+    let inFlight = false;
+    let failures = 0;
 
-          setReports(prev => {
-            const next = allRes.data;
+    const fetchReports = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const requests = [api.get('/reports', opts), api.get('/reports/heatmap', opts)];
+        if (!isGuest) requests.push(api.get('/user/reports', opts));
+
+        const [allRes, heatRes, myRes] = await Promise.all(requests);
+        if (signal.aborted) return;
+
+        setReports(prev => {
+          const next = allRes.data;
+          return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+        });
+        setZoneHeatPoints(prev => {
+          const next = groupHeatByZone(heatRes.data);
+          return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+        });
+        if (!isGuest && myRes) {
+          setMyReports(prev => {
+            const next = myRes.data;
             return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
           });
-          setZoneHeatPoints(groupHeatByZone(heatRes.data));
-          if (!isGuest && myRes) {
-            setMyReports(prev => {
-              const next = myRes.data;
-              return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
-            });
-            syncStatusNotifications(myRes.data).catch(() => {});
-          }
-          failures = 0;
-          setOffline(false);
-        } catch {
-          // Un fallo aislado se ignora; dos seguidos indican que los datos mostrados están desactualizados
-          failures += 1;
-          if (active && failures >= 2) setOffline(true);
+          syncStatusNotifications(myRes.data).catch(() => {});
         }
-        if (active) timer = setTimeout(fetchReports, 5000);
-      };
+        failures = 0;
+        setOffline(false);
+      } catch {
+        // Un fallo aislado se ignora; dos seguidos indican que los datos mostrados están desactualizados
+        if (signal.aborted) return;
+        failures += 1;
+        if (failures >= 2) setOffline(true);
+      } finally {
+        inFlight = false;
+      }
+    };
 
-      fetchReports();
-      return () => { active = false; clearTimeout(timer); };
-    }, [isGuest])
-  );
+    fetchReports();
+    const interval = setInterval(fetchReports, 5000);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
+  }, [shouldPoll, isGuest]);
 
   const handleLogout = () => {
     if (isGuest) {
@@ -221,28 +262,41 @@ export default function HomeScreen({ navigation, route }) {
 
   // Sin filtros se muestran todos los reportes; con filtros, solo los de las
   // categorías seleccionadas.
-  const visibleReports = activeFilters.length > 0
-    ? reports.filter(r => activeFilters.includes(r.category?.id))
-    : reports;
+  const visibleReports = useMemo(
+    () => (activeFilters.length > 0
+      ? reports.filter(r => activeFilters.includes(r.category?.id))
+      : reports),
+    [reports, activeFilters]
+  );
 
-  const iconCodeFor = (categoryName) => {
-    const cat = categories.find(c => c.name === categoryName);
-    const code = Ionicons.glyphMap?.[cat?.icon || 'ellipsis-horizontal'];
-    return code ? code.toString(16) : null;
-  };
-  const mapReports = visibleReports.map(r => ({ ...r, iconCode: iconCodeFor(r.category?.name) }));
+  // Se memoizan para no reenviar datos idénticos al mapa en cada render/poll (evita parpadeos).
+  const mapReports = useMemo(
+    () => visibleReports.map((r) => {
+      const cat = categories.find(c => c.name === r.category?.name);
+      const code = Ionicons.glyphMap?.[cat?.icon || 'ellipsis-horizontal'];
+      return { ...r, iconCode: code ? code.toString(16) : null };
+    }),
+    [visibleReports, categories]
+  );
 
-  const focusHeatPoints = visibleReports.map(r => ({
-    latitude: r.latitude,
-    longitude: r.longitude,
-    weight: 1,
-    reportId: r.id,
-    description: r.description,
-    category: r.category?.name ?? null,
-    user: r.user?.name ?? null,
-    photo_url: r.photo_url ?? null,
-  }));
-  const heatPoints = heatMode === 'foco' ? focusHeatPoints : zoneHeatPoints;
+  const focusHeatPoints = useMemo(
+    () => visibleReports.map(r => ({
+      latitude: r.latitude,
+      longitude: r.longitude,
+      weight: 1,
+      reportId: r.id,
+      description: r.description,
+      category: r.category?.name ?? null,
+      user: r.user?.name ?? null,
+      photo_url: r.photo_url ?? null,
+    })),
+    [visibleReports]
+  );
+
+  const heatPoints = useMemo(
+    () => (heatMode === 'foco' ? focusHeatPoints : zoneHeatPoints),
+    [heatMode, focusHeatPoints, zoneHeatPoints]
+  );
   const showMarkers = mapView !== 'calor';
   const showHeat = mapView !== 'marcadores';
 
