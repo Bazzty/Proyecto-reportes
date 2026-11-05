@@ -22,9 +22,9 @@ export default function App() {
   const navigationRef = useRef(null);
 
   useEffect(() => {
-    // Force navigation to Login when token is expired/invalid (401 response)
+    // Token vencido o inválido (401): vuelve al mapa como invitado
     setUnauthorizedHandler(() => {
-      navigationRef.current?.reset({ index: 0, routes: [{ name: 'Login' }] });
+      navigationRef.current?.reset({ index: 0, routes: [{ name: 'Home', params: { guest: true } }] });
     });
 
     const restoreStartup = async () => {
@@ -62,7 +62,7 @@ export default function App() {
         console.warn('Error restaurando el inicio:', error);
       } finally {
         setStartup({
-          initialRoute: token ? 'Home' : 'Login',
+          hasSession: !!token,
           pendingPhoto: token ? pendingPhoto : null,
         });
       }
@@ -75,19 +75,25 @@ export default function App() {
     return <WelcomeScreen />;
   }
 
-  const initialState = startup.pendingPhoto
-    ? {
-        index: 1,
-        routes: [
-          { name: 'Home' },
-          { name: 'NewReport', params: { pendingPhoto: startup.pendingPhoto } },
-        ],
-      }
-    : undefined;
+  // Sin sesión se abre el mapa como invitado; desde ahí se puede iniciar sesión.
+  // Se usa initialState y no initialParams: estos últimos también se aplicarían a la
+  // ruta Home creada tras el login y dejarían al usuario autenticado como invitado.
+  let initialState;
+  if (startup.pendingPhoto) {
+    initialState = {
+      index: 1,
+      routes: [
+        { name: 'Home' },
+        { name: 'NewReport', params: { pendingPhoto: startup.pendingPhoto } },
+      ],
+    };
+  } else if (!startup.hasSession) {
+    initialState = { index: 0, routes: [{ name: 'Home', params: { guest: true } }] };
+  }
 
   return (
     <NavigationContainer ref={navigationRef} initialState={initialState}>
-      <Stack.Navigator initialRouteName={startup.initialRoute}>
+      <Stack.Navigator initialRouteName="Home">
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />

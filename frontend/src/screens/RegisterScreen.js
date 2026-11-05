@@ -72,7 +72,10 @@ export default function RegisterScreen({ navigation }) {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <TouchableWithoutFeedback
+      // En web, Keyboard.dismiss le quita el foco al campo recién tocado y no se puede escribir.
+      onPress={Platform.OS === 'web' ? undefined : Keyboard.dismiss}
+    >
     <KeyboardAvoidingView
       style={styles.wrapper}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}

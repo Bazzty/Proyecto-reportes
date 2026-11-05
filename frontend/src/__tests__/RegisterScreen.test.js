@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { Alert, Keyboard, Platform } from 'react-native';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -106,5 +106,28 @@ describe('RegisterScreen', () => {
     await fireEvent.press(screen.getByText('Registrarse'));
 
     await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Error', 'No se pudo registrar.'));
+  });
+
+  describe('cierre del teclado al tocar fuera', () => {
+    const originalOS = Platform.OS;
+    afterEach(() => {
+      Platform.OS = originalOS;
+      jest.restoreAllMocks();
+    });
+
+    it('en móvil cierra el teclado', async () => {
+      const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
+      await setup();
+      await fireEvent.press(screen.getByText('Únete a la comunidad'));
+      expect(dismiss).toHaveBeenCalled();
+    });
+
+    it('en web no le quita el foco a los campos', async () => {
+      Platform.OS = 'web';
+      const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
+      await setup();
+      await fireEvent.press(screen.getByText('Únete a la comunidad'));
+      expect(dismiss).not.toHaveBeenCalled();
+    });
   });
 });

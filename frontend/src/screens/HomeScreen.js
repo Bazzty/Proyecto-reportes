@@ -217,7 +217,7 @@ export default function HomeScreen({ navigation, route }) {
 
   const handleLogout = () => {
     if (isGuest) {
-      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      navigation.navigate('Login');
       return;
     }
     Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
@@ -233,7 +233,7 @@ export default function HomeScreen({ navigation, route }) {
           await clearNotifications();
           await AsyncStorage.multiRemove(['token', 'userName', 'userId', 'isAdmin', 'reportStatusSnapshot']);
           clearAuthToken();
-          navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+          navigation.reset({ index: 0, routes: [{ name: 'Home', params: { guest: true } }] });
         },
       },
     ]);
@@ -245,7 +245,7 @@ export default function HomeScreen({ navigation, route }) {
       `Para ${action} necesitas una cuenta.`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Iniciar sesión', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Login' }] }) },
+        { text: 'Iniciar sesión', onPress: () => navigation.navigate('Login') },
       ]
     );
   };
@@ -333,7 +333,7 @@ export default function HomeScreen({ navigation, route }) {
             {isGuest ? '¡Bienvenido!' : (userName ? `¡Bienvenido, ${userName.split(' ')[0]}!` : '¡Bienvenido!')}
           </Text>
           {isGuest ? (
-            <TouchableOpacity onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Login' }] })}>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
               <Text style={styles.greetingGuestLink}>Inicia sesión para reportar →</Text>
             </TouchableOpacity>
           ) : myReports.length > 0 ? (
