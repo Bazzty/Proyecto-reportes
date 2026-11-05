@@ -84,6 +84,49 @@ class AdminReportTest extends TestCase
             ->assertJsonPath('data.0.validation_status', 'rechazado');
     }
 
+    public function test_admin_can_filter_by_status()
+    {
+        $category = Category::create(['name' => 'basura']);
+        $user = User::factory()->create();
+        $this->makeReport($user, $category);
+        $resolved = $this->makeReport($user, $category);
+        $resolved->update(['status' => 'Resuelto']);
+        Sanctum::actingAs($this->makeAdmin(), ['*']);
+
+        $this->getJson('/api/admin/reports?status=Resuelto')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $resolved->id)
+            ->assertJsonPath('data.0.status', 'Resuelto');
+    }
+
+    public function test_admin_list_rejects_invalid_status()
+    {
+        Sanctum::actingAs($this->makeAdmin(), ['*']);
+
+        $this->getJson('/api/admin/reports?status=Inexistente')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('status');
+    }
+
+    public function test_admin_can_combine_status_and_category_filters()
+    {
+        $basura = Category::create(['name' => 'basura']);
+        $escombros = Category::create(['name' => 'escombros']);
+        $user = User::factory()->create();
+        $match = $this->makeReport($user, $basura);
+        $match->update(['status' => 'En Progreso']);
+        $this->makeReport($user, $basura);
+        $otherCategory = $this->makeReport($user, $escombros);
+        $otherCategory->update(['status' => 'En Progreso']);
+        Sanctum::actingAs($this->makeAdmin(), ['*']);
+
+        $this->getJson("/api/admin/reports?status=En%20Progreso&category_id={$basura->id}")
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.id', $match->id);
+    }
+
     public function test_admin_can_validate_a_report()
     {
         $category = Category::create(['name' => 'basura']);

@@ -364,6 +364,7 @@ describe('DetalleReporteScreen', () => {
   });
 
   it('un administrador ve los controles de estado y puede cambiarlo', async () => {
+    mockGet({ report: { ...REPORT, validation_status: 'valido' } });
     api.patch.mockResolvedValue({ data: { status: 'Resuelto' } });
     await setup({ admin: true });
     await screen.findByText('Basura acumulada');
@@ -375,6 +376,29 @@ describe('DetalleReporteScreen', () => {
     await waitFor(() =>
       expect(api.patch).toHaveBeenCalledWith('/reports/5/status', { status: 'Resuelto' })
     );
+  });
+
+  it.each(['pendiente', 'rechazado'])('con el reporte %s no muestra las opciones de estado sino el aviso', async (validation) => {
+    mockGet({ report: { ...REPORT, validation_status: validation } });
+    await setup({ admin: true });
+    await screen.findByText('Basura acumulada');
+
+    expect(screen.getByText('Estado del reporte (admin)')).toBeTruthy();
+    expect(screen.getByText('Valida el reporte para poder cambiar su estado.')).toBeTruthy();
+    expect(screen.queryByText('En Progreso')).toBeNull();
+    expect(screen.queryByText('Resuelto')).toBeNull();
+  });
+
+  it('tras validar el reporte aparecen las opciones de estado sin recargar', async () => {
+    api.patch.mockResolvedValue({ data: { validation_status: 'valido', rejection_reason: null } });
+    await setup({ admin: true });
+    await screen.findByText('Basura acumulada');
+    expect(screen.queryByText('En Progreso')).toBeNull();
+
+    await fireEvent.press(screen.getByText('Validar'));
+
+    expect(await screen.findByText('En Progreso')).toBeTruthy();
+    expect(screen.queryByText('Valida el reporte para poder cambiar su estado.')).toBeNull();
   });
 
   it('un usuario normal no ve los controles de estado', async () => {

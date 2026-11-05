@@ -302,7 +302,7 @@ Requiere token de un **usuario administrador** (investigadores de "Más Azul"). 
 ```
 GET /admin/reports
 ```
-Requiere token de **administrador**. Lista los reportes paginados (20 por página), incluyendo `validation_status`, `zone` y el validador. Filtros opcionales por query string: `validation_status` (`pendiente`|`valido`|`rechazado`), `zone_id`, `category_id`.
+Requiere token de **administrador**. Lista los reportes paginados (20 por página), incluyendo `validation_status`, `zone` y el validador. Filtros opcionales por query string: `validation_status` (`pendiente`|`valido`|`rechazado`), `zone_id`, `category_id`, `status` (`Pendiente`|`En Progreso`|`Resuelto`).
 
 **Response 200:**
 ```json

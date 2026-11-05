@@ -17,6 +17,7 @@ class AdminReportController extends Controller
             'validation_status' => ['nullable', Rule::in(['pendiente', 'valido', 'rechazado'])],
             'zone_id' => ['nullable', 'integer', 'exists:zones,id'],
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'status' => ['nullable', Rule::in(['Pendiente', 'En Progreso', 'Resuelto'])],
         ]);
 
         $uid = $request->user()->id;
@@ -26,6 +27,7 @@ class AdminReportController extends Controller
             ->when($filters['validation_status'] ?? null, fn ($q, $value) => $q->where('validation_status', $value))
             ->when($filters['zone_id'] ?? null, fn ($q, $value) => $q->where('zone_id', $value))
             ->when($filters['category_id'] ?? null, fn ($q, $value) => $q->where('category_id', $value))
+            ->when($filters['status'] ?? null, fn ($q, $value) => $q->where('status', $value))
             ->latest()->latest('id')
             ->paginate(20);
 

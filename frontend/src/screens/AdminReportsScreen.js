@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, Modal, TextInput, Alert,
@@ -25,17 +25,30 @@ const FILTERS = [
   { key: null, label: 'Todos' },
 ];
 
+const STATUS_FILTERS = [
+  { key: null, label: 'Todos' },
+  { key: 'Pendiente', label: 'Pendiente' },
+  { key: 'En Progreso', label: 'En Progreso' },
+  { key: 'Resuelto', label: 'Resuelto' },
+];
+
+const STATUS_OPTIONS = ['Pendiente', 'En Progreso', 'Resuelto'];
+
 const formatDate = (iso) => {
   if (!iso) return '';
   return new Date(iso).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-export default function AdminReportsScreen() {
+export default function AdminReportsScreen({ navigation }) {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(false);
   const [filter, setFilter] = useState('pendiente');
+  const [statusFilter, setStatusFilter] = useState(null);
+  const [categoryFilter, setCategoryFilter] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [changingId, setChangingId] = useState(null);
   const [page, setPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -45,18 +58,41 @@ export default function AdminReportsScreen() {
 
   const keyboardHeight = useKeyboardHeight();
 
+  // Contador de petición: con varios filtros se puede cambiar de filtro con una petición en
+  // vuelo; solo la última puede escribir en la lista.
+  const requestRef = useRef(0);
+  // Guarda síncrona contra doble envío del cambio de estado (el estado de React llega tarde).
+  const changingRef = useRef(false);
+
+  // Si las categorías fallan, la pantalla funciona igual, solo sin esos chips.
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/categories')
+      .then((res) => { if (!cancelled && Array.isArray(res.data)) setCategories(res.data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const load = useCallback((pageToLoad = 1) => {
+    const requestId = ++requestRef.current;
     if (pageToLoad === 1) {
       setLoading(true);
       setError(false);
+      setLoadingMore(false);
     } else {
       setLoadingMore(true);
     }
 
     api.get('/admin/reports', {
-      params: { ...(filter ? { validation_status: filter } : {}), page: pageToLoad },
+      params: {
+        ...(filter ? { validation_status: filter } : {}),
+        ...(statusFilter ? { status: statusFilter } : {}),
+        ...(categoryFilter ? { category_id: categoryFilter } : {}),
+        page: pageToLoad,
+      },
     })
       .then((res) => {
+        if (requestId !== requestRef.current) return;
         const rows = res.data.data ?? [];
         const meta = res.data.meta ?? {};
         setReports(prev => (pageToLoad === 1 ? rows : [...prev, ...rows]));
@@ -64,9 +100,13 @@ export default function AdminReportsScreen() {
         setLastPage(meta.last_page ?? 1);
         setTotal(meta.total ?? rows.length);
       })
-      .catch(() => { if (pageToLoad === 1) setError(true); })
-      .finally(() => { setLoading(false); setLoadingMore(false); });
-  }, [filter]);
+      .catch(() => { if (requestId === requestRef.current && pageToLoad === 1) setError(true); })
+      .finally(() => {
+        if (requestId !== requestRef.current) return;
+        setLoading(false);
+        setLoadingMore(false);
+      });
+  }, [filter, statusFilter, categoryFilter]);
 
   useFocusEffect(useCallback(() => { load(1); }, [load]));
 
@@ -85,6 +125,27 @@ export default function AdminReportsScreen() {
       ? prev.filter(r => r.id !== id)
       : prev.map(r => (r.id === id ? data : r))));
     if (filter) setTotal(t => Math.max(0, t - 1));
+  };
+
+  const handleStatusChange = async (item, status) => {
+    if (status === item.status || changingRef.current) return;
+    changingRef.current = true;
+    setChangingId(item.id);
+    try {
+      const { data } = await api.patch(`/reports/${item.id}/status`, { status });
+      // La respuesta no trae validated_by: se combina para no perderlo.
+      const updated = { ...item, ...data };
+      const stillMatches = !statusFilter || updated.status === statusFilter;
+      setReports(prev => (stillMatches
+        ? prev.map(r => (r.id === item.id ? { ...r, ...data } : r))
+        : prev.filter(r => r.id !== item.id)));
+      if (!stillMatches) setTotal(t => Math.max(0, t - 1));
+    } catch {
+      Alert.alert('Error', 'No se pudo actualizar el estado.');
+    } finally {
+      changingRef.current = false;
+      setChangingId(null);
+    }
   };
 
   const handleValidate = async (id, expectedValidationStatus) => {
@@ -116,7 +177,11 @@ export default function AdminReportsScreen() {
   const renderItem = ({ item }) => {
     const vs = validationStyle(item.validation_status);
     return (
-      <View style={styles.card}>
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.9}
+        onPress={() => navigation.navigate('DetalleReporte', { reportId: item.id })}
+      >
         {item.photo_url ? (
           <Image source={item.photo_url} style={styles.photo} contentFit="cover" cachePolicy="disk" transition={150} />
         ) : (
@@ -145,6 +210,26 @@ export default function AdminReportsScreen() {
             <Text style={styles.reason}>Motivo: {item.rejection_reason}</Text>
           ) : null}
 
+          {item.validation_status === 'valido' ? (
+            <View style={styles.statusBlock}>
+              <Text style={styles.statusLabel}>Estado del reporte</Text>
+              <View style={styles.statusOptions}>
+                {STATUS_OPTIONS.map(status => {
+                  const active = item.status === status;
+                  return (
+                    <TouchableOpacity
+                      key={status}
+                      style={[styles.statusOption, active && styles.statusOptionActive, changingId === item.id && styles.statusOptionBusy]}
+                      onPress={() => handleStatusChange(item, status)}
+                    >
+                      <Text style={[styles.statusOptionText, active && styles.statusOptionTextActive]}>{status}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          ) : null}
+
           <View style={styles.actions}>
             <TouchableOpacity style={[styles.action, styles.validateBtn]} onPress={() => handleValidate(item.id, item.validation_status)}>
               <Ionicons name="checkmark-circle-outline" size={18} color="#166534" />
@@ -156,7 +241,7 @@ export default function AdminReportsScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -164,7 +249,7 @@ export default function AdminReportsScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Revisión de Reportes</Text>
       <Text style={styles.subtitle}>
-        Valida o rechaza los reportes recibidos{total > 0 ? ` · ${total} en total` : ''}
+        Revisa, valida o rechaza reportes y gestiona su estado{total > 0 ? ` · ${total} en total` : ''}
       </Text>
 
       <View style={styles.filters}>
@@ -178,6 +263,34 @@ export default function AdminReportsScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      <View style={styles.filters}>
+        {STATUS_FILTERS.map(f => (
+          <TouchableOpacity
+            key={String(f.key)}
+            style={[styles.chip, statusFilter === f.key && styles.chipActive]}
+            onPress={() => setStatusFilter(f.key)}
+          >
+            <Text style={[styles.chipText, statusFilter === f.key && styles.chipTextActive]}>{f.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {categories.length > 0 ? (
+        <View style={styles.filters}>
+          {[{ id: null, name: 'Todas' }, ...categories].map(c => (
+            <TouchableOpacity
+              key={String(c.id)}
+              style={[styles.chip, categoryFilter === c.id && styles.chipActive]}
+              onPress={() => setCategoryFilter(c.id)}
+            >
+              <Text style={[styles.chipText, categoryFilter === c.id && styles.chipTextActive]}>
+                {c.id === null ? c.name : c.name.charAt(0).toUpperCase() + c.name.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : null}
 
       {loading ? (
         <ActivityIndicator size="large" color="#0e7490" style={{ marginTop: 40 }} />
@@ -273,6 +386,15 @@ const styles = StyleSheet.create({
   rejectBtn:   { backgroundColor: '#fef2f2', borderColor: '#fca5a5' },
   validateText: { color: '#166534', fontWeight: '600' },
   rejectText:   { color: '#991b1b', fontWeight: '600' },
+
+  statusBlock:            { marginTop: 12 },
+  statusLabel:            { fontSize: 11, color: '#6b7280', fontWeight: '600', marginBottom: 6 },
+  statusOptions:          { flexDirection: 'row', gap: 8 },
+  statusOption:           { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: '#d1d5db', backgroundColor: '#fff' },
+  statusOptionActive:     { backgroundColor: '#0e7490', borderColor: '#0e7490' },
+  statusOptionBusy:       { opacity: 0.6 },
+  statusOptionText:       { fontSize: 12, color: '#374151', fontWeight: '600' },
+  statusOptionTextActive: { color: '#fff' },
 
   emptyState: { alignItems: 'center', marginTop: 50, gap: 10 },
   emptyText:  { color: '#6b7280', fontSize: 15 },
