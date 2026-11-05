@@ -13,6 +13,7 @@ import api from '../services/api';
 import useAutoLocation from '../hooks/useAutoLocation';
 import useNetworkStatus from '../hooks/useNetworkStatus';
 import useKeyboardHeight from '../hooks/useKeyboardHeight';
+import useCategories from '../hooks/useCategories';
 import { enqueue } from '../services/offlineQueue';
 import LeafletMap from '../components/LeafletMap';
 
@@ -22,12 +23,17 @@ const LOCATION_ERRORS = {
   unavailable: 'No se pudo obtener tu ubicación.',
 };
 
+const alertCategoriesError = () => Alert.alert(
+  'Error',
+  'No se pudieron cargar las categorías. Verifica tu conexión e intenta de nuevo.'
+);
+
 export default function NewReportScreen({ navigation, route = {} }) {
   const [photo, setPhoto]             = useState(null);
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId]   = useState(null);
   const [loading, setLoading]         = useState(false);
-  const [categories, setCategories]   = useState([]);
+  const categories = useCategories(alertCategoriesError);
   const [manualLocation, setManualLocation] = useState(null);
   const [showPicker, setShowPicker]         = useState(false);
   const pickerRef = useRef(null);
@@ -54,18 +60,6 @@ export default function NewReportScreen({ navigation, route = {} }) {
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300);
     }
   };
-
-  useEffect(() => {
-    api.get('/categories')
-      .then(res => setCategories(res.data))
-      .catch(() => {
-        Alert.alert(
-          'Error',
-          'No se pudieron cargar las categorías. Verifica tu conexión e intenta de nuevo.'
-        );
-        setCategories([]);
-      });
-  }, []);
 
   useEffect(() => {
     const asset = route?.params?.pendingPhoto;

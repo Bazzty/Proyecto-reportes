@@ -8,6 +8,7 @@ import api, { clearAuthToken } from '../services/api';
 import LeafletMap from '../components/LeafletMap';
 import useOfflineSync from '../hooks/useOfflineSync';
 import useNotifications from '../hooks/useNotifications';
+import useCategories from '../hooks/useCategories';
 import { subscribe as subscribeQueue, getPendingCount, isSyncing, clearQueue } from '../services/offlineQueue';
 import { syncStatusNotifications, markAllRead, clearNotifications } from '../services/notifications';
 
@@ -65,7 +66,7 @@ export default function HomeScreen({ navigation, route }) {
   const [reports, setReports]             = useState([]);
   const [myReports, setMyReports]         = useState([]);
   const [activeFilters, setActiveFilters] = useState([]); // ids de categoría; vacío = "Todos"
-  const [categories, setCategories]       = useState([]);
+  const categories = useCategories();
   const [zoneHeatPoints, setZoneHeatPoints] = useState([]);
   const [heatMode, setHeatMode]         = useState('zona');
   const [mapView, setMapView]           = useState('ambos');
@@ -89,9 +90,6 @@ export default function HomeScreen({ navigation, route }) {
       if (mode === 'foco' || mode === 'zona') setHeatMode(mode);
       if (view === 'marcadores' || view === 'calor' || view === 'ambos') setMapView(view);
     });
-    api.get('/categories')
-      .then(res => setCategories(res.data))
-      .catch(() => setCategories([]));
   }, []);
 
   const changeHeatMode = (mode) => {

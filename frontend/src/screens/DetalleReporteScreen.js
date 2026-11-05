@@ -9,6 +9,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
+import { REPORT_STATUSES } from '../constants/reports';
 
 // Gris del botón "Yo también lo vi" mientras espera la respuesta del servidor.
 const BUSY_COLOR = '#6b7280';
@@ -300,7 +301,7 @@ function DetalleReporte({ route, navigation }) {
             {/* El backend responde 409 si el reporte no está validado. */}
             {report.validation_status === 'valido' ? (
               <View style={styles.statusOptions}>
-                {['Pendiente', 'En Progreso', 'Resuelto'].map(status => {
+                {REPORT_STATUSES.map(status => {
                   const active = report.status === status;
                   return (
                     <TouchableOpacity

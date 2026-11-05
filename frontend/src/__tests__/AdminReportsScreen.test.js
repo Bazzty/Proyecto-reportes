@@ -7,9 +7,16 @@ jest.mock('../services/api', () => ({
   __esModule: true,
   default: { get: jest.fn(), patch: jest.fn() },
 }));
+// mockRefocus repite el foco de la pantalla, como al volver del detalle.
+let mockRefocus;
 jest.mock('@react-navigation/native', () => {
   const React = require('react');
-  return { useFocusEffect: (cb) => React.useEffect(cb, [cb]) };
+  return {
+    useFocusEffect: (cb) => {
+      mockRefocus = cb;
+      return React.useEffect(cb, [cb]);
+    },
+  };
 });
 
 const report = (overrides = {}) => ({
@@ -27,10 +34,13 @@ const report = (overrides = {}) => ({
 
 const CATEGORIES = [{ id: 1, name: 'basura' }, { id: 2, name: 'escombros' }];
 
-const setup = async (items = [report()], { navigation = { navigate: jest.fn() }, categories = CATEGORIES } = {}) => {
+const setup = async (items = [report()], { navigation = { navigate: jest.fn() }, categories = CATEGORIES, detail = null } = {}) => {
   api.get.mockImplementation((url) => {
     if (url === '/categories') {
       return categories ? Promise.resolve({ data: categories }) : Promise.reject(new Error('fail'));
+    }
+    if (url.startsWith('/reports/')) {
+      return detail ? Promise.resolve({ data: detail }) : Promise.reject(new Error('fail'));
     }
     return Promise.resolve({
       data: { data: items, meta: { current_page: 1, last_page: 1, per_page: 20, total: items.length } },
@@ -42,6 +52,15 @@ const setup = async (items = [report()], { navigation = { navigate: jest.fn() },
 
 const reportsCalls = () => api.get.mock.calls.filter(([url]) => url === '/admin/reports');
 const lastReportsParams = () => reportsCalls().at(-1)[1].params;
+const validReport = (overrides = {}) => report({ validation_status: 'valido', status: 'Pendiente', ...overrides });
+
+// Deja la pantalla en el filtro Válidos, donde se gestiona el estado.
+const setupValid = async (items = [validReport()], options) => {
+  const navigation = await setup(items, options);
+  await fireEvent.press(await screen.findByText('Válidos'));
+  await screen.findAllByText('Basura en la plaza');
+  return navigation;
+};
 
 describe('AdminReportsScreen', () => {
   beforeEach(() => {
@@ -121,11 +140,79 @@ describe('AdminReportsScreen', () => {
     await setup();
     await screen.findByText('Basura en la plaza');
 
+    await fireEvent.press(screen.getByText('Pendiente'));
+
+    await waitFor(() =>
+      expect(lastReportsParams()).toEqual({ validation_status: 'pendiente', status: 'Pendiente', page: 1 })
+    );
+  });
+
+  it('elegir un estado avanzado desde Pendientes pasa a Válidos, porque esa combinación nunca tiene datos', async () => {
+    await setup();
+    await screen.findByText('Basura en la plaza');
+
     await fireEvent.press(screen.getByText('En Progreso'));
 
     await waitFor(() =>
-      expect(lastReportsParams()).toEqual({ validation_status: 'pendiente', status: 'En Progreso', page: 1 })
+      expect(lastReportsParams()).toEqual({ validation_status: 'valido', status: 'En Progreso', page: 1 })
     );
+  });
+
+  it('volver a Pendientes quita un filtro de estado avanzado', async () => {
+    await setup();
+    await screen.findByText('Basura en la plaza');
+    await fireEvent.press(screen.getByText('Resuelto'));
+    await waitFor(() => expect(lastReportsParams().status).toBe('Resuelto'));
+
+    await fireEvent.press(await screen.findByText('Pendientes'));
+
+    await waitFor(() => expect(lastReportsParams()).toEqual({ validation_status: 'pendiente', page: 1 }));
+  });
+
+  it('cada fila de filtros tiene su etiqueta', async () => {
+    await setup();
+    await screen.findByText('Basura en la plaza');
+
+    expect(screen.getByText('Validación')).toBeTruthy();
+    expect(screen.getByText('Estado')).toBeTruthy();
+    expect(await screen.findByText('Categoría')).toBeTruthy();
+  });
+
+  it('solo ofrece la acción de validación que cambia algo', async () => {
+    await setup([
+      validReport({ id: 1, description: 'Uno' }),
+      report({ id: 2, description: 'Dos', validation_status: 'rechazado' }),
+    ]);
+    await screen.findByText('Uno');
+
+    // Una sola de cada: Rechazar en el válido y Validar en el rechazado.
+    expect(screen.getAllByText('Validar')).toHaveLength(1);
+    expect(screen.getAllByText('Rechazar')).toHaveLength(1);
+  });
+
+  it('validar con el filtro Todos deja la tarjeta y actualiza su insignia', async () => {
+    api.patch.mockResolvedValue({ data: report({ validation_status: 'valido' }) });
+    await setup();
+    await screen.findByText('Basura en la plaza');
+    await fireEvent.press(screen.getAllByText('Todos').at(0));
+    await screen.findByText('Basura en la plaza');
+
+    await fireEvent.press(screen.getByText('Validar'));
+
+    expect(await screen.findByText('VÁLIDO')).toBeTruthy();
+    expect(screen.getByText('Basura en la plaza')).toBeTruthy();
+    expect(screen.getByText(/1 en total/)).toBeTruthy();
+  });
+
+  it('validar con el filtro Pendientes saca la tarjeta y baja el total', async () => {
+    api.patch.mockResolvedValue({ data: report({ validation_status: 'valido' }) });
+    await setup();
+    await screen.findByText('Basura en la plaza');
+
+    await fireEvent.press(screen.getByText('Validar'));
+
+    await waitFor(() => expect(screen.queryByText('Basura en la plaza')).toBeNull());
+    expect(screen.queryByText(/en total/)).toBeNull();
   });
 
   it('el filtro de categoría usa /categories y envía category_id', async () => {
@@ -176,9 +263,8 @@ describe('AdminReportsScreen', () => {
   });
 
   it('cambiar estado llama al PATCH y actualiza la tarjeta sin sacarla de la lista', async () => {
-    api.patch.mockResolvedValue({ data: { id: 1, status: 'Resuelto' } });
-    await setup([report({ validation_status: 'valido', status: 'Pendiente' })]);
-    await screen.findByText('Basura en la plaza');
+    api.patch.mockResolvedValue({ data: validReport({ status: 'Resuelto' }) });
+    await setupValid();
 
     await fireEvent.press(screen.getAllByText('Resuelto').at(-1));
 
@@ -189,8 +275,7 @@ describe('AdminReportsScreen', () => {
   });
 
   it('no llama al PATCH si se elige el estado actual', async () => {
-    await setup([report({ validation_status: 'valido', status: 'Pendiente' })]);
-    await screen.findByText('Basura en la plaza');
+    await setupValid();
 
     await fireEvent.press(screen.getAllByText('Pendiente').at(-1));
 
@@ -200,15 +285,14 @@ describe('AdminReportsScreen', () => {
   it('evita doble envío mientras se guarda el estado', async () => {
     let resolvePatch;
     api.patch.mockImplementation(() => new Promise((resolve) => { resolvePatch = resolve; }));
-    await setup([report({ validation_status: 'valido', status: 'Pendiente' })]);
-    await screen.findByText('Basura en la plaza');
+    await setupValid();
 
     // fireEvent.press es asíncrono: se esperan sus promesas al final, con el PATCH ya resuelto.
     const first = fireEvent.press(screen.getAllByText('Resuelto').at(-1));
     await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(1));
     const second = fireEvent.press(screen.getAllByText('En Progreso').at(-1));
 
-    resolvePatch({ data: { id: 1, status: 'Resuelto' } });
+    resolvePatch({ data: validReport({ status: 'Resuelto' }) });
     await first;
     await second;
 
@@ -216,10 +300,26 @@ describe('AdminReportsScreen', () => {
     expect(api.patch).toHaveBeenCalledWith('/reports/1/status', { status: 'Resuelto' });
   });
 
+  it('mientras se guarda un estado no se puede cambiar el de otra tarjeta', async () => {
+    let resolvePatch;
+    api.patch.mockImplementation(() => new Promise((resolve) => { resolvePatch = resolve; }));
+    await setupValid([validReport({ id: 1 }), validReport({ id: 2 })]);
+
+    const first = fireEvent.press(screen.getAllByText('Resuelto').at(1));
+    await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(1));
+
+    expect(screen.getAllByText('En Progreso').at(-1)).toBeDisabled();
+
+    resolvePatch({ data: validReport({ id: 1, status: 'Resuelto' }) });
+    await first;
+
+    expect(api.patch).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getAllByText('En Progreso').at(-1)).toBeEnabled());
+  });
+
   it('el reporte sale de la lista y baja el total si deja de coincidir con el filtro de estado', async () => {
-    api.patch.mockResolvedValue({ data: { id: 1, status: 'Resuelto' } });
-    await setup([report({ validation_status: 'valido', status: 'Pendiente' })]);
-    await screen.findByText('Basura en la plaza');
+    api.patch.mockResolvedValue({ data: validReport({ status: 'Resuelto' }) });
+    await setupValid();
     await fireEvent.press(screen.getAllByText('Pendiente').at(0));
     await waitFor(() => expect(lastReportsParams().status).toBe('Pendiente'));
     await screen.findByText('Basura en la plaza');
@@ -233,13 +333,78 @@ describe('AdminReportsScreen', () => {
 
   it('un error al cambiar el estado muestra alerta y deja la tarjeta igual', async () => {
     api.patch.mockRejectedValue(new Error('fail'));
-    await setup([report({ validation_status: 'valido', status: 'Pendiente' })]);
-    await screen.findByText('Basura en la plaza');
+    await setupValid();
 
     await fireEvent.press(screen.getAllByText('Resuelto').at(-1));
 
     await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Error', 'No se pudo actualizar el estado.'));
     expect(screen.getByText('Basura en la plaza')).toBeTruthy();
+  });
+
+  it('un 409 al cambiar el estado avisa y refresca la tarjeta obsoleta', async () => {
+    api.patch.mockRejectedValue({ response: { status: 409 } });
+    await setupValid([validReport()], { detail: report({ validation_status: 'rechazado' }) });
+
+    await fireEvent.press(screen.getAllByText('Resuelto').at(-1));
+
+    await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Reporte actualizado', expect.any(String)));
+    expect(api.get).toHaveBeenCalledWith('/reports/1');
+    // Con el filtro Válidos, el reporte rechazado sale de la lista.
+    await waitFor(() => expect(screen.queryByText('Basura en la plaza')).toBeNull());
+  });
+
+  it('si cambia el filtro con un PATCH en vuelo recarga en vez de tocar la lista nueva', async () => {
+    let resolvePatch;
+    api.patch.mockImplementation(() => new Promise((resolve) => { resolvePatch = resolve; }));
+    await setupValid();
+    await fireEvent.press(screen.getAllByText('Pendiente').at(0));
+    await waitFor(() => expect(lastReportsParams().status).toBe('Pendiente'));
+    await screen.findByText('Basura en la plaza');
+
+    const pressed = fireEvent.press(screen.getAllByText('Resuelto').at(-1));
+    await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(1));
+    await fireEvent.press(screen.getAllByText('Todos').at(-1));
+    await waitFor(() => expect(lastReportsParams().status).toBeUndefined());
+    await screen.findByText('Basura en la plaza');
+    const callsBefore = reportsCalls().length;
+
+    await act(async () => { resolvePatch({ data: validReport({ status: 'Resuelto' }) }); });
+    await pressed;
+
+    await waitFor(() => expect(reportsCalls().length).toBe(callsBefore + 1));
+    expect(await screen.findByText('Basura en la plaza')).toBeTruthy();
+    expect(screen.getByText(/1 en total/)).toBeTruthy();
+  });
+
+  it('al volver del detalle refresca solo esa tarjeta, sin recargar la lista', async () => {
+    await setup([report()], { detail: report({ description: 'Descripción editada' }) });
+    await fireEvent.press(await screen.findByText('Basura en la plaza'));
+    const callsBefore = reportsCalls().length;
+
+    await act(async () => { mockRefocus(); });
+
+    expect(await screen.findByText('Descripción editada')).toBeTruthy();
+    expect(api.get).toHaveBeenCalledWith('/reports/1');
+    expect(reportsCalls()).toHaveLength(callsBefore);
+  });
+
+  it('al volver del detalle saca la tarjeta si ya no coincide con el filtro', async () => {
+    await setup([report()], { detail: report({ validation_status: 'valido' }) });
+    await fireEvent.press(await screen.findByText('Basura en la plaza'));
+
+    await act(async () => { mockRefocus(); });
+
+    await waitFor(() => expect(screen.queryByText('Basura en la plaza')).toBeNull());
+  });
+
+  it('un foco sin venir del detalle recarga la lista', async () => {
+    await setup();
+    await screen.findByText('Basura en la plaza');
+    const callsBefore = reportsCalls().length;
+
+    await act(async () => { mockRefocus(); });
+
+    await waitFor(() => expect(reportsCalls().length).toBe(callsBefore + 1));
   });
 
   it('una respuesta obsoleta no pisa la lista del filtro más reciente', async () => {
