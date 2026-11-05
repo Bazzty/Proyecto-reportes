@@ -1,4 +1,4 @@
-import { Alert } from 'react-native';
+import { Alert, Keyboard, Platform } from 'react-native';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LoginScreen from '../screens/LoginScreen';
@@ -97,5 +97,28 @@ describe('LoginScreen', () => {
   it('no ofrece continuar sin cuenta', async () => {
     await setup();
     expect(screen.queryByText(/Continuar sin cuenta/)).toBeNull();
+  });
+
+  describe('cierre del teclado al tocar fuera', () => {
+    const originalOS = Platform.OS;
+    afterEach(() => {
+      Platform.OS = originalOS;
+      jest.restoreAllMocks();
+    });
+
+    it('en móvil cierra el teclado', async () => {
+      const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
+      await setup();
+      await fireEvent.press(screen.getByText('Bienvenido de vuelta'));
+      expect(dismiss).toHaveBeenCalled();
+    });
+
+    it('en web no le quita el foco a los campos', async () => {
+      Platform.OS = 'web';
+      const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
+      await setup();
+      await fireEvent.press(screen.getByText('Bienvenido de vuelta'));
+      expect(dismiss).not.toHaveBeenCalled();
+    });
   });
 });
