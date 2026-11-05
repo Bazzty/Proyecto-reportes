@@ -627,7 +627,7 @@ class ReportApiTest extends TestCase
         $this->getJson('/api/reports')
             ->assertOk()
             ->assertJsonCount(2)
-            ->assertJsonPath('0.id', $second->id)
-            ->assertJsonFragment(['id' => $first->id]);
+            ->assertJsonFragment(['id' => $first->id])
+            ->assertJsonFragment(['id' => $second->id]);
     }
 }

@@ -113,7 +113,7 @@ describe('HomeScreen', () => {
     expect(zoned.longitude).toBeCloseTo(-73, 5);
     expect(unzoned).toMatchObject({ latitude: -33.45, longitude: -70.65, weight: 1, zoneName: 'Sin zona', count: 1 });
 
-    expect(api.get).toHaveBeenCalledWith('/reports/heatmap');
+    expect(api.get).toHaveBeenCalledWith('/reports/heatmap', expect.any(Object));
   });
 
   it('el modo "Foco" usa los reportes individuales como heatmap', async () => {
@@ -410,6 +410,100 @@ describe('HomeScreen', () => {
         await act(async () => { listeners.forEach((cb) => cb('active')); });
         await settle();
         expect(count()).toBe(beforeBackground + 1);
+      } finally {
+        addSpy.mockRestore();
+      }
+    });
+
+    it('envía timeout y señal de cancelación en las peticiones del polling', async () => {
+      await setup();
+      await settle();
+
+      const call = api.get.mock.calls.find(([u]) => u === '/reports');
+      expect(call[1].timeout).toBeGreaterThan(0);
+      expect(call[1].signal).toBeDefined();
+    });
+
+    it('cancela las peticiones en vuelo y descarta su respuesta al pausar', async () => {
+      const listeners = [];
+      const addSpy = jest.spyOn(AppState, 'addEventListener').mockImplementation((event, cb) => {
+        if (event === 'change') listeners.push(cb);
+        return { remove: jest.fn() };
+      });
+
+      try {
+        await setup();
+        await settle();
+        const ok = api.get.getMockImplementation();
+        let resolveLate;
+        api.get.mockImplementation((url) => (url === '/reports'
+          ? new Promise((resolve) => { resolveLate = resolve; })
+          : ok(url)));
+        await advance(5000);
+        const signal = api.get.mock.calls.filter(([u]) => u === '/reports').pop()[1].signal;
+
+        await act(async () => { listeners.forEach((cb) => cb('background')); });
+        expect(signal.aborted).toBe(true);
+
+        const before = mockLeafletProps.reports.map(r => r.id);
+        await act(async () => { resolveLate({ data: [] }); });
+        expect(mockLeafletProps.reports.map(r => r.id)).toEqual(before);
+      } finally {
+        addSpy.mockRestore();
+      }
+    });
+
+    it('tras reanudar, una petición colgada previa no bloquea el refresco', async () => {
+      const listeners = [];
+      const addSpy = jest.spyOn(AppState, 'addEventListener').mockImplementation((event, cb) => {
+        if (event === 'change') listeners.push(cb);
+        return { remove: jest.fn() };
+      });
+
+      try {
+        await setup();
+        await settle();
+        const ok = api.get.getMockImplementation();
+        api.get.mockImplementation((url) => (url === '/reports' ? new Promise(() => {}) : ok(url)));
+        await advance(5000);
+        const count = () => api.get.mock.calls.filter(([u]) => u === '/reports').length;
+
+        await act(async () => { listeners.forEach((cb) => cb('background')); });
+        await act(async () => { listeners.forEach((cb) => cb('active')); });
+        const before = count();
+        await settle();
+
+        expect(count()).toBe(before);
+        api.get.mockImplementation(ok);
+        await act(async () => { listeners.forEach((cb) => cb('background')); });
+        await act(async () => { listeners.forEach((cb) => cb('active')); });
+        await settle();
+        expect(count()).toBe(before + 1);
+      } finally {
+        addSpy.mockRestore();
+      }
+    });
+
+    it('un fallo antes de pausar no se suma a uno posterior a la reanudación', async () => {
+      const listeners = [];
+      const addSpy = jest.spyOn(AppState, 'addEventListener').mockImplementation((event, cb) => {
+        if (event === 'change') listeners.push(cb);
+        return { remove: jest.fn() };
+      });
+
+      try {
+        await setup();
+        await settle();
+        const ok = api.get.getMockImplementation();
+        failReports();
+        await advance(5000);
+
+        await act(async () => { listeners.forEach((cb) => cb('background')); });
+        await act(async () => { listeners.forEach((cb) => cb('active')); });
+        await settle();
+
+        expect(screen.queryByText(/Sin conexión/)).toBeNull();
+        api.get.mockImplementation(ok);
       } finally {
         addSpy.mockRestore();
       }

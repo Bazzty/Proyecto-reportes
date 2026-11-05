@@ -11,6 +11,9 @@ import useNotifications from '../hooks/useNotifications';
 import { subscribe as subscribeQueue, getPendingCount, isSyncing, clearQueue } from '../services/offlineQueue';
 import { syncStatusNotifications, markAllRead, clearNotifications } from '../services/notifications';
 
+// Tiempo máximo por petición del polling: una petición colgada no debe bloquear los refrescos.
+const POLL_TIMEOUT_MS = 10000;
+
 // El endpoint /reports/heatmap devuelve un punto por reporte (con su zona).
 // Para el heat "por zona" agrupamos los reportes con zona en su centroide; los
 // que no caen en ninguna zona se muestran individuales (no hay centroide representativo).
@@ -49,9 +52,6 @@ export default function HomeScreen({ navigation, route }) {
   const isGuest = route.params?.guest === true;
 
   const leafletRef = useRef(null);
-  const inFlightRef = useRef(false);
-  const failuresRef = useRef(0);
-  const mountedRef = useRef(true);
   const [isFocused, setIsFocused] = useState(false);
   const [appState, setAppState] = useState(() => {
     // Al montar, "unknown"/null se trata como activo: solo pausamos si sabemos
@@ -76,11 +76,6 @@ export default function HomeScreen({ navigation, route }) {
 
   const { isConnected } = useOfflineSync();
   const { notifications, unreadCount } = useNotifications();
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', setAppState);
@@ -158,43 +153,6 @@ export default function HomeScreen({ navigation, route }) {
 
   const shouldPoll = isFocused && appState === 'active';
 
-  const fetchReports = useCallback(async () => {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
-    try {
-      const requests = [api.get('/reports'), api.get('/reports/heatmap')];
-      if (!isGuest) requests.push(api.get('/user/reports'));
-
-      const [allRes, heatRes, myRes] = await Promise.all(requests);
-      if (!mountedRef.current) return;
-
-      setReports(prev => {
-        const next = allRes.data;
-        return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
-      });
-      setZoneHeatPoints(prev => {
-        const next = groupHeatByZone(heatRes.data);
-        return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
-      });
-      if (!isGuest && myRes) {
-        setMyReports(prev => {
-          const next = myRes.data;
-          return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
-        });
-        syncStatusNotifications(myRes.data).catch(() => {});
-      }
-      failuresRef.current = 0;
-      setOffline(false);
-    } catch {
-      // Un fallo aislado se ignora; dos seguidos indican que los datos mostrados están desactualizados
-      if (!mountedRef.current) return;
-      failuresRef.current += 1;
-      if (failuresRef.current >= 2) setOffline(true);
-    } finally {
-      inFlightRef.current = false;
-    }
-  }, [isGuest]);
-
   useFocusEffect(
     useCallback(() => {
       setIsFocused(true);
@@ -203,13 +161,61 @@ export default function HomeScreen({ navigation, route }) {
   );
 
   // Polling cada 5s mientras la pantalla está enfocada y la app en primer plano.
-  // El guard inFlightRef evita solapar peticiones si una anterior aún no termina.
+  // Cada ejecución del efecto tiene su propio AbortController y guard de "en vuelo":
+  // al pausar/desmontar/cambiar isGuest se cancelan las peticiones y se descartan sus
+  // respuestas; el timeout evita que una petición colgada bloquee el polling.
   useEffect(() => {
     if (!shouldPoll) return undefined;
+    const controller = new AbortController();
+    const { signal } = controller;
+    const opts = { signal, timeout: POLL_TIMEOUT_MS };
+    let inFlight = false;
+    let failures = 0;
+
+    const fetchReports = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const requests = [api.get('/reports', opts), api.get('/reports/heatmap', opts)];
+        if (!isGuest) requests.push(api.get('/user/reports', opts));
+
+        const [allRes, heatRes, myRes] = await Promise.all(requests);
+        if (signal.aborted) return;
+
+        setReports(prev => {
+          const next = allRes.data;
+          return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+        });
+        setZoneHeatPoints(prev => {
+          const next = groupHeatByZone(heatRes.data);
+          return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+        });
+        if (!isGuest && myRes) {
+          setMyReports(prev => {
+            const next = myRes.data;
+            return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+          });
+          syncStatusNotifications(myRes.data).catch(() => {});
+        }
+        failures = 0;
+        setOffline(false);
+      } catch {
+        // Un fallo aislado se ignora; dos seguidos indican que los datos mostrados están desactualizados
+        if (signal.aborted) return;
+        failures += 1;
+        if (failures >= 2) setOffline(true);
+      } finally {
+        inFlight = false;
+      }
+    };
+
     fetchReports();
     const interval = setInterval(fetchReports, 5000);
-    return () => clearInterval(interval);
-  }, [shouldPoll, fetchReports]);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
+  }, [shouldPoll, isGuest]);
 
   const handleLogout = () => {
     if (isGuest) {
