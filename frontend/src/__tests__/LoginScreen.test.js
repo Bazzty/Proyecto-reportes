@@ -11,7 +11,7 @@ jest.mock('../services/api', () => ({
 }));
 
 const setup = async () => {
-  const navigation = { replace: jest.fn(), navigate: jest.fn() };
+  const navigation = { reset: jest.fn(), navigate: jest.fn(), goBack: jest.fn() };
   await render(<LoginScreen navigation={navigation} />);
   return navigation;
 };
@@ -42,7 +42,7 @@ describe('LoginScreen', () => {
     await fill('ana@example.com', 'password123');
     await fireEvent.press(screen.getByText('Ingresar'));
 
-    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('Home'));
+    await waitFor(() => expect(navigation.reset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Home' }] }));
     expect(api.post).toHaveBeenCalledWith('/login', { email: 'ana@example.com', password: 'password123' });
     expect(setAuthToken).toHaveBeenCalledWith('tok');
     expect(await AsyncStorage.getItem('token')).toBe('tok');
@@ -57,7 +57,7 @@ describe('LoginScreen', () => {
     await fireEvent.press(screen.getByText('Ingresar'));
 
     await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Error al iniciar sesión', 'Clave inválida'));
-    expect(navigation.replace).not.toHaveBeenCalled();
+    expect(navigation.reset).not.toHaveBeenCalled();
   });
 
   it('si la API falla sin mensaje usa "Credenciales incorrectas."', async () => {
@@ -88,9 +88,14 @@ describe('LoginScreen', () => {
     expect(navigation.navigate).toHaveBeenCalledWith('Register');
   });
 
-  it('"Continuar sin cuenta" navega a Home como invitado', async () => {
+  it('la flecha vuelve al mapa', async () => {
     const navigation = await setup();
-    await fireEvent.press(screen.getByText('Continuar sin cuenta →'));
-    expect(navigation.navigate).toHaveBeenCalledWith('Home', { guest: true });
+    await fireEvent.press(screen.getByLabelText('Volver al mapa'));
+    expect(navigation.goBack).toHaveBeenCalled();
+  });
+
+  it('no ofrece continuar sin cuenta', async () => {
+    await setup();
+    expect(screen.queryByText(/Continuar sin cuenta/)).toBeNull();
   });
 });

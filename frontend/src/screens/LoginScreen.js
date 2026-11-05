@@ -45,8 +45,8 @@ export default function LoginScreen({ navigation }) {
       ]);
       setAuthToken(token);
 
-      // replace evita que al presionar "atrás" en Home se vuelva al Login
-      navigation.replace('Home');
+      // reset descarta el mapa de invitado que queda debajo y evita volver al Login con "atrás"
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (error) {
       const message = error.response?.data?.message || 'Credenciales incorrectas.';
       Alert.alert('Error al iniciar sesión', message);
@@ -123,11 +123,16 @@ export default function LoginScreen({ navigation }) {
       <TouchableOpacity onPress={() => navigation.navigate('Register')}>
         <Text style={styles.link}>¿No tienes cuenta? Regístrate</Text>
       </TouchableOpacity>
-
-      <TouchableOpacity style={{ marginTop: 12 }} onPress={() => navigation.navigate('Home', { guest: true })}>
-        <Text style={styles.guestLink}>Continuar sin cuenta →</Text>
-      </TouchableOpacity>
     </ScrollView>
+    <TouchableOpacity
+      style={styles.backBtn}
+      onPress={() => navigation.goBack()}
+      accessibilityRole="button"
+      accessibilityLabel="Volver al mapa"
+      hitSlop={8}
+    >
+      <Ionicons name="arrow-back" size={22} color="#fff" />
+    </TouchableOpacity>
     </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   );
@@ -136,6 +141,10 @@ export default function LoginScreen({ navigation }) {
 const styles = StyleSheet.create({
   wrapper:      { flex: 1, backgroundColor: '#0e7490' },
   scrollView:   { backgroundColor: '#0e7490' },
+  backBtn: {
+    position: 'absolute', top: 52, left: 16, width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)',
+  },
   container:    { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40, backgroundColor: '#0e7490' },
   imageWrapper: { marginHorizontal: -24 },
   image:        { width: '100%', height: '100%', resizeMode: 'cover' },
@@ -156,5 +165,4 @@ const styles = StyleSheet.create({
   buttonDisabled: { backgroundColor: '#ccfbf1' },
   buttonText:     { color: '#0e7490', fontWeight: 'bold', fontSize: 16 },
   link:           { color: '#ccfbf1', textAlign: 'center', fontSize: 14 },
-  guestLink:      { color: 'rgba(255,255,255,0.5)', textAlign: 'center', fontSize: 13 },
 });
