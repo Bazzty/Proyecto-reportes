@@ -150,6 +150,8 @@ POST /reports
 ```
 Requiere token. Se envía como `multipart/form-data` porque incluye una foto.
 
+El reporte nace con `validation_status = "pendiente"`, salvo que lo cree un administrador: en ese caso nace `"valido"`, con `validated_by` igual al autor.
+
 **Request (form-data):**
 | Campo | Tipo | Requerido |
 |---|---|---|
@@ -302,17 +304,31 @@ Requiere token de un **usuario administrador** (investigadores de "Más Azul"). 
 ```
 GET /admin/reports
 ```
-Requiere token de **administrador**. Lista los reportes paginados (20 por página), incluyendo `validation_status`, `zone` y el validador. Filtros opcionales por query string: `validation_status` (`pendiente`|`valido`|`rechazado`), `zone_id`, `category_id`, `status` (`Pendiente`|`En Progreso`|`Resuelto`).
+Requiere token de **administrador**. Lista los reportes paginados (20 por página), incluyendo `validation_status`, `zone` y el validador. Filtros opcionales por query string: `validation_status` (`pendiente`|`valido`|`rechazado`), `zone_id`, `category_id`, `status` (`Pendiente`|`En Progreso`|`Resuelto`), `search` y `sort`.
+
+- `search`: texto (máx. 100, se aplica `trim`; vacío = sin filtro). Coincide (`LIKE`) con la `description`, el nombre del autor o el nombre de la zona. `%`, `_` y `\` se tratan como texto literal.
+- `sort`: `recientes` (por defecto, más nuevos primero) o `confirmaciones` (más `confirmations_count` primero y, a igualdad, los más recientes). Cualquier otro valor da `422`.
+
+Además de los campos del reporte, cada elemento trae `validated_by` (`{id,name}|null`), `status_updated_by` (`{id,name}|null`), `status_updated_at` (ISO 8601 o `null`) y `auto_validated` (`true` si quien validó es el propio autor, p. ej. un admin que reporta).
 
 **Response 200:**
 ```json
 {
   "data": [
-    { "id": 1, "validation_status": "pendiente", "zone": { "id": 5, "name": "Puerto Varas" } }
+    {
+      "id": 1, "validation_status": "valido", "status": "En Progreso", "zone": { "id": 5, "name": "Puerto Varas" },
+      "validated_by": { "id": 2, "name": "Admin" }, "auto_validated": false,
+      "status_updated_by": { "id": 2, "name": "Admin" }, "status_updated_at": "2026-11-05T14:00:00.000000Z"
+    }
   ],
-  "meta": { "current_page": 1, "last_page": 1, "per_page": 20, "total": 21 }
+  "meta": {
+    "current_page": 1, "last_page": 1, "per_page": 20, "total": 21,
+    "counts": { "pendiente": 12, "valido": 7, "rechazado": 2, "total": 21 }
+  }
 }
 ```
+
+`meta.counts` indica cuántos reportes hay en cada estado de validación (con `0` por defecto) y su `total`. Aplica los filtros `zone_id`, `category_id`, `status` y `search`, pero **no** `validation_status`, así que sirve para mostrar el contador de cada pestaña aunque haya una seleccionada. `meta.total` sí respeta todos los filtros.
 
 ---
 
@@ -330,13 +346,96 @@ Requiere token de **administrador**.
 ```json
 { "validation_status": "rechazado", "rejection_reason": "No corresponde a contaminación.", "expected_validation_status": "pendiente" }
 ```
-`expected_validation_status` es **obligatorio**: es el estado que el cliente vio al cargar la lista (concurrencia optimista). `rejection_reason` es obligatorio al rechazar.
+**Request (deshacer):**
+```json
+{ "validation_status": "pendiente", "expected_validation_status": "valido" }
+```
+`validation_status` acepta `pendiente`, `valido` y `rechazado`. `expected_validation_status` es **obligatorio**: es el estado que el cliente vio al cargar la lista (concurrencia optimista). `rejection_reason` es obligatorio solo al rechazar.
 
-**Response 200:** el reporte actualizado (incluye `validation_status`, `rejection_reason`, `validated_at` y `validated_by`).
+Al pasar a `pendiente` se limpian `validated_by`, `validated_at`, `rejection_reason`, `status_updated_by` y `status_updated_at`, y `status` vuelve a `Pendiente`.
+
+**Response 200:** el reporte actualizado (incluye `validation_status`, `rejection_reason`, `validated_at`, `validated_by`, `status_updated_by`, `status_updated_at` y `auto_validated`).
 
 **Response 409 — El estado cambió mientras tanto:** otro admin ya modificó el reporte. El `UPDATE` es atómico (`WHERE id = ? AND validation_status = ?`), así que dos admins simultáneos no pueden pisarse; recargá la lista y reintentá.
 
 > **Visibilidad:** los reportes con `validation_status = "pendiente"` **sí** son públicos (aparecen en `GET /reports` y en el heatmap; esto es intencional para no perder reportes aún no moderados). Los reportes `"rechazado"` **no** aparecen en `GET /reports` ni en el heatmap, y su detalle (`GET /reports/{id}`), sus comentarios (`GET/POST /reports/{id}/comments`) y su confirmación (`POST /reports/{id}/confirm`) devuelven `404` salvo para el autor o un administrador.
+
+---
+
+### Panel de administración — zonas
+```
+GET /admin/zones
+```
+Requiere token de **administrador**. Lista id y nombre de todas las zonas, ordenadas por nombre (para el filtro `zone_id`).
+
+**Response 200:**
+```json
+[
+  { "id": 3, "name": "Frutillar" },
+  { "id": 5, "name": "Puerto Montt" }
+]
+```
+
+---
+
+### Panel de administración — resumen
+```
+GET /admin/reports/summary
+```
+Requiere token de **administrador**. Sin parámetros.
+
+**Response 200:**
+```json
+{
+  "total": 64,
+  "pending": 62,
+  "new_this_week": 5,
+  "avg_validation_hours": 3.5,
+  "top_zone": { "id": 5, "name": "Puerto Montt", "count": 20 }
+}
+```
+- `new_this_week`: reportes creados en los últimos 7 días.
+- `avg_validation_hours`: promedio en horas (1 decimal) entre `created_at` y `validated_at` de los últimos 200 reportes validados o rechazados, **sin contar los autovalidados** (`validated_by` = autor). `null` si no hay datos.
+- `top_zone`: zona con más reportes no rechazados (desempate: id menor) o `null`.
+
+---
+
+### Panel de administración — validar / rechazar en lote
+```
+POST /admin/reports/bulk-validation
+```
+Requiere token de **administrador**.
+
+**Request:**
+```json
+{ "ids": [1, 2, 3, 4], "validation_status": "rechazado", "rejection_reason": "Duplicados." }
+```
+- `ids`: de 1 a 50 enteros distintos que existan (más de 50, repetidos o inexistentes dan `422`).
+- `validation_status`: `valido` o `rechazado`; `rejection_reason` (máx. 500) es obligatorio al rechazar.
+
+Solo se modifican los reportes que sigan `pendiente` en ese momento (selección bloqueada dentro de una transacción, así dos admins simultáneos no se pisan). No es todo-o-nada: los demás se informan en `skipped`.
+
+**Response 200:**
+```json
+{ "updated": [1, 2, 3], "skipped": [4] }
+```
+
+---
+
+### Panel de administración — exportar CSV
+```
+GET /admin/reports/export
+```
+Requiere token de **administrador** (cabecera `Authorization: Bearer`; se descarga con una petición autenticada). Acepta los mismos filtros que el listado: `validation_status`, `zone_id`, `category_id`, `status`, `search` y `sort`.
+
+**Response 200:** `Content-Type: text/csv; charset=UTF-8` y `Content-Disposition: attachment; filename="reportes-2026-11-06.csv"`. El archivo empieza con BOM UTF-8 y tiene como máximo 5000 filas (las más recientes según el orden pedido). Columnas, en este orden:
+```
+id,categoria,descripcion,zona,autor,estado,validacion,motivo_rechazo,confirmaciones,latitud,longitud,creado,validado_por,validado_en,estado_actualizado_por,estado_actualizado_en
+```
+```
+12,basura,"Basura en la costanera, lado norte",Puerto Montt,Ana,Resuelto,valido,,3,-41.32,-72.98,2026-11-01T12:00:00.000000Z,Admin,2026-11-01T15:30:00.000000Z,Admin,2026-11-03T09:00:00.000000Z
+```
+Las fechas van en ISO 8601. Los valores se escapan según CSV (comillas, comas, saltos de línea) y toda celda de texto que empiece por `=`, `+`, `-`, `@`, tab o retorno de carro se antepone con una comilla simple `'` para evitar inyección de fórmulas. Filtros inválidos dan `422`.
 
 ---
 

@@ -33,6 +33,13 @@ SELECT 'reportes con status_updated_by inexistente', COUNT(*)
 FROM reports r LEFT JOIN users u ON u.id = r.status_updated_by
 WHERE r.status_updated_by IS NOT NULL AND u.id IS NULL;
 
+-- Un reporte pendiente no puede conservar rastro de moderación (el "deshacer" lo limpia todo).
+INSERT INTO audit_findings
+SELECT 'pendientes con datos de moderación', COUNT(*)
+FROM reports
+WHERE validation_status = 'pendiente'
+  AND (validated_by IS NOT NULL OR validated_at IS NOT NULL OR rejection_reason IS NOT NULL);
+
 INSERT INTO audit_findings
 SELECT 'coordenadas nulas o fuera de rango', COUNT(*)
 FROM reports
