@@ -172,7 +172,7 @@ export default function RegisterScreen({ navigation }) {
 const styles = StyleSheet.create({
   flex:         { flex: 1 },
   wrapper:      { flex: 1, backgroundColor: '#0e7490' },
-  imageWrapper: { marginHorizontal: 0 },
+  imageWrapper: { marginHorizontal: -24 },
   image:        { width: '100%', height: '100%', resizeMode: 'cover' },
   fade:         { position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%' },
   container:    { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40 },

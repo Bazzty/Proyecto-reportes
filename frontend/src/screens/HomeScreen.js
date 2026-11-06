@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Modal, FlatList, AppState } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, FlatList, AppState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
@@ -10,6 +10,7 @@ import useOfflineSync from '../hooks/useOfflineSync';
 import useNotifications from '../hooks/useNotifications';
 import useCategories from '../hooks/useCategories';
 import { subscribe as subscribeQueue, getPendingCount, isSyncing, clearQueue } from '../services/offlineQueue';
+import confirmAction from '../utils/confirmAction';
 import { syncStatusNotifications, markAllRead, clearNotifications } from '../services/notifications';
 
 // Tiempo máximo por petición del polling: una petición colgada no debe bloquear los refrescos.
@@ -220,34 +221,31 @@ export default function HomeScreen({ navigation, route }) {
       navigation.navigate('Login');
       return;
     }
-    Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Salir',
-        style: 'destructive',
-        onPress: async () => {
-          try { await api.post('/logout'); } catch {}
-          // La cola, el snapshot y las notificaciones son por usuario: no deben sobrevivir
-          // al cierre de sesión (si no, un segundo usuario vería datos del anterior).
-          await clearQueue();
-          await clearNotifications();
-          await AsyncStorage.multiRemove(['token', 'userName', 'userId', 'isAdmin', 'reportStatusSnapshot']);
-          clearAuthToken();
-          navigation.reset({ index: 0, routes: [{ name: 'Home', params: { guest: true } }] });
-        },
+    confirmAction({
+      title: 'Cerrar sesión',
+      message: '¿Seguro que quieres salir?',
+      confirmText: 'Salir',
+      destructive: true,
+      onConfirm: async () => {
+        try { await api.post('/logout'); } catch {}
+        // La cola, el snapshot y las notificaciones son por usuario: no deben sobrevivir
+        // al cierre de sesión (si no, un segundo usuario vería datos del anterior).
+        await clearQueue();
+        await clearNotifications();
+        await AsyncStorage.multiRemove(['token', 'userName', 'userId', 'isAdmin', 'reportStatusSnapshot']);
+        clearAuthToken();
+        navigation.reset({ index: 0, routes: [{ name: 'Home', params: { guest: true } }] });
       },
-    ]);
+    });
   };
 
   const handleGuestBlock = (action) => {
-    Alert.alert(
-      'Inicia sesión',
-      `Para ${action} necesitas una cuenta.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Iniciar sesión', onPress: () => navigation.navigate('Login') },
-      ]
-    );
+    confirmAction({
+      title: 'Inicia sesión',
+      message: `Para ${action} necesitas una cuenta.`,
+      confirmText: 'Iniciar sesión',
+      onConfirm: () => navigation.navigate('Login'),
+    });
   };
 
   const pendientes = myReports.filter(r => r.status?.toLowerCase() === 'pendiente').length;
@@ -326,6 +324,9 @@ export default function HomeScreen({ navigation, route }) {
         onSelectReport={(reportId) => navigation.navigate('DetalleReporte', { reportId })}
       />
 
+      {/* Tarjeta de saludo y filtros en un mismo bloque: los filtros siempre quedan debajo de la
+          tarjeta, aunque el título se parta en varias líneas en pantallas angostas. */}
+      <View style={styles.topOverlay} pointerEvents="box-none">
       {/* Greeting card */}
       <View style={styles.greetingCard}>
         <View style={styles.greetingBody}>
@@ -442,6 +443,7 @@ export default function HomeScreen({ navigation, route }) {
           )}
         </View>
       </View>
+      </View>
 
       {userLocation && (
         <TouchableOpacity
@@ -519,9 +521,9 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
 
+  topOverlay: { position: 'absolute', top: 56, left: 0, right: 0 },
   greetingCard: {
-    position: 'absolute',
-    top: 56, left: 16, right: 16,
+    marginHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -551,10 +553,7 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 12, color: '#6b7280' },
   badgeSep:  { fontSize: 12, color: '#d1d5db' },
 
-  filtersWrapper: {
-    position: 'absolute',
-    top: 126, left: 0, right: 0,
-  },
+  filtersWrapper: { marginTop: 10 },
   filtersContent:   { paddingHorizontal: 16, gap: 8 },
   chip: {
     paddingHorizontal: 14,

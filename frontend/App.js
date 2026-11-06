@@ -17,6 +17,12 @@ import { setAuthToken, setUnauthorizedHandler } from './src/services/api';
 
 const Stack = createStackNavigator();
 
+// En web el stack deja crecer cada pantalla con su contenido y el scroll pasa al documento, que la app
+// tiene bloqueado (body con overflow hidden): lo que queda bajo el borde de la ventana no se puede
+// alcanzar, las listas largas se dibujan enteras y los avisos fijos quedan al final de la página.
+// Acotar la tarjeta a la ventana hace que scrollee cada ScrollView/FlatList, como en móvil.
+const WEB_CARD_STYLE = Platform.OS === 'web' ? { flex: 1, overflow: 'hidden' } : undefined;
+
 export default function App() {
   const [startup, setStartup] = useState(null);
   const navigationRef = useRef(null);
@@ -93,7 +99,7 @@ export default function App() {
 
   return (
     <NavigationContainer ref={navigationRef} initialState={initialState}>
-      <Stack.Navigator initialRouteName="Home">
+      <Stack.Navigator initialRouteName="Home" screenOptions={{ cardStyle: WEB_CARD_STYLE }}>
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
