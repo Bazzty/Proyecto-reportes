@@ -550,7 +550,11 @@ class ReportApiTest extends TestCase
         $report = $this->sampleReport($category, $admin);
         Sanctum::actingAs($admin, ['*']);
 
-        $this->patchJson("/api/reports/{$report->id}/status", ['status' => 'Resuelto'])->assertOk();
+        $this->patchJson("/api/reports/{$report->id}/status", ['status' => 'Resuelto'])
+            ->assertOk()
+            ->assertJsonPath('status_updated_by.id', $admin->id)
+            ->assertJsonPath('status_updated_by.name', $admin->name)
+            ->assertJsonStructure(['status_updated_at']);
 
         $this->assertDatabaseHas('reports', [
             'id' => $report->id,

@@ -7,6 +7,8 @@ use App\Models\Report;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -125,6 +127,43 @@ class AdminReportTest extends TestCase
             ->assertOk()
             ->assertJsonPath('meta.total', 1)
             ->assertJsonPath('data.0.id', $match->id);
+    }
+
+    public function test_admin_list_includes_counts_by_validation_status()
+    {
+        $category = Category::create(['name' => 'basura']);
+        $user = User::factory()->create();
+        $this->makeReport($user, $category);
+        $this->makeReport($user, $category);
+        $this->makeReport($user, $category, 'valido');
+        Sanctum::actingAs($this->makeAdmin(), ['*']);
+
+        $this->getJson('/api/admin/reports')
+            ->assertOk()
+            ->assertJsonPath('meta.counts', ['pendiente' => 2, 'valido' => 1, 'rechazado' => 0, 'total' => 3]);
+    }
+
+    public function test_counts_ignore_validation_status_filter_but_apply_the_others()
+    {
+        $basura = Category::create(['name' => 'basura']);
+        $escombros = Category::create(['name' => 'escombros']);
+        $user = User::factory()->create();
+        $this->makeReport($user, $basura);
+        $this->makeReport($user, $basura, 'rechazado');
+        $this->makeReport($user, $escombros, 'valido');
+        $resolved = $this->makeReport($user, $basura, 'valido');
+        $resolved->update(['status' => 'Resuelto']);
+        Sanctum::actingAs($this->makeAdmin(), ['*']);
+
+        // El filtro de validación recorta la lista pero no los conteos.
+        $this->getJson("/api/admin/reports?validation_status=valido&category_id={$basura->id}")
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('meta.counts', ['pendiente' => 1, 'valido' => 1, 'rechazado' => 1, 'total' => 3]);
+
+        $this->getJson("/api/admin/reports?category_id={$basura->id}&status=Resuelto")
+            ->assertOk()
+            ->assertJsonPath('meta.counts', ['pendiente' => 0, 'valido' => 1, 'rechazado' => 0, 'total' => 1]);
     }
 
     public function test_admin_can_validate_a_report()
@@ -256,5 +295,49 @@ class AdminReportTest extends TestCase
             'id' => $report->id,
             'validation_status' => 'valido',
         ]);
+    }
+
+    private function reportPayload(Category $category): array
+    {
+        return [
+            'description' => 'Reporte nuevo',
+            'latitude' => -41.3,
+            'longitude' => -72.9,
+            'category_id' => $category->id,
+            'photo' => UploadedFile::fake()->create('photo.jpg', 100, 'image/jpeg'),
+        ];
+    }
+
+    public function test_report_created_by_admin_is_validated_automatically()
+    {
+        Storage::fake('public');
+        $admin = $this->makeAdmin();
+        Sanctum::actingAs($admin, ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $id = $this->postJson('/api/reports', $this->reportPayload($category))
+            ->assertCreated()
+            ->assertJsonPath('validation_status', 'valido')
+            ->json('id');
+
+        $report = Report::findOrFail($id);
+        $this->assertSame($admin->id, $report->validated_by);
+        $this->assertNotNull($report->validated_at);
+
+        $this->patchJson("/api/reports/{$id}/status", ['status' => 'En Progreso'])->assertOk();
+    }
+
+    public function test_report_created_by_regular_user_stays_pending()
+    {
+        Storage::fake('public');
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $category = Category::create(['name' => 'basura']);
+
+        $id = $this->postJson('/api/reports', $this->reportPayload($category))
+            ->assertCreated()
+            ->assertJsonPath('validation_status', 'pendiente')
+            ->json('id');
+
+        $this->assertNull(Report::findOrFail($id)->validated_by);
     }
 }

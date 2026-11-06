@@ -64,6 +64,11 @@ class Report extends Model
         return $this->belongsTo(User::class, 'validated_by');
     }
 
+    public function statusUpdatedBy()
+    {
+        return $this->belongsTo(User::class, 'status_updated_by');
+    }
+
     public function confirmations()
     {
         return $this->hasMany(Confirmation::class);

@@ -34,7 +34,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Panel de administración: recibir y validar/rechazar reportes.
     Route::middleware('admin')->group(function () {
+        // Rutas fijas antes de /admin/reports/{id}/...: no deben confundirse con un id.
         Route::get('/admin/reports', [AdminReportController::class, 'index']);
-        Route::patch('/admin/reports/{id}/validation', [AdminReportController::class, 'updateValidation']);
+        Route::get('/admin/reports/summary', [AdminReportController::class, 'summary']);
+        Route::get('/admin/reports/export', [AdminReportController::class, 'export']);
+        Route::post('/admin/reports/bulk-validation', [AdminReportController::class, 'bulkValidation']);
+        Route::get('/admin/zones', [AdminReportController::class, 'zones']);
+        Route::patch('/admin/reports/{id}/validation', [AdminReportController::class, 'updateValidation'])->whereNumber('id');
     });
 });
