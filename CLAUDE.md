@@ -107,6 +107,16 @@ npm install   # only needed after cloning — dependencies are in package.json
 npx expo start
 ```
 
+### Generar APK (Android)
+
+`eas.json` tiene el perfil `preview` que genera un APK instalable. `EXPO_PUBLIC_API_URL` del APK sale de `eas.json` (no de `.env`, que no se sube a EAS): actualízala a la IP actual del backend o a una URL pública (ngrok) antes de compilar. El APK permite `http://` (`usesCleartextTraffic`) porque el backend local no tiene TLS.
+
+```bash
+cd frontend
+npx eas-cli login
+npx eas-cli build -p android --profile preview
+```
+
 Structure: `frontend/src/screens/`, `frontend/src/components/`, `frontend/src/services/`. All API calls go through `src/services/api.js` (axios instance with Sanctum token support already configured).
 
 ## Git workflow

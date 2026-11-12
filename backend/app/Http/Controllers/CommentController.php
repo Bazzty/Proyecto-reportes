@@ -15,7 +15,7 @@ class CommentController extends Controller
         abort_unless($report->isVisibleTo($request->user('sanctum')), 404);
 
         return response()->json(
-            $report->comments()->with('user:id,name')->latest()->get()
+            $report->comments()->with('user:id,name')->latest()->latest('id')->get()
                 ->map(fn (Comment $c) => [
                     'id' => $c->id,
                     'body' => $c->body,

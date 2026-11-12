@@ -4,14 +4,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import api, { clearAuthToken } from '../services/api';
+import api from '../services/api';
+import { clearSession } from '../services/session';
 import LeafletMap from '../components/LeafletMap';
 import useOfflineSync from '../hooks/useOfflineSync';
 import useNotifications from '../hooks/useNotifications';
 import useCategories from '../hooks/useCategories';
-import { subscribe as subscribeQueue, getPendingCount, isSyncing, clearQueue } from '../services/offlineQueue';
+import { subscribe as subscribeQueue, getPendingCount, isSyncing } from '../services/offlineQueue';
 import confirmAction from '../utils/confirmAction';
-import { syncStatusNotifications, markAllRead, clearNotifications } from '../services/notifications';
+import { syncStatusNotifications, markAllRead } from '../services/notifications';
 
 // Tiempo máximo por petición del polling: una petición colgada no debe bloquear los refrescos.
 const POLL_TIMEOUT_MS = 10000;
@@ -238,10 +239,7 @@ export default function HomeScreen({ navigation, route }) {
         try { await api.post('/logout'); } catch {}
         // La cola, el snapshot y las notificaciones son por usuario: no deben sobrevivir
         // al cierre de sesión (si no, un segundo usuario vería datos del anterior).
-        await clearQueue();
-        await clearNotifications();
-        await AsyncStorage.multiRemove(['token', 'userName', 'userId', 'isAdmin', 'reportStatusSnapshot']);
-        clearAuthToken();
+        await clearSession();
         navigation.reset({ index: 0, routes: [{ name: 'Home', params: { guest: true } }] });
       },
     });

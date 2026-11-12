@@ -39,9 +39,12 @@ export const markAllRead = async () => {
 
 export const clearNotifications = () => write([]);
 
+// Evita duplicar el mismo cambio (dos sincronizaciones simultáneas), pero solo compara con el
+// último aviso del reporte: si el estado vuelve a cambiar igual que antes (A→B→A→B), se avisa de nuevo.
 const pushUnique = async (notification) => {
   const list = await read();
-  if (list.some((item) => item.id === notification.id)) return;
+  const lastForReport = list.find((item) => item.reportId === notification.reportId);
+  if (lastForReport?.id === notification.id) return;
   await write([notification, ...list].slice(0, MAX_NOTIFICATIONS));
 };
 
@@ -64,7 +67,7 @@ export const syncStatusNotifications = async (myReports) => {
 
     if (previous !== undefined && previous !== current) {
       await pushUnique({
-        id: `status-${report.id}-${current}`,
+        id: `status-${report.id}-${previous}-${current}`,
         type: 'status',
         reportId: report.id,
         message: `Tu reporte pasó a "${current}".`,

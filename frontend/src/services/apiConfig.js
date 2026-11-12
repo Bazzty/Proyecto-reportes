@@ -37,7 +37,9 @@ export function resolveApiUrl({ envUrl, hostUri, isDev }) {
   const match = /^(https?:\/\/)([^/:?#]+)(:\d+)?(.*)$/i.exec(configured);
   if (!match) return configured;
   const [, protocol, host, port = '', rest] = match;
-  if (!isLocalHost(host) || host === metroHost) return configured;
+  // Con `expo start --tunnel` Metro es un dominio público (*.exp.direct) que no sirve el backend:
+  // solo se reemplaza cuando ambos hosts son de la red local.
+  if (!isLocalHost(host) || !isLocalHost(metroHost) || host === metroHost) return configured;
 
   return `${protocol}${metroHost}${port}${rest}`;
 }

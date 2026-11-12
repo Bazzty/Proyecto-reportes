@@ -1,24 +1,19 @@
 {
   "expo": {
-    "name": "frontend",
+    "name": "Reportes Ambientales",
     "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Se necesita acceso a tu galería para adjuntar fotos a los reportes.",
         "NSCameraUsageDescription": "Se necesita acceso a la cámara para tomar fotos de las incidencias.",
         "NSLocationWhenInUseUsageDescription": "Se necesita tu ubicación para registrar el lugar de la incidencia."
-      }
+      },
+      "bundleIdentifier": "com.reportesambientales.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -26,13 +21,14 @@
         "backgroundColor": "#ffffff"
       },
       "softwareKeyboardLayoutMode": "resize",
-      "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION"
-      ]
+      ],
+      "package": "com.reportesambientales.app",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -40,7 +36,25 @@
     "plugins": [
       "expo-image",
       "expo-status-bar",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ]
     ]
   }
 }

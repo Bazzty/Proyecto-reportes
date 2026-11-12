@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Confirmation;
 use App\Models\Report;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -18,22 +19,28 @@ class ConfirmationController extends Controller
 
         abort_if((int) $report->user_id === (int) $userId, 403, 'No puedes confirmar tu propio reporte.');
 
-        $confirmed = DB::transaction(function () use ($userId, $report) {
-            $existing = Confirmation::where('user_id', $userId)
-                ->where('report_id', $report->id)
-                ->lockForUpdate()
-                ->first();
+        try {
+            $confirmed = DB::transaction(function () use ($userId, $report) {
+                $existing = Confirmation::where('user_id', $userId)
+                    ->where('report_id', $report->id)
+                    ->lockForUpdate()
+                    ->first();
 
-            if ($existing) {
-                $existing->delete();
+                if ($existing) {
+                    $existing->delete();
 
-                return false;
-            }
+                    return false;
+                }
 
-            Confirmation::create(['user_id' => $userId, 'report_id' => $report->id]);
+                Confirmation::create(['user_id' => $userId, 'report_id' => $report->id]);
 
-            return true;
-        });
+                return true;
+            }, 3);
+        } catch (UniqueConstraintViolationException) {
+            // Dos toggles simultáneos del mismo usuario: el otro insertó primero. Se responde con el
+            // estado real (confirmado) en vez de un 500.
+            $confirmed = true;
+        }
 
         return response()->json([
             'confirmed' => $confirmed,

@@ -34,6 +34,8 @@ jest.mock('@react-navigation/stack', () => {
     }),
   };
 });
+const mockClearSession = jest.fn(async () => {});
+jest.mock('../services/session', () => ({ clearSession: (...args) => mockClearSession(...args) }));
 jest.mock('../screens/WelcomeScreen', () => () => null);
 jest.mock('../screens/LoginScreen', () => () => null);
 jest.mock('../screens/RegisterScreen', () => () => null);
@@ -80,7 +82,8 @@ describe('App', () => {
     await renderApp();
     await screen.findByText('ruta:Home');
 
-    mockUnauthorizedHandler();
+    await mockUnauthorizedHandler();
+    expect(mockClearSession).toHaveBeenCalled();
     expect(mockReset).toHaveBeenCalledWith(GUEST_STATE);
   });
 

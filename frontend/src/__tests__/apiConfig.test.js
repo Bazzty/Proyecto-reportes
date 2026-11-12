@@ -19,6 +19,11 @@ describe('resolveApiUrl', () => {
     expect(resolveApiUrl({ envUrl: url, hostUri: '192.168.1.5:8081', isDev: true })).toBe(url);
   });
 
+  it('con expo --tunnel (Metro en un dominio público) mantiene la IP configurada', () => {
+    const url = 'http://192.168.1.10:8000/api';
+    expect(resolveApiUrl({ envUrl: url, hostUri: 'abc-anonymous-8081.exp.direct', isDev: true })).toBe(url);
+  });
+
   it('fuera de desarrollo usa la URL configurada tal cual', () => {
     const url = 'http://10.0.0.2:8000/api';
     expect(resolveApiUrl({ envUrl: url, hostUri: '192.168.1.5:8081', isDev: false })).toBe(url);
