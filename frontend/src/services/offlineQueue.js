@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { randomUUID } from 'expo-crypto';
 import api from './api';
+import { UPLOAD_TIMEOUT_MS } from './apiConfig';
 
 const STORAGE_KEY = 'offlineReports';
 const PHOTO_DIR = `${FileSystem.documentDirectory}pending-reports/`;
@@ -141,7 +142,10 @@ export const syncPending = async () => {
           form.append('photo', { uri: item.photoUri, type: 'image/jpeg', name: 'reporte.jpg' });
         }
 
-        await api.post('/reports', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+        await api.post('/reports', form, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: UPLOAD_TIMEOUT_MS,
+        });
 
         await removeFromQueue(item.localId);
         synced += 1;

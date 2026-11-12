@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react-nativ
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RegisterScreen from '../screens/RegisterScreen';
 import api, { setAuthToken } from '../services/api';
+import { CONNECTION_ERROR_MESSAGE } from '../services/apiConfig';
 
 jest.mock('../services/api', () => ({
   __esModule: true,
@@ -100,12 +101,21 @@ describe('RegisterScreen', () => {
   });
 
   it('un error sin detalle muestra "No se pudo registrar."', async () => {
-    api.post.mockRejectedValue(new Error('network'));
+    api.post.mockRejectedValue({ response: { status: 500, data: {} } });
     await setup();
     await fill();
     await fireEvent.press(screen.getByText('Registrarse'));
 
     await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Error', 'No se pudo registrar.'));
+  });
+
+  it('sin respuesta del servidor avisa que no hay conexión', async () => {
+    api.post.mockRejectedValue(new Error('Network Error'));
+    await setup();
+    await fill();
+    await fireEvent.press(screen.getByText('Registrarse'));
+
+    await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Error', CONNECTION_ERROR_MESSAGE));
   });
 
   describe('cierre del teclado al tocar fuera', () => {
