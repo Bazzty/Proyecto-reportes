@@ -309,6 +309,26 @@ class AdminPanelTest extends TestCase
         $this->assertSame('valido', $report->fresh()->validation_status);
     }
 
+    public function test_undo_validation_gives_409_if_status_already_advanced()
+    {
+        $admin = $this->actAsAdmin();
+        $editor = User::factory()->create();
+        $report = $this->makeReport([
+            'validation_status' => 'valido', 'validated_by' => $admin->id, 'validated_at' => now(),
+            'status' => 'Resuelto', 'status_updated_by' => $editor->id, 'status_updated_at' => now(),
+        ]);
+
+        $this->patchJson("/api/admin/reports/{$report->id}/validation", [
+            'validation_status' => 'pendiente',
+            'expected_validation_status' => 'valido',
+        ])->assertStatus(409);
+
+        $fresh = $report->fresh();
+        $this->assertSame('valido', $fresh->validation_status);
+        $this->assertSame('Resuelto', $fresh->status);
+        $this->assertSame($editor->id, $fresh->status_updated_by);
+    }
+
     public function test_undo_validation_does_not_require_reason_and_requires_expected()
     {
         $admin = $this->actAsAdmin();

@@ -139,13 +139,7 @@ class ReportController extends Controller
 
         // Solo lo llaman administradores: se devuelve también quién y cuándo cambió el estado,
         // para que el panel actualice el historial de la tarjeta sin recargar.
-        return response()->json(array_merge($this->formatReport($report, $uid), [
-            'status_updated_by' => $report->statusUpdatedBy ? [
-                'id' => $report->statusUpdatedBy->id,
-                'name' => $report->statusUpdatedBy->name,
-            ] : null,
-            'status_updated_at' => $report->status_updated_at?->toISOString(),
-        ]));
+        return response()->json(array_merge($this->formatReport($report, $uid), $this->formatStatusUpdate($report)));
     }
 
     public function heatmap()

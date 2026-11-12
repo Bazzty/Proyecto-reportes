@@ -101,6 +101,9 @@ export default function AdminReportsScreen({ navigation }) {
   // Última versión de la lista y de sus ids, para el polling y para decidir si una tarjeta sigue.
   const reportsRef = useRef([]);
   const knownIdsRef = useRef(new Set());
+  // Id más alto visto desde la última recarga completa: el polling solo avisa de reportes más nuevos.
+  // No baja cuando un reporte sale de la lista, así los que suben desde la página 2 no cuentan.
+  const newestIdRef = useRef(0);
   // Los avisos con "Deshacer" llaman a la versión más reciente del manejador, no a la del render
   // en que se mostraron.
   const undoHandlerRef = useRef(null);
@@ -108,6 +111,7 @@ export default function AdminReportsScreen({ navigation }) {
   useEffect(() => {
     reportsRef.current = reports;
     knownIdsRef.current = new Set(reports.map(r => r.id));
+    reports.forEach((r) => { if (r.id > newestIdRef.current) newestIdRef.current = r.id; });
   }, [reports]);
 
   const dismissToast = useCallback(() => {
@@ -180,6 +184,8 @@ export default function AdminReportsScreen({ navigation }) {
         if (requestId !== requestRef.current) return;
         const rows = res.data.data ?? [];
         const meta = res.data.meta ?? {};
+        // Recarga completa (otros filtros o "Mostrar"): el tope se recalcula con la lista nueva.
+        if (pageToLoad === 1) newestIdRef.current = 0;
         setReports(prev => (pageToLoad === 1 ? rows : [...prev, ...rows]));
         setPage(meta.current_page ?? 1);
         setLastPage(meta.last_page ?? 1);
@@ -578,7 +584,7 @@ export default function AdminReportsScreen({ navigation }) {
       && !confirmingBulk && !actionInProgress,
     params: listParams,
     listVersionRef,
-    knownIdsRef,
+    newestIdRef,
     onResult: handlePollResult,
   });
 

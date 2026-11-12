@@ -353,7 +353,7 @@ export default function HomeScreen({ navigation, route }) {
             <Text style={styles.greetingSubtitle}>Reporta incidencias ambientales en tu zona</Text>
           )}
         </View>
-        {isAdmin && (
+        {isAdmin && !isGuest && (
           <TouchableOpacity
             style={styles.bell}
             testID="admin-button"

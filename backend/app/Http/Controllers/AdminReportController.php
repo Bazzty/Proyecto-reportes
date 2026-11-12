@@ -92,10 +92,18 @@ class AdminReportController extends Controller
             ->first();
         $topZone = $top ? Zone::find($top->zone_id, ['id', 'name']) : null;
 
+        // Los tres conteos en una sola pasada sobre la tabla.
+        $totals = Report::query()
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw("SUM(CASE WHEN validation_status = 'pendiente' THEN 1 ELSE 0 END) as pending")
+            ->selectRaw('SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as new_this_week', [now()->subDays(7)])
+            ->toBase()
+            ->first();
+
         return response()->json([
-            'total' => Report::count(),
-            'pending' => Report::where('validation_status', 'pendiente')->count(),
-            'new_this_week' => Report::where('created_at', '>=', now()->subDays(7))->count(),
+            'total' => (int) $totals->total,
+            'pending' => (int) $totals->pending,
+            'new_this_week' => (int) $totals->new_this_week,
             'avg_validation_hours' => $avg,
             'top_zone' => $topZone ? [
                 'id' => $topZone->id,
@@ -215,6 +223,12 @@ class AdminReportController extends Controller
         // validan a la vez, el segundo afecta 0 filas y recibe 409.
         $affected = Report::whereKey($id)
             ->where('validation_status', $data['expected_validation_status'])
+            // Deshacer una validación: si otro admin ya avanzó el estado (En Progreso / Resuelto),
+            // volver a pendiente borraría ese cambio. Se trata como conflicto (409).
+            ->when(
+                $data['validation_status'] === 'pendiente' && $data['expected_validation_status'] === 'valido',
+                fn ($q) => $q->where('status', 'Pendiente')
+            )
             ->update($data['validation_status'] === 'pendiente'
                 // Deshacer: vuelve al estado inicial y borra todo rastro de la moderación y del cambio de estado.
                 ? [
@@ -325,11 +339,7 @@ class AdminReportController extends Controller
                 'id' => $report->validatedBy->id,
                 'name' => $report->validatedBy->name,
             ] : null,
-            'status_updated_by' => $report->statusUpdatedBy ? [
-                'id' => $report->statusUpdatedBy->id,
-                'name' => $report->statusUpdatedBy->name,
-            ] : null,
-            'status_updated_at' => $report->status_updated_at?->toISOString(),
+            ...$this->formatStatusUpdate($report),
             // El admin que reporta se valida solo; el panel lo distingue de una moderación real.
             'auto_validated' => $report->validated_by !== null && (int) $report->validated_by === (int) $report->user_id,
         ]);

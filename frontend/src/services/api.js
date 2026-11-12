@@ -22,7 +22,9 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401 && _onUnauthorized) {
-      await AsyncStorage.removeItem('token');
+      // Se borra toda la sesión (igual que al cerrar sesión): la app vuelve al mapa como invitado
+      // y no debe quedar, por ejemplo, isAdmin del usuario anterior.
+      await AsyncStorage.multiRemove(['token', 'userName', 'userId', 'isAdmin', 'reportStatusSnapshot']);
       clearAuthToken();
       _onUnauthorized();
     }

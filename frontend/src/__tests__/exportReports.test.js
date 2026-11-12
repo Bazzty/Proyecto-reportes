@@ -30,6 +30,11 @@ describe('exportReports', () => {
     expect(countCsvRows(undefined)).toBe(0);
   });
 
+  it('no corta una fila por saltos de línea dentro de un campo entre comillas', () => {
+    expect(countCsvRows('id,desc\n1,"línea 1\nlínea 2\r\nlínea 3"\n2,b\n')).toBe(2);
+    expect(countCsvRows('id,desc\n1,"con ""comillas""\ny salto"\n')).toBe(1);
+  });
+
   describe('en móvil', () => {
     it('comparte el CSV con Share.share', async () => {
       jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });

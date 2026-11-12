@@ -7,11 +7,28 @@ const pad = (n) => String(n).padStart(2, '0');
 export const csvFilename = (date = new Date()) =>
   `reportes-${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}.csv`;
 
-// Filas de datos del CSV (sin la cabecera ni el BOM ni líneas vacías).
+// Filas de datos del CSV (sin la cabecera ni el BOM ni líneas vacías). Un salto de línea dentro de
+// un campo entre comillas (una descripción de varias líneas) no corta la fila.
 export const countCsvRows = (csv) => {
   if (typeof csv !== 'string') return 0;
-  const lines = csv.replace(/^﻿/, '').split(/\r?\n/).filter(line => line.trim() !== '');
-  return Math.max(0, lines.length - 1);
+  const text = csv.replace(/^﻿/, '');
+  let rows = 0;
+  let inQuotes = false;
+  let hasContent = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+      hasContent = true;
+    } else if (ch === '\n' && !inQuotes) {
+      if (hasContent) rows += 1;
+      hasContent = false;
+    } else if (ch !== '\r' && (inQuotes || ch.trim() !== '')) {
+      hasContent = true;
+    }
+  }
+  if (hasContent) rows += 1;
+  return Math.max(0, rows - 1);
 };
 
 // Web: descarga con un Blob y un enlace temporal. Móvil: hoja de compartir del sistema.

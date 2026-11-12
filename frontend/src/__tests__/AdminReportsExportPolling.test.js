@@ -141,6 +141,17 @@ describe('AdminReportsScreen: actualización automática', () => {
     expect(screen.getByLabelText('Todos, 16')).toBeTruthy();
   });
 
+  it('no cuenta como nuevos los reportes más antiguos que suben a la página 1', async () => {
+    const state = await setupPolling();
+    // El admin moderó la cola: en la página 1 aparece un reporte anterior (id menor) que no estaba cargado.
+    state.rows = [report(), report({ id: 0, description: 'Reporte antiguo de la página 2' })];
+
+    await tick();
+
+    expect(pollCalls()).toHaveLength(1);
+    expect(screen.queryByText(/nuevo/)).toBeNull();
+  });
+
   it('sin ids nuevos no muestra aviso', async () => {
     await setupPolling();
 
