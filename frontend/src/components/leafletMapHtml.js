@@ -13,7 +13,8 @@ export const buildPayload = (
   showMarkers = true,
   showHeat = true,
   pickable = false,
-  pickedLocation = null
+  pickedLocation = null,
+  topInset = 0
 ) => ({
   type: 'update',
   reports: reports.map(r => ({
@@ -33,6 +34,8 @@ export const buildPayload = (
   showHeat,
   pickable,
   pickedLocation,
+  // Alto (px) de lo que la app dibuja encima del mapa arriba: los popups se desplazan para no quedar debajo.
+  topInset,
 });
 
 export const HTML = `<!DOCTYPE html>
@@ -161,7 +164,13 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
       post({ type: 'select', reportId: id });
     }
 
+    var popupTopInset = 0;
+    function popupOptions() {
+      return { autoPanPaddingTopLeft: L.point(12, popupTopInset + 12) };
+    }
+
     function render(data) {
+      popupTopInset = Math.max(0, Number(data.topInset) || 0);
       if (heat) { map.removeLayer(heat); heat = null; }
       heatClickLayer.clearLayers();
       if (data.showHeat !== false && data.heat && data.heat.length) {
@@ -185,7 +194,7 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
               + '<div style="font-weight:bold;color:#0e7490">' + esc(p.zoneName || 'Sin zona') + '</div>'
               + '<div style="font-size:12px;color:#374151;margin-top:4px">' + n + ' reporte' + (n === 1 ? '' : 's') + '</div></div>';
           }
-          L.circleMarker([p.latitude, p.longitude], { radius: 14, opacity: 0, fillOpacity: 0 }).bindPopup(popup).addTo(heatClickLayer);
+          L.circleMarker([p.latitude, p.longitude], { radius: 14, opacity: 0, fillOpacity: 0 }).bindPopup(popup, popupOptions()).addTo(heatClickLayer);
         });
       }
 
@@ -209,7 +218,7 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
             + '<div style="font-size:12px;color:#374151;margin:4px 0">' + esc(r.description || '') + '</div>'
             + '<div style="font-size:11px;color:#9ca3af">' + esc(r.user || '') + '</div>'
             + '<a href="#" onclick="select(' + r.id + ');return false;" style="color:#0e7490;font-weight:600;font-size:12px">Ver detalle &rarr;</a></div>';
-          L.marker([r.latitude, r.longitude], { icon: icon }).bindPopup(popup).addTo(markersLayer);
+          L.marker([r.latitude, r.longitude], { icon: icon }).bindPopup(popup, popupOptions()).addTo(markersLayer);
         });
       }
 

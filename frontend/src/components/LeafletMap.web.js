@@ -5,7 +5,7 @@ import { HTML, buildPayload } from './leafletMapHtml';
 const LeafletMap = forwardRef(function LeafletMap(
   {
     reports = [], heat = [], userLocation = null, showMarkers = true, showHeat = true,
-    pickable = false, pickedLocation = null, onSelectReport, onPick, style,
+    pickable = false, pickedLocation = null, topInset = 0, onSelectReport, onPick, style,
   },
   ref
 ) {
@@ -22,8 +22,8 @@ const LeafletMap = forwardRef(function LeafletMap(
   };
 
   useEffect(() => {
-    send(buildPayload(reports, heat, userLocation, showMarkers, showHeat, pickable, pickedLocation));
-  }, [reports, heat, userLocation, showMarkers, showHeat, pickable, pickedLocation]);
+    send(buildPayload(reports, heat, userLocation, showMarkers, showHeat, pickable, pickedLocation, topInset));
+  }, [reports, heat, userLocation, showMarkers, showHeat, pickable, pickedLocation, topInset]);
 
   useImperativeHandle(ref, () => ({
     centerOn: (latitude, longitude, zoom) => send({ type: 'center', lat: latitude, lng: longitude, zoom }),
@@ -39,7 +39,7 @@ const LeafletMap = forwardRef(function LeafletMap(
       try {
         const message = JSON.parse(event.data);
         if (message.type === 'ready') {
-          send(buildPayload(reports, heat, userLocation, showMarkers, showHeat, pickable, pickedLocation));
+          send(buildPayload(reports, heat, userLocation, showMarkers, showHeat, pickable, pickedLocation, topInset));
         } else if (message.type === 'select' && onSelectReport) {
           onSelectReport(message.reportId);
         } else if (message.type === 'pick' && onPick) {
@@ -52,7 +52,7 @@ const LeafletMap = forwardRef(function LeafletMap(
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [reports, heat, userLocation, showMarkers, showHeat, pickable, pickedLocation, onSelectReport, onPick]);
+  }, [reports, heat, userLocation, showMarkers, showHeat, pickable, pickedLocation, topInset, onSelectReport, onPick]);
 
   return (
     <View style={[styles.container, style]} testID="leaflet-map">
