@@ -117,11 +117,17 @@ export default function HomeScreen({ navigation, route }) {
 
   useEffect(() => {
     (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
-      const loc = await Location.getCurrentPositionAsync({});
-      setUserLocation(loc.coords);
-      leafletRef.current?.centerOn(loc.coords.latitude, loc.coords.longitude, 14);
+      // Centrar el mapa en el usuario es opcional: sin permiso, sin GPS o sin señal (interiores, el
+      // simulador sin ubicación) el mapa se queda en su vista por defecto en vez de lanzar un error.
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+        const loc = await Location.getCurrentPositionAsync({});
+        setUserLocation(loc.coords);
+        leafletRef.current?.centerOn(loc.coords.latitude, loc.coords.longitude, 14);
+      } catch (error) {
+        console.warn('No se pudo obtener la ubicación para centrar el mapa:', error?.message ?? error);
+      }
     })();
   }, []);
 

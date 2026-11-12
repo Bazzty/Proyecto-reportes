@@ -289,6 +289,20 @@ describe('HomeScreen', () => {
     expect(mockCenterOn).toHaveBeenLastCalledWith(-41.3, -72.9, 15);
   });
 
+  it('si no se puede obtener la ubicación el mapa queda en su vista por defecto, sin error sin manejar', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    Location.getCurrentPositionAsync.mockRejectedValue(new Error('Cannot obtain current location'));
+    await setup();
+
+    await waitFor(() => expect(warn).toHaveBeenCalledWith(
+      'No se pudo obtener la ubicación para centrar el mapa:', 'Cannot obtain current location',
+    ));
+    expect(mockCenterOn).not.toHaveBeenCalled();
+    expect(screen.queryByText('icon:locate')).toBeNull();
+    warn.mockRestore();
+  });
+
   it('sin permiso de ubicación no centra el mapa ni muestra el botón', async () => {
     await setup();
     expect(mockCenterOn).not.toHaveBeenCalled();
