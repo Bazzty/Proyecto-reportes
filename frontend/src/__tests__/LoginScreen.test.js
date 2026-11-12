@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react-nativ
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LoginScreen from '../screens/LoginScreen';
 import api, { setAuthToken } from '../services/api';
+import { CONNECTION_ERROR_MESSAGE } from '../services/apiConfig';
 
 jest.mock('../services/api', () => ({
   __esModule: true,
@@ -61,13 +62,24 @@ describe('LoginScreen', () => {
   });
 
   it('si la API falla sin mensaje usa "Credenciales incorrectas."', async () => {
-    api.post.mockRejectedValue(new Error('network'));
+    api.post.mockRejectedValue({ response: { status: 401, data: {} } });
     await setup();
     await fill('ana@example.com', 'mala');
     await fireEvent.press(screen.getByText('Ingresar'));
 
     await waitFor(() =>
       expect(Alert.alert).toHaveBeenCalledWith('Error al iniciar sesión', 'Credenciales incorrectas.')
+    );
+  });
+
+  it('sin respuesta del servidor avisa que no hay conexión, no credenciales malas', async () => {
+    api.post.mockRejectedValue(new Error('timeout of 15000ms exceeded'));
+    await setup();
+    await fill('ana@example.com', 'secreta');
+    await fireEvent.press(screen.getByText('Ingresar'));
+
+    await waitFor(() =>
+      expect(Alert.alert).toHaveBeenCalledWith('Error al iniciar sesión', CONNECTION_ERROR_MESSAGE)
     );
   });
 

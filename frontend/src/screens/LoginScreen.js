@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { setAuthToken } from '../services/api';
+import { isConnectionError, CONNECTION_ERROR_MESSAGE } from '../services/apiConfig';
 import useKeyboardHeight from '../hooks/useKeyboardHeight';
 
 export default function LoginScreen({ navigation }) {
@@ -48,7 +49,10 @@ export default function LoginScreen({ navigation }) {
       // reset descarta el mapa de invitado que queda debajo y evita volver al Login con "atrás"
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (error) {
-      const message = error.response?.data?.message || 'Credenciales incorrectas.';
+      // Sin respuesta no son credenciales malas: no se llegó al servidor.
+      const message = isConnectionError(error)
+        ? CONNECTION_ERROR_MESSAGE
+        : error.response?.data?.message || 'Credenciales incorrectas.';
       Alert.alert('Error al iniciar sesión', message);
     } finally {
       setLoading(false);

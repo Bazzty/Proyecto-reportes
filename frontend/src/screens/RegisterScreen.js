@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { setAuthToken } from '../services/api';
+import { isConnectionError, CONNECTION_ERROR_MESSAGE } from '../services/apiConfig';
 import useKeyboardHeight from '../hooks/useKeyboardHeight';
 
 export default function RegisterScreen({ navigation }) {
@@ -64,7 +65,9 @@ export default function RegisterScreen({ navigation }) {
         const primerError = Object.values(errors)[0][0];
         Alert.alert('Error de validación', primerError);
       } else {
-        Alert.alert('Error', error.response?.data?.message || 'No se pudo registrar.');
+        Alert.alert('Error', isConnectionError(error)
+          ? CONNECTION_ERROR_MESSAGE
+          : error.response?.data?.message || 'No se pudo registrar.');
       }
     } finally {
       setLoading(false);

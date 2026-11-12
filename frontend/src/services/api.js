@@ -1,8 +1,17 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+import { resolveApiUrl, REQUEST_TIMEOUT_MS } from './apiConfig';
+
+export const API_URL = resolveApiUrl({
+  envUrl: process.env.EXPO_PUBLIC_API_URL,
+  hostUri: Constants.expoConfig?.hostUri,
+  isDev: typeof __DEV__ !== 'undefined' && __DEV__,
+});
 
 const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000/api',
+  baseURL: API_URL,
+  timeout: REQUEST_TIMEOUT_MS,
   headers: { 'ngrok-skip-browser-warning': 'true' },
 });
 

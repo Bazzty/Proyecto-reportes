@@ -10,6 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { randomUUID } from 'expo-crypto';
 import api from '../services/api';
+import { UPLOAD_TIMEOUT_MS } from '../services/apiConfig';
 import useAutoLocation from '../hooks/useAutoLocation';
 import useNetworkStatus from '../hooks/useNetworkStatus';
 import useKeyboardHeight from '../hooks/useKeyboardHeight';
@@ -171,6 +172,9 @@ export default function NewReportScreen({ navigation, route = {} }) {
 
       const { data: newReport } = await api.post('/reports', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        // La foto puede tardar en subir con mala señal; si aun así vence, se guarda sin conexión
+        // y el client_uuid evita un duplicado al reintentar.
+        timeout: UPLOAD_TIMEOUT_MS,
       });
 
       Alert.alert('¡Éxito!', 'Reporte enviado correctamente.', [
