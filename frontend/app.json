@@ -27,7 +27,6 @@
       },
       "softwareKeyboardLayoutMode": "resize",
       "edgeToEdgeEnabled": true,
-      "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -40,7 +39,8 @@
     },
     "plugins": [
       "expo-image",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-sharing"
     ]
   }
 }

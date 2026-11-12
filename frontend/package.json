@@ -27,6 +27,7 @@
     "expo-linear-gradient": "~57.0.2",
     "expo-location": "~57.0.20",
     "expo-network": "~57.0.2",
+    "expo-sharing": "~57.0.26",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",

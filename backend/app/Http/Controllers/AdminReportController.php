@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\FormatsReports;
 use App\Models\Report;
 use App\Models\Zone;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -116,18 +117,22 @@ class AdminReportController extends Controller
     public function bulkValidation(Request $request)
     {
         $data = $request->validate([
-            'ids' => ['required', 'array', 'min:1', 'max:50'],
-            'ids.*' => ['integer', 'distinct', 'exists:reports,id'],
+            // exists sobre el array completo: una sola consulta (WHERE id IN ...) en vez de una por id.
+            'ids' => ['required', 'array', 'min:1', 'max:50', 'exists:reports,id'],
+            'ids.*' => ['integer', 'distinct'],
             'validation_status' => ['required', Rule::in(['valido', 'rechazado'])],
             'rejection_reason' => ['nullable', 'string', 'max:500', 'required_if:validation_status,rechazado'],
         ]);
 
-        $uid = $request->user('sanctum')->id;
+        $admin = $request->user('sanctum');
+        $uid = $admin->id;
         $ids = array_map('intval', $data['ids']);
+        // Al segundo, como lo guarda la columna: la fecha devuelta coincide con la almacenada.
+        $now = now()->startOfSecond();
 
         // Selección bloqueada dentro de la transacción + UPDATE condicionado: dos admins
         // simultáneos no pisan; el segundo ve los reportes ya moderados y los omite.
-        $updated = DB::transaction(function () use ($ids, $data, $uid) {
+        $updated = DB::transaction(function () use ($ids, $data, $uid, $now) {
             $pending = Report::query()
                 ->whereIn('id', $ids)
                 ->where('validation_status', 'pendiente')
@@ -141,7 +146,7 @@ class AdminReportController extends Controller
                     'validation_status' => $data['validation_status'],
                     'rejection_reason' => $data['validation_status'] === 'rechazado' ? $data['rejection_reason'] : null,
                     'validated_by' => $uid,
-                    'validated_at' => now(),
+                    'validated_at' => $now,
                 ]);
             }
 
@@ -152,6 +157,9 @@ class AdminReportController extends Controller
             // Se conserva el orden en que llegaron los ids.
             'updated' => array_values(array_filter($ids, fn ($id) => in_array($id, $updated, true))),
             'skipped' => array_values(array_diff($ids, $updated)),
+            // Quién y cuándo moderó los actualizados: el panel completa el historial de las tarjetas sin recargar.
+            'validated_by' => ['id' => $admin->id, 'name' => $admin->name],
+            'validated_at' => $now->toISOString(),
         ]);
     }
 
@@ -214,10 +222,15 @@ class AdminReportController extends Controller
             'rejection_reason' => ['nullable', 'string', 'max:500', 'required_if:validation_status,rechazado'],
             // Obligatorio: el cliente debe declarar el estado que vio (concurrencia optimista).
             'expected_validation_status' => ['required', Rule::in(['pendiente', 'valido', 'rechazado'])],
+            // Deshacer hacia valido/rechazado: quién moderó antes y cuándo, para restaurarlo en vez de
+            // registrar como moderador a quien deshace. Van juntos y no aplican al volver a pendiente.
+            'restore_validated_by' => ['nullable', 'integer', 'exists:users,id', 'required_with:restore_validated_at', 'prohibited_if:validation_status,pendiente'],
+            'restore_validated_at' => ['nullable', 'date', 'before_or_equal:now', 'required_with:restore_validated_by', 'prohibited_if:validation_status,pendiente'],
         ]);
 
         $uid = $request->user('sanctum')->id;
         $report = Report::findOrFail($id);
+        $restore = isset($data['restore_validated_by'], $data['restore_validated_at']);
 
         // UPDATE atómico: solo aplica si el estado sigue siendo el esperado. Si dos admins
         // validan a la vez, el segundo afecta 0 filas y recibe 409.
@@ -245,8 +258,8 @@ class AdminReportController extends Controller
                     'rejection_reason' => $data['validation_status'] === 'rechazado'
                         ? ($data['rejection_reason'] ?? null)
                         : null,
-                    'validated_by' => $uid,
-                    'validated_at' => now(),
+                    'validated_by' => $restore ? (int) $data['restore_validated_by'] : $uid,
+                    'validated_at' => $restore ? Carbon::parse($data['restore_validated_at']) : now(),
                 ]);
 
         if ($affected === 0) {

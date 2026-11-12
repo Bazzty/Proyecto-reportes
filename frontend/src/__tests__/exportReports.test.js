@@ -1,10 +1,21 @@
 import { Platform, Share } from 'react-native';
 import api from '../services/api';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { csvFilename, countCsvRows, deliverCsv, exportReports } from '../services/exportReports';
 
 jest.mock('../services/api', () => ({
   __esModule: true,
   default: { get: jest.fn() },
+}));
+jest.mock('expo-file-system/legacy', () => ({
+  cacheDirectory: 'file:///cache/',
+  EncodingType: { UTF8: 'utf8' },
+  writeAsStringAsync: jest.fn(() => Promise.resolve()),
+}));
+jest.mock('expo-sharing', () => ({
+  isAvailableAsync: jest.fn(() => Promise.resolve(true)),
+  shareAsync: jest.fn(() => Promise.resolve()),
 }));
 
 describe('exportReports', () => {
@@ -36,19 +47,46 @@ describe('exportReports', () => {
   });
 
   describe('en móvil', () => {
-    it('comparte el CSV con Share.share', async () => {
-      jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    beforeEach(() => {
+      FileSystem.writeAsStringAsync.mockClear();
+      Sharing.shareAsync.mockClear();
+      Sharing.isAvailableAsync.mockResolvedValue(true);
+    });
+
+    it('guarda el CSV (con BOM) como archivo en la caché y comparte el archivo', async () => {
+      const spy = jest.spyOn(Share, 'share');
 
       const result = await deliverCsv('id\n1\n', 'reportes-2026-11-06.csv');
 
-      expect(Share.share).toHaveBeenCalledWith({ message: 'id\n1\n', title: 'reportes-2026-11-06.csv' });
+      expect(FileSystem.writeAsStringAsync).toHaveBeenCalledWith(
+        'file:///cache/reportes-2026-11-06.csv', '﻿id\n1\n', { encoding: 'utf8' },
+      );
+      expect(Sharing.shareAsync).toHaveBeenCalledWith('file:///cache/reportes-2026-11-06.csv', expect.objectContaining({
+        mimeType: 'text/csv',
+        dialogTitle: 'reportes-2026-11-06.csv',
+      }));
+      expect(spy).not.toHaveBeenCalled();
       expect(result).toEqual({ shared: true });
     });
 
-    it('si el usuario cierra la hoja de compartir no cuenta como exportado', async () => {
-      jest.spyOn(Share, 'share').mockResolvedValue({ action: Share.dismissedAction });
+    describe('si el dispositivo no puede compartir archivos', () => {
+      beforeEach(() => { Sharing.isAvailableAsync.mockResolvedValue(false); });
 
-      expect(await deliverCsv('id\n1\n', 'x.csv')).toEqual({ shared: false });
+      it('comparte el CSV como texto con Share.share', async () => {
+        jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+
+        const result = await deliverCsv('id\n1\n', 'reportes-2026-11-06.csv');
+
+        expect(Share.share).toHaveBeenCalledWith({ message: 'id\n1\n', title: 'reportes-2026-11-06.csv' });
+        expect(FileSystem.writeAsStringAsync).not.toHaveBeenCalled();
+        expect(result).toEqual({ shared: true });
+      });
+
+      it('si el usuario cierra la hoja de compartir no cuenta como exportado', async () => {
+        jest.spyOn(Share, 'share').mockResolvedValue({ action: Share.dismissedAction });
+
+        expect(await deliverCsv('id\n1\n', 'x.csv')).toEqual({ shared: false });
+      });
     });
   });
 

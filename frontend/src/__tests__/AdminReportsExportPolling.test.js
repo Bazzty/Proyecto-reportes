@@ -1,4 +1,6 @@
-import { AppState, Share } from 'react-native';
+import { AppState } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import api from '../services/api';
 import { resetSummaryPreference } from '../components/admin/SummaryCard';
@@ -7,6 +9,15 @@ import { report, COUNTS, setup, reportsCalls, lastReportsParams, openFilters } f
 jest.mock('../services/api', () => ({
   __esModule: true,
   default: { get: jest.fn(), patch: jest.fn(), post: jest.fn() },
+}));
+jest.mock('expo-file-system/legacy', () => ({
+  cacheDirectory: 'file:///cache/',
+  EncodingType: { UTF8: 'utf8' },
+  writeAsStringAsync: jest.fn(() => Promise.resolve()),
+}));
+jest.mock('expo-sharing', () => ({
+  isAvailableAsync: jest.fn(() => Promise.resolve(true)),
+  shareAsync: jest.fn(() => Promise.resolve()),
 }));
 jest.mock('@react-navigation/native', () => {
   const React = require('react');
@@ -18,7 +29,7 @@ const exportCalls = () => api.get.mock.calls.filter(([url]) => url === '/admin/r
 beforeEach(() => {
   jest.clearAllMocks();
   resetSummaryPreference();
-  jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+  Sharing.isAvailableAsync.mockResolvedValue(true);
 });
 
 afterEach(() => {
@@ -48,10 +59,13 @@ describe('AdminReportsScreen: exportar CSV', () => {
       },
       responseType: 'text',
     });
-    await waitFor(() => expect(Share.share).toHaveBeenCalledWith({
-      message: 'id,descripcion\n1,Basura\n',
-      title: expect.stringMatching(/^reportes-\d{4}-\d{2}-\d{2}\.csv$/),
-    }));
+    await waitFor(() => expect(Sharing.shareAsync).toHaveBeenCalledWith(
+      expect.stringMatching(/^file:\/\/\/cache\/reportes-\d{4}-\d{2}-\d{2}\.csv$/),
+      expect.objectContaining({ mimeType: 'text/csv' }),
+    ));
+    expect(FileSystem.writeAsStringAsync).toHaveBeenCalledWith(
+      expect.any(String), '﻿id,descripcion\n1,Basura\n', { encoding: 'utf8' },
+    );
     expect(await screen.findByText('1 reporte exportado.')).toBeTruthy();
   });
 
@@ -85,7 +99,7 @@ describe('AdminReportsScreen: exportar CSV', () => {
     await fireEvent.press(screen.getByLabelText('Exportar'));
 
     expect(await screen.findByText('No se pudo exportar los reportes.')).toBeTruthy();
-    expect(Share.share).not.toHaveBeenCalled();
+    expect(Sharing.shareAsync).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Exportar')).toBeEnabled();
   });
 
@@ -96,7 +110,7 @@ describe('AdminReportsScreen: exportar CSV', () => {
     await fireEvent.press(screen.getByLabelText('Exportar'));
 
     expect(await screen.findByText('No hay reportes para exportar con los filtros actuales.')).toBeTruthy();
-    expect(Share.share).not.toHaveBeenCalled();
+    expect(Sharing.shareAsync).not.toHaveBeenCalled();
   });
 });
 

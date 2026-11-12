@@ -182,6 +182,27 @@ describe('AdminReportsScreen: validar y rechazar en lote', () => {
     expect(screen.queryByText('Seleccionar visibles')).toBeNull();
   });
 
+  it('el historial de las tarjetas del lote muestra quién las validó, sin recargar', async () => {
+    api.post.mockResolvedValue({
+      data: { updated: [1], skipped: [], validated_by: { id: 9, name: 'Admin Uno' }, validated_at: '2026-11-12T15:00:00.000Z' },
+    });
+    await setup(two());
+    await screen.findByText('Uno');
+    await fireEvent.press(screen.getAllByText('Todos').at(0));
+    await screen.findByText('Uno');
+    const loadsBefore = reportsCalls().length;
+    await startSelecting();
+    await fireEvent.press(checkboxes()[0]);
+    await fireEvent.press(screen.getByText('Validar'));
+    await fireEvent.press((await screen.findAllByText('Validar')).at(-1));
+    expect(await screen.findByText('1 validado, 0 omitidos')).toBeTruthy();
+
+    await fireEvent.press(screen.getAllByLabelText('Historial').at(0));
+
+    expect(screen.getByText(/^Validado por Admin Uno/)).toBeTruthy();
+    expect(reportsCalls()).toHaveLength(loadsBefore);
+  });
+
   it('con filtro Todos actualiza las tarjetas en su sitio', async () => {
     api.post.mockResolvedValue({ data: { updated: [1], skipped: [] } });
     await setup(two());
@@ -282,6 +303,29 @@ describe('AdminReportsScreen: deshacer', () => {
     expect(await screen.findByText('Basura en la plaza')).toBeTruthy();
     expect(screen.getByLabelText('Pendientes, 3')).toBeTruthy();
     timeoutSpy.mockRestore();
+  });
+
+  it('deshacer el rechazo de un reporte ya válido restaura a quien lo validó y cuándo', async () => {
+    api.patch
+      .mockResolvedValueOnce({ data: report({ validation_status: 'rechazado', rejection_reason: 'Reporte duplicado' }) })
+      .mockResolvedValueOnce({ data: report({ validation_status: 'valido' }) });
+    await setup([report({
+      validation_status: 'valido', validated_by: { id: 7, name: 'Eva' }, validated_at: '2026-11-01T10:00:00.000Z',
+    })]);
+    await screen.findAllByText('Basura en la plaza');
+    await fireEvent.press(screen.getByText('Rechazar'));
+    await fireEvent.press(await screen.findByText('Reporte duplicado'));
+    await fireEvent.press(screen.getAllByText('Rechazar').at(-1));
+    expect(await screen.findByText('Reporte rechazado')).toBeTruthy();
+
+    await fireEvent.press(screen.getByLabelText('Deshacer'));
+
+    await waitFor(() => expect(api.patch).toHaveBeenLastCalledWith('/admin/reports/1/validation', {
+      validation_status: 'valido',
+      expected_validation_status: 'rechazado',
+      restore_validated_by: 7,
+      restore_validated_at: '2026-11-01T10:00:00.000Z',
+    }));
   });
 
   it('deshacer una validación de un reporte rechazado reenvía su motivo', async () => {
