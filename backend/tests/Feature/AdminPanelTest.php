@@ -329,6 +329,46 @@ class AdminPanelTest extends TestCase
         $this->assertSame($editor->id, $fresh->status_updated_by);
     }
 
+    public function test_undo_reject_restores_the_original_validator_and_date()
+    {
+        $original = User::factory()->admin()->create();
+        $admin = $this->actAsAdmin();
+        $validatedAt = now()->subDays(5)->startOfSecond();
+        $report = $this->makeReport(['validation_status' => 'rechazado', 'rejection_reason' => 'Duplicado', 'validated_by' => $admin->id, 'validated_at' => now()]);
+
+        $this->patchJson("/api/admin/reports/{$report->id}/validation", [
+            'validation_status' => 'valido',
+            'expected_validation_status' => 'rechazado',
+            'restore_validated_by' => $original->id,
+            'restore_validated_at' => $validatedAt->toISOString(),
+        ])->assertOk()->assertJsonPath('validated_by.id', $original->id);
+
+        $fresh = $report->fresh();
+        $this->assertSame('valido', $fresh->validation_status);
+        $this->assertSame($original->id, $fresh->validated_by);
+        $this->assertTrue($fresh->validated_at->equalTo($validatedAt));
+        $this->assertNull($fresh->rejection_reason);
+    }
+
+    public function test_restore_validator_rejects_bad_input()
+    {
+        $admin = $this->actAsAdmin();
+        $report = $this->makeReport(['validation_status' => 'rechazado', 'rejection_reason' => 'x', 'validated_by' => $admin->id, 'validated_at' => now()]);
+        $url = "/api/admin/reports/{$report->id}/validation";
+        $base = ['validation_status' => 'valido', 'expected_validation_status' => 'rechazado'];
+
+        $this->patchJson($url, $base + ['restore_validated_by' => $admin->id, 'restore_validated_at' => now()->addDay()->toISOString()])
+            ->assertUnprocessable()->assertJsonValidationErrors('restore_validated_at');
+        $this->patchJson($url, $base + ['restore_validated_by' => 99999, 'restore_validated_at' => now()->subDay()->toISOString()])
+            ->assertUnprocessable()->assertJsonValidationErrors('restore_validated_by');
+        $this->patchJson($url, $base + ['restore_validated_by' => $admin->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('restore_validated_at');
+        $this->patchJson($url, ['validation_status' => 'pendiente', 'expected_validation_status' => 'rechazado', 'restore_validated_by' => $admin->id, 'restore_validated_at' => now()->subDay()->toISOString()])
+            ->assertUnprocessable()->assertJsonValidationErrors(['restore_validated_by', 'restore_validated_at']);
+
+        $this->assertSame('rechazado', $report->fresh()->validation_status);
+    }
+
     public function test_undo_validation_does_not_require_reason_and_requires_expected()
     {
         $admin = $this->actAsAdmin();
@@ -352,7 +392,11 @@ class AdminPanelTest extends TestCase
         $this->postJson('/api/admin/reports/bulk-validation', [
             'ids' => [$a->id, $done->id, $b->id],
             'validation_status' => 'valido',
-        ])->assertOk()->assertExactJson(['updated' => [$a->id, $b->id], 'skipped' => [$done->id]]);
+        ])->assertOk()
+            ->assertJsonPath('updated', [$a->id, $b->id])
+            ->assertJsonPath('skipped', [$done->id])
+            ->assertJsonPath('validated_by', ['id' => $admin->id, 'name' => $admin->name])
+            ->assertJsonPath('validated_at', fn ($at) => $at === $a->fresh()->validated_at->toISOString());
 
         $this->assertDatabaseHas('reports', ['id' => $a->id, 'validation_status' => 'valido', 'validated_by' => $admin->id]);
         $this->assertNotNull($a->fresh()->validated_at);
@@ -383,7 +427,7 @@ class AdminPanelTest extends TestCase
         $this->postJson('/api/admin/reports/bulk-validation', ['validation_status' => 'valido'])->assertUnprocessable()->assertJsonValidationErrors('ids');
         $this->postJson('/api/admin/reports/bulk-validation', ['ids' => [], 'validation_status' => 'valido'])->assertUnprocessable()->assertJsonValidationErrors('ids');
         $this->postJson('/api/admin/reports/bulk-validation', ['ids' => [$a->id], 'validation_status' => 'pendiente'])->assertUnprocessable()->assertJsonValidationErrors('validation_status');
-        $this->postJson('/api/admin/reports/bulk-validation', ['ids' => [$a->id, 99999], 'validation_status' => 'valido'])->assertUnprocessable()->assertJsonValidationErrors('ids.1');
+        $this->postJson('/api/admin/reports/bulk-validation', ['ids' => [$a->id, 99999], 'validation_status' => 'valido'])->assertUnprocessable()->assertJsonValidationErrors('ids');
         $this->postJson('/api/admin/reports/bulk-validation', ['ids' => [$a->id, $a->id], 'validation_status' => 'valido'])->assertUnprocessable();
         $this->postJson('/api/admin/reports/bulk-validation', ['ids' => ['x'], 'validation_status' => 'valido'])->assertUnprocessable();
 

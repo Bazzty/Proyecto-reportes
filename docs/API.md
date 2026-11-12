@@ -352,7 +352,12 @@ Requiere token de **administrador**.
 ```
 `validation_status` acepta `pendiente`, `valido` y `rechazado`. `expected_validation_status` es **obligatorio**: es el estado que el cliente vio al cargar la lista (concurrencia optimista). `rejection_reason` es obligatorio solo al rechazar.
 
-Al pasar a `pendiente` se limpian `validated_by`, `validated_at`, `rejection_reason`, `status_updated_by` y `status_updated_at`, y `status` vuelve a `Pendiente`.
+Al pasar a `pendiente` se limpian `validated_by`, `validated_at`, `rejection_reason`, `status_updated_by` y `status_updated_at`, y `status` vuelve a `Pendiente`. Si se pasa de `valido` a `pendiente` y el reporte ya avanzó de estado (`En Progreso` o `Resuelto`), la respuesta es `409`: deshacer no borra el cambio de estado de otro admin.
+
+Opcional al pasar a `valido` o `rechazado` (deshacer una moderación previa): `restore_validated_by` (id de usuario existente) y `restore_validated_at` (fecha ISO 8601, no futura), siempre juntos. En vez de registrar como moderador a quien deshace, se restauran quien moderó antes y cuándo. No se aceptan al pasar a `pendiente` (`422`).
+```json
+{ "validation_status": "valido", "expected_validation_status": "rechazado", "restore_validated_by": 7, "restore_validated_at": "2026-11-01T10:00:00.000000Z" }
+```
 
 **Response 200:** el reporte actualizado (incluye `validation_status`, `rejection_reason`, `validated_at`, `validated_by`, `status_updated_by`, `status_updated_at` y `auto_validated`).
 
@@ -410,15 +415,21 @@ Requiere token de **administrador**.
 ```json
 { "ids": [1, 2, 3, 4], "validation_status": "rechazado", "rejection_reason": "Duplicados." }
 ```
-- `ids`: de 1 a 50 enteros distintos que existan (más de 50, repetidos o inexistentes dan `422`).
+- `ids`: de 1 a 50 enteros distintos que existan (más de 50, repetidos o inexistentes dan `422`; la existencia se revisa con una sola consulta y el error va en `ids`).
 - `validation_status`: `valido` o `rechazado`; `rejection_reason` (máx. 500) es obligatorio al rechazar.
 
 Solo se modifican los reportes que sigan `pendiente` en ese momento (selección bloqueada dentro de una transacción, así dos admins simultáneos no se pisan). No es todo-o-nada: los demás se informan en `skipped`.
 
 **Response 200:**
 ```json
-{ "updated": [1, 2, 3], "skipped": [4] }
+{
+  "updated": [1, 2, 3],
+  "skipped": [4],
+  "validated_by": { "id": 2, "name": "Admin" },
+  "validated_at": "2026-11-12T15:00:00.000000Z"
+}
 ```
+`validated_by` y `validated_at` corresponden a los reportes de `updated` (los mismos para todos), para que el panel actualice el historial sin recargar.
 
 ---
 

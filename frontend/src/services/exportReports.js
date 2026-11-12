@@ -1,4 +1,6 @@
 import { Platform, Share } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import api from './api';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -31,11 +33,13 @@ export const countCsvRows = (csv) => {
   return Math.max(0, rows - 1);
 };
 
-// Web: descarga con un Blob y un enlace temporal. Móvil: hoja de compartir del sistema.
+// Web: descarga con un Blob y un enlace temporal. Móvil: se guarda como archivo .csv en la caché de
+// la app y se comparte ese archivo (pasarlo como texto falla en Android sobre ~1 MB y no llega
+// como archivo). Si el dispositivo no puede compartir archivos, se comparte como texto.
 export const deliverCsv = async (csv, filename) => {
+  // El BOM ayuda a Excel con las tildes; la lectura como texto puede haberlo descartado.
+  const content = csv.startsWith('\uFEFF') ? csv : `\uFEFF${csv}`;
   if (Platform.OS === 'web') {
-    // El BOM ayuda a Excel con las tildes; la lectura como texto puede haberlo descartado.
-    const content = csv.startsWith('\uFEFF') ? csv : `\uFEFF${csv}`;
     const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     try {
@@ -48,6 +52,16 @@ export const deliverCsv = async (csv, filename) => {
     } finally {
       URL.revokeObjectURL(url);
     }
+    return { shared: true };
+  }
+  if (FileSystem.cacheDirectory && await Sharing.isAvailableAsync()) {
+    const uri = `${FileSystem.cacheDirectory}${filename}`;
+    await FileSystem.writeAsStringAsync(uri, content, { encoding: FileSystem.EncodingType.UTF8 });
+    await Sharing.shareAsync(uri, {
+      mimeType: 'text/csv',
+      dialogTitle: filename,
+      UTI: 'public.comma-separated-values-text',
+    });
     return { shared: true };
   }
   const result = await Share.share({ message: csv, title: filename });

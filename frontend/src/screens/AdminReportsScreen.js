@@ -137,6 +137,14 @@ export default function AdminReportsScreen({ navigation }) {
 
   const undoAction = (entry) => ({ label: 'Deshacer', onPress: () => undoHandlerRef.current(entry) });
 
+  // Quién moderó el reporte antes de la acción, para que deshacer lo restaure. Solo tiene sentido si
+  // ya estaba moderado (válido o rechazado) y se conocen ambos datos.
+  const previousModeration = (validationStatus, validatedBy, validatedAt) => (
+    validationStatus !== 'pendiente' && validatedBy?.id && validatedAt
+      ? { prevValidatedBy: validatedBy.id, prevValidatedAt: validatedAt }
+      : {}
+  );
+
   // Búsqueda con debounce: el valor aplicado (y la recarga) sigue al escrito 400 ms después.
   useEffect(() => {
     const applied = searchInput.trim();
@@ -341,6 +349,7 @@ export default function AdminReportsScreen({ navigation }) {
         duration: UNDO_MS,
         action: undoAction({
           kind: 'validation', id: item.id, from: item.validation_status, to: 'valido', reason: item.rejection_reason,
+          ...previousModeration(item.validation_status, item.validated_by, item.validated_at),
         }),
       });
     } catch (err) {
@@ -375,6 +384,10 @@ export default function AdminReportsScreen({ navigation }) {
           validation_status: entry.from,
           expected_validation_status: entry.to,
           ...(entry.from === 'rechazado' && entry.reason ? { rejection_reason: entry.reason } : {}),
+          ...(entry.prevValidatedBy ? {
+            restore_validated_by: entry.prevValidatedBy,
+            restore_validated_at: entry.prevValidatedAt,
+          } : {}),
         }));
         if (listVersion === listVersionRef.current) adjustCounts(entry.to, entry.from);
       }
@@ -397,7 +410,12 @@ export default function AdminReportsScreen({ navigation }) {
   undoHandlerRef.current = handleUndo;
 
   const openReject = (item) => {
-    setRejecting({ id: item.id, validationStatus: item.validation_status, description: item.description });
+    setRejecting({
+      id: item.id,
+      validationStatus: item.validation_status,
+      description: item.description,
+      ...previousModeration(item.validation_status, item.validated_by, item.validated_at),
+    });
     setReason('');
     setReasonTouched(false);
   };
@@ -454,7 +472,7 @@ export default function AdminReportsScreen({ navigation }) {
 
   // Aplica a la lista y al total el resultado de un lote: los reportes cambiados que ya no
   // coinciden con el filtro activo salen, igual que en las acciones individuales.
-  const applyBulkUpdate = (updatedIds, validationStatus, rejectionReason) => {
+  const applyBulkUpdate = (updatedIds, validationStatus, rejectionReason, validatedBy = null, validatedAt = null) => {
     const ids = new Set(updatedIds);
     let removed = 0;
     const next = [];
@@ -463,7 +481,15 @@ export default function AdminReportsScreen({ navigation }) {
         next.push(r);
         return;
       }
-      const changed = { ...r, validation_status: validationStatus, rejection_reason: validationStatus === 'rechazado' ? rejectionReason : null };
+      // validated_by/at vienen en la respuesta del lote: el historial de la tarjeta queda al día sin recargar.
+      const changed = {
+        ...r,
+        validation_status: validationStatus,
+        rejection_reason: validationStatus === 'rechazado' ? rejectionReason : null,
+        validated_by: validatedBy,
+        validated_at: validatedAt,
+        auto_validated: false,
+      };
       const matches = (!filter || validationStatus === filter) && (!statusFilter || changed.status === statusFilter);
       if (matches) next.push(changed);
       else removed += 1;
@@ -488,7 +514,7 @@ export default function AdminReportsScreen({ navigation }) {
       const skipped = data?.skipped ?? [];
       if (listVersion === listVersionRef.current) {
         adjustCounts('pendiente', validationStatus, updated.length);
-        applyBulkUpdate(updated, validationStatus, rejectionReason);
+        applyBulkUpdate(updated, validationStatus, rejectionReason, data?.validated_by ?? null, data?.validated_at ?? null);
       } else {
         loadRef.current(1);
       }
@@ -537,6 +563,10 @@ export default function AdminReportsScreen({ navigation }) {
         duration: UNDO_MS,
         action: undoAction({
           kind: 'validation', id: rejecting.id, from: rejecting.validationStatus, to: 'rechazado',
+          ...(rejecting.prevValidatedBy ? {
+            prevValidatedBy: rejecting.prevValidatedBy,
+            prevValidatedAt: rejecting.prevValidatedAt,
+          } : {}),
         }),
       });
     } catch (err) {
