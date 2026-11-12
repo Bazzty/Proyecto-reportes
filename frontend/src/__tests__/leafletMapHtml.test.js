@@ -113,3 +113,16 @@ describe('leafletMapHtml', () => {
     expect(statusColor('En Progreso')).toBe('#0e7490');
   });
 });
+
+describe('popups bajo los controles superpuestos', () => {
+  it('buildPayload incluye topInset (0 por defecto)', () => {
+    expect(buildPayload().topInset).toBe(0);
+    expect(buildPayload([], [], null, true, true, false, null, 230).topInset).toBe(230);
+  });
+
+  it('los popups usan el topInset como margen al desplazar el mapa', () => {
+    expect(HTML).toContain('popupTopInset = Math.max(0, Number(data.topInset) || 0)');
+    expect(HTML).toContain('autoPanPaddingTopLeft: L.point(12, popupTopInset + 12)');
+    expect(HTML).not.toContain('.bindPopup(popup)');
+  });
+});

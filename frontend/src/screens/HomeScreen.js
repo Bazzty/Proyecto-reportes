@@ -63,6 +63,8 @@ export default function HomeScreen({ navigation, route }) {
   });
   const [userLocation, setUserLocation]   = useState(null);
   const [userName, setUserName]           = useState('');
+  // Alto que ocupan la tarjeta de saludo y los controles sobre el mapa (para que los popups no queden debajo).
+  const [overlayBottom, setOverlayBottom] = useState(0);
   const [isAdmin, setIsAdmin]             = useState(false);
   const [reports, setReports]             = useState([]);
   const [myReports, setMyReports]         = useState([]);
@@ -327,12 +329,20 @@ export default function HomeScreen({ navigation, route }) {
         userLocation={userLocation}
         showMarkers={showMarkers}
         showHeat={showHeat}
+        topInset={overlayBottom}
         onSelectReport={(reportId) => navigation.navigate('DetalleReporte', { reportId })}
       />
 
       {/* Tarjeta de saludo y filtros en un mismo bloque: los filtros siempre quedan debajo de la
           tarjeta, aunque el título se parta en varias líneas en pantallas angostas. */}
-      <View style={styles.topOverlay} pointerEvents="box-none">
+      <View
+        style={styles.topOverlay}
+        pointerEvents="box-none"
+        onLayout={(e) => {
+          const { y, height } = e.nativeEvent.layout;
+          setOverlayBottom(Math.round(y + height));
+        }}
+      >
       {/* Greeting card */}
       <View style={styles.greetingCard}>
         <View style={styles.greetingBody}>
