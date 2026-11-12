@@ -21,22 +21,24 @@ describe('api service', () => {
     expect(api.defaults.headers.common.Authorization).toBeUndefined();
   });
 
-  it('un 401 borra el token, el header y llama al handler', async () => {
+  it('un 401 con sesión quita el header y llama al handler', async () => {
     const handler = jest.fn();
     setUnauthorizedHandler(handler);
-    await AsyncStorage.setItem('token', 'abc123');
-    await AsyncStorage.setItem('isAdmin', '1');
-    await AsyncStorage.setItem('userName', 'Ana');
     setAuthToken('abc123');
 
     await expect(rejected({ response: { status: 401 } })).rejects.toBeDefined();
 
-    expect(await AsyncStorage.getItem('token')).toBeNull();
-    // Vuelve al mapa como invitado: no debe quedar nada de la sesión anterior (p. ej. el botón de admin).
-    expect(await AsyncStorage.getItem('isAdmin')).toBeNull();
-    expect(await AsyncStorage.getItem('userName')).toBeNull();
     expect(api.defaults.headers.common.Authorization).toBeUndefined();
     expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('un 401 sin sesión (contraseña incorrecta en /login) no llama al handler', async () => {
+    const handler = jest.fn();
+    setUnauthorizedHandler(handler);
+
+    await expect(rejected({ response: { status: 401, data: { message: 'Credenciales incorrectas.' } } })).rejects.toBeDefined();
+
+    expect(handler).not.toHaveBeenCalled();
   });
 
   it('un error distinto de 401 no llama al handler ni borra el token', async () => {

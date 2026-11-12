@@ -36,6 +36,25 @@ describe('notifications', () => {
     expect(await getNotifications()).toHaveLength(1);
   });
 
+  it('avisa de nuevo si el estado vuelve a cambiar igual que antes', async () => {
+    await syncStatusNotifications([{ id: 1, status: 'Pendiente' }]);
+    await syncStatusNotifications([{ id: 1, status: 'En Progreso' }]);
+    await syncStatusNotifications([{ id: 1, status: 'Pendiente' }]);
+    await syncStatusNotifications([{ id: 1, status: 'En Progreso' }]);
+
+    expect(await getNotifications()).toHaveLength(3);
+  });
+
+  it('dos sincronizaciones simultáneas del mismo cambio no lo duplican', async () => {
+    await syncStatusNotifications([{ id: 1, status: 'Pendiente' }]);
+    await Promise.all([
+      syncStatusNotifications([{ id: 1, status: 'Resuelto' }]),
+      syncStatusNotifications([{ id: 1, status: 'Resuelto' }]),
+    ]);
+
+    expect(await getNotifications()).toHaveLength(1);
+  });
+
   it('markAllRead marca todas como leídas', async () => {
     await syncStatusNotifications([{ id: 1, status: 'Pendiente' }]);
     await syncStatusNotifications([{ id: 1, status: 'Resuelto' }]);

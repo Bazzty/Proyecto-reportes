@@ -123,6 +123,38 @@ class CommentApiTest extends TestCase
         $this->assertEquals('Primero', $response->json()[1]['body']);
     }
 
+    public function test_comments_in_the_same_second_are_ordered_newest_first_by_id()
+    {
+        $user = User::factory()->create();
+        $report = $this->makeReport($user);
+        $at = now()->startOfSecond();
+
+        foreach (['Primero', 'Segundo', 'Tercero'] as $body) {
+            Comment::create(['user_id' => $user->id, 'report_id' => $report->id, 'body' => $body])
+                ->forceFill(['created_at' => $at])->saveQuietly();
+        }
+
+        $response = $this->getJson("/api/reports/{$report->id}/comments");
+
+        $response->assertOk();
+        $this->assertSame(['Tercero', 'Segundo', 'Primero'], array_column($response->json(), 'body'));
+    }
+
+    public function test_posting_comments_is_rate_limited_with_spanish_message()
+    {
+        $user = User::factory()->create();
+        $report = $this->makeReport($user);
+        Sanctum::actingAs($user);
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->postJson("/api/reports/{$report->id}/comments", ['body' => "Comentario {$i}"])->assertCreated();
+        }
+
+        $this->postJson("/api/reports/{$report->id}/comments", ['body' => 'Uno más'])
+            ->assertStatus(429)
+            ->assertJsonPath('message', 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.');
+    }
+
     public function test_commenting_on_unknown_report_returns_404()
     {
         Sanctum::actingAs(User::factory()->create());

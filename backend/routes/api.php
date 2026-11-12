@@ -25,9 +25,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/reports', [ReportController::class, 'store']);
     Route::get('/user/reports', [ReportController::class, 'userReports']);
 
-    Route::post('/reports/{id}/confirm', [ConfirmationController::class, 'toggle']);
+    Route::post('/reports/{id}/confirm', [ConfirmationController::class, 'toggle'])->middleware('throttle:30,1');
 
-    Route::post('/reports/{id}/comments', [CommentController::class, 'store']);
+    Route::post('/reports/{id}/comments', [CommentController::class, 'store'])->middleware('throttle:10,1');
 
     // Solo administradores pueden cambiar el estado de un reporte.
     Route::middleware('admin')->patch('/reports/{id}/status', [ReportController::class, 'updateStatus']);

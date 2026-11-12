@@ -14,6 +14,7 @@ import NewReportScreen from './src/screens/NewReportScreen';
 import MyReportsScreen from './src/screens/MyReportsScreen';
 import AdminReportsScreen from './src/screens/AdminReportsScreen';
 import { setAuthToken, setUnauthorizedHandler } from './src/services/api';
+import { clearSession } from './src/services/session';
 
 const Stack = createStackNavigator();
 
@@ -29,7 +30,8 @@ export default function App() {
 
   useEffect(() => {
     // Token vencido o inválido (401): vuelve al mapa como invitado
-    setUnauthorizedHandler(() => {
+    setUnauthorizedHandler(async () => {
+      try { await clearSession(); } catch { /* se vuelve al mapa igual */ }
       navigationRef.current?.reset({ index: 0, routes: [{ name: 'Home', params: { guest: true } }] });
     });
 

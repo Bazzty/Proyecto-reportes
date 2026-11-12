@@ -1,5 +1,4 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { resolveApiUrl, REQUEST_TIMEOUT_MS } from './apiConfig';
 
@@ -30,12 +29,13 @@ export const setUnauthorizedHandler = (handler) => { _onUnauthorized = handler; 
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401 && _onUnauthorized) {
-      // Se borra toda la sesión (igual que al cerrar sesión): la app vuelve al mapa como invitado
-      // y no debe quedar, por ejemplo, isAdmin del usuario anterior.
-      await AsyncStorage.multiRemove(['token', 'userName', 'userId', 'isAdmin', 'reportStatusSnapshot']);
+    // Solo es "sesión vencida" si había token: sin él (invitado), un 401 es por ejemplo una
+    // contraseña incorrecta en /login y la pantalla debe mostrar el error sin salir.
+    const hadToken = !!api.defaults.headers.common['Authorization'];
+    if (error.response?.status === 401 && hadToken && _onUnauthorized) {
       clearAuthToken();
-      _onUnauthorized();
+      // El handler (App.js) borra la sesión completa con clearSession y vuelve al mapa como invitado.
+      await _onUnauthorized();
     }
     return Promise.reject(error);
   }
