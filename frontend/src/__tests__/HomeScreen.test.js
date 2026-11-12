@@ -224,14 +224,14 @@ describe('HomeScreen', () => {
 
     const buttons = Alert.alert.mock.calls.at(-1)[2];
     buttons.find((b) => b.text === 'Iniciar sesión').onPress();
-    expect(navigation.reset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Login' }] });
+    expect(navigation.navigate).toHaveBeenCalledWith('Login');
   });
 
   it('"Ingresar" como invitado va directo a Login sin confirmar', async () => {
     const navigation = await setup({ guest: true });
     await fireEvent.press(screen.getByText('Ingresar'));
 
-    expect(navigation.reset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Login' }] });
+    expect(navigation.navigate).toHaveBeenCalledWith('Login');
     expect(Alert.alert).not.toHaveBeenCalled();
   });
 
@@ -250,7 +250,7 @@ describe('HomeScreen', () => {
     expect(await AsyncStorage.getItem('token')).toBeNull();
     expect(await AsyncStorage.getItem('userId')).toBeNull();
     expect(clearAuthToken).toHaveBeenCalled();
-    expect(navigation.reset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Login' }] });
+    expect(navigation.reset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Home', params: { guest: true } }] });
   });
 
   it('cierra la sesión localmente aunque /logout falle', async () => {
@@ -263,7 +263,7 @@ describe('HomeScreen', () => {
     await buttons.find((b) => b.text === 'Salir').onPress();
 
     expect(await AsyncStorage.getItem('token')).toBeNull();
-    expect(navigation.reset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Login' }] });
+    expect(navigation.reset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Home', params: { guest: true } }] });
   });
 
   it('al cerrar sesión limpia las notificaciones guardadas', async () => {

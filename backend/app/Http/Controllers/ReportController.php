@@ -69,8 +69,14 @@ class ReportController extends Controller
 
         $path = $request->file('photo')->store('photos', 'public');
 
+        // Un administrador es quien valida: su propio reporte nace validado, sin pasar por la cola.
+        $validation = $request->user()->isAdmin()
+            ? ['validation_status' => 'valido', 'validated_by' => $uid, 'validated_at' => now()]
+            : [];
+
         try {
             $report = Report::create([
+                ...$validation,
                 'user_id' => $request->user()->id,
                 'client_uuid' => $clientUuid,
                 'category_id' => $data['category_id'],
@@ -129,9 +135,11 @@ class ReportController extends Controller
         $report->save();
 
         $uid = $request->user()->id;
-        $report = $this->withReportData(Report::query(), $uid)->findOrFail($report->id);
+        $report = $this->withReportData(Report::query(), $uid)->with('statusUpdatedBy:id,name')->findOrFail($report->id);
 
-        return response()->json($this->formatReport($report, $uid));
+        // Solo lo llaman administradores: se devuelve también quién y cuándo cambió el estado,
+        // para que el panel actualice el historial de la tarjeta sin recargar.
+        return response()->json(array_merge($this->formatReport($report, $uid), $this->formatStatusUpdate($report)));
     }
 
     public function heatmap()

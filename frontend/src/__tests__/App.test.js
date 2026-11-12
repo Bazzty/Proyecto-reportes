@@ -6,6 +6,7 @@ import { setAuthToken } from '../services/api';
 
 const mockReset = jest.fn();
 let mockUnauthorizedHandler = null;
+let mockInitialState;
 
 jest.mock('../services/api', () => ({
   __esModule: true,
@@ -16,7 +17,8 @@ jest.mock('../services/api', () => ({
 jest.mock('@react-navigation/native', () => {
   const React = require('react');
   return {
-    NavigationContainer: React.forwardRef(function NavigationContainer({ children }, ref) {
+    NavigationContainer: React.forwardRef(function NavigationContainer({ children, initialState }, ref) {
+      mockInitialState = initialState;
       React.useImperativeHandle(ref, () => ({ reset: mockReset }));
       return children;
     }),
@@ -50,13 +52,17 @@ describe('App', () => {
     jest.useFakeTimers();
     jest.clearAllMocks();
     mockUnauthorizedHandler = null;
+    mockInitialState = undefined;
     await AsyncStorage.clear();
   });
   afterEach(() => jest.useRealTimers());
 
-  it('sin token guardado arranca en Login', async () => {
+  const GUEST_STATE = { index: 0, routes: [{ name: 'Home', params: { guest: true } }] };
+
+  it('sin token guardado abre el mapa como invitado', async () => {
     await renderApp();
-    expect(await screen.findByText('ruta:Login')).toBeTruthy();
+    expect(await screen.findByText('ruta:Home')).toBeTruthy();
+    expect(mockInitialState).toEqual(GUEST_STATE);
     expect(setAuthToken).not.toHaveBeenCalled();
   });
 
@@ -65,23 +71,25 @@ describe('App', () => {
     await renderApp();
 
     expect(await screen.findByText('ruta:Home')).toBeTruthy();
+    expect(mockInitialState).toBeUndefined();
     expect(setAuthToken).toHaveBeenCalledWith('tok');
   });
 
-  it('un 401 reinicia la navegación a Login', async () => {
+  it('un 401 vuelve al mapa como invitado', async () => {
     await AsyncStorage.setItem('token', 'tok');
     await renderApp();
     await screen.findByText('ruta:Home');
 
     mockUnauthorizedHandler();
-    expect(mockReset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Login' }] });
+    expect(mockReset).toHaveBeenCalledWith(GUEST_STATE);
   });
 
-  it('si falla la lectura del token igual arranca en Login', async () => {
+  it('si falla la lectura del token abre el mapa como invitado', async () => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     jest.spyOn(AsyncStorage, 'getItem').mockRejectedValueOnce(new Error('storage'));
     await renderApp();
 
-    expect(await screen.findByText('ruta:Login')).toBeTruthy();
+    expect(await screen.findByText('ruta:Home')).toBeTruthy();
+    expect(mockInitialState).toEqual(GUEST_STATE);
   });
 });

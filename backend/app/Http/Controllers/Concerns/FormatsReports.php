@@ -46,4 +46,16 @@ trait FormatsReports
             'created_at' => $report->created_at?->toISOString(),
         ];
     }
+
+    /** Quién y cuándo cambió el estado del reporte (requiere la relación statusUpdatedBy cargada). */
+    protected function formatStatusUpdate(Report $report): array
+    {
+        return [
+            'status_updated_by' => $report->statusUpdatedBy ? [
+                'id' => $report->statusUpdatedBy->id,
+                'name' => $report->statusUpdatedBy->name,
+            ] : null,
+            'status_updated_at' => $report->status_updated_at?->toISOString(),
+        ];
+    }
 }
