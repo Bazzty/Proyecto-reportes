@@ -2,6 +2,10 @@
   "name": "frontend",
   "version": "1.0.0",
   "main": "index.js",
+  "engines": {
+    "node": ">=22.13.0",
+    "npm": ">=11.19.0"
+  },
   "scripts": {
     "start": "expo start",
     "start:azure": "node scripts/start-azure.js",
