@@ -24,11 +24,11 @@ jest.mock('@react-navigation/native', () => {
     }),
   };
 });
-jest.mock('@react-navigation/stack', () => {
+jest.mock('@react-navigation/native-stack', () => {
   const React = require('react');
   const { Text } = require('react-native');
   return {
-    createStackNavigator: () => ({
+    createNativeStackNavigator: () => ({
       Navigator: ({ initialRouteName }) => <Text>{`ruta:${initialRouteName}`}</Text>,
       Screen: () => null,
     }),
