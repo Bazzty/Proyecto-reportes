@@ -646,7 +646,8 @@ describe('AdminReportsScreen', () => {
     api.get.mockImplementation((url, config) => {
       if (url === '/admin/reports') {
         if (config?.params?.offset !== undefined) {
-          return Promise.resolve({ data: { data: [report({ id: 1, description: 'Primero' })], meta: { offset: config.params.offset, total: 2, counts: COUNTS } } });
+          const rows = [report({ id: 2, description: 'Segundo' }), report({ id: 1, description: 'Primero' })];
+          return Promise.resolve({ data: { data: rows, meta: { offset: config.params.offset, total: 2, counts: COUNTS } } });
         }
         return Promise.resolve({ data: { data: page1, meta: { current_page: 1, last_page: 2, per_page: 2, total: 3, counts: COUNTS } } });
       }
@@ -663,8 +664,9 @@ describe('AdminReportsScreen', () => {
 
     await fireEvent(screen.getByTestId('admin-report-list'), 'onEndReached');
 
-    await waitFor(() => expect(lastReportsParams()).toEqual({ validation_status: 'pendiente', offset: 1 }));
+    // Con solape: vuelve a pedir las filas ya cargadas (aquí desde 0) y descarta las repetidas.
+    await waitFor(() => expect(lastReportsParams()).toEqual({ validation_status: 'pendiente', offset: 0 }));
     expect(await screen.findByText('Primero')).toBeTruthy();
-    expect(screen.getByText('Segundo')).toBeTruthy();
+    expect(screen.getAllByText('Segundo')).toHaveLength(1);
   });
 });

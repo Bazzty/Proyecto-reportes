@@ -165,7 +165,7 @@ describe('offlineQueue', () => {
       expect((await syncPending()).synced).toBe(1);
     });
 
-    it('claimQueue descarta lo de otra cuenta, conserva lo propio y adopta lo sin dueño', async () => {
+    it('claimQueue adopta lo sin dueño y conserva, oculto, lo de otra cuenta', async () => {
       await AsyncStorage.setItem('userId', '7');
       await enqueue(report({ description: 'De 7' }));
       await AsyncStorage.setItem('userId', '8');
@@ -173,12 +173,19 @@ describe('offlineQueue', () => {
       await AsyncStorage.removeItem('userId');
       await enqueue(report({ description: 'Sin dueño' }));
 
+      await AsyncStorage.setItem('userId', '7');
       await claimQueue(7);
 
       const pending = await getPending();
       expect(pending.map((q) => q.description)).toEqual(['De 7', 'Sin dueño']);
       expect(pending.every((q) => q.ownerId === '7')).toBe(true);
-      expect(FileSystem.deleteAsync).toHaveBeenCalledTimes(1);
+      expect(await getPendingCount()).toBe(2);
+      expect(FileSystem.deleteAsync).not.toHaveBeenCalled();
+
+      // El dueño vuelve a entrar: su reporte sigue en la cola.
+      await AsyncStorage.setItem('userId', '8');
+      await claimQueue(8);
+      expect((await getPending()).map((q) => q.description)).toEqual(['De 8']);
     });
   });
 });

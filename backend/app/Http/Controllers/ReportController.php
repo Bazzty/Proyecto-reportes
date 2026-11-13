@@ -153,10 +153,14 @@ class ReportController extends Controller
     {
         $reports = DB::table('reports')->selectRaw('COUNT(*) as total, MAX(id) as max_id, MAX(updated_at) as updated')->first();
         $confirmations = DB::table('confirmations')->selectRaw('COUNT(*) as total, MAX(id) as max_id')->first();
+        // updated_at tiene precisión de segundo: si otro reporte cambia en el mismo segundo que el
+        // último sondeo, MAX no varía pero sí cuántos reportes tienen ese updated_at.
+        $atLatest = $reports->updated === null ? 0
+            : DB::table('reports')->where('updated_at', $reports->updated)->count();
 
         return response()->json([
             'version' => sha1(json_encode([
-                (int) $reports->total, (int) $reports->max_id, (string) $reports->updated,
+                (int) $reports->total, (int) $reports->max_id, (string) $reports->updated, $atLatest,
                 (int) $confirmations->total, (int) $confirmations->max_id,
             ])),
         ]);
