@@ -19,8 +19,13 @@ class ReportController extends Controller
     {
         // index y show son rutas públicas: el guard por defecto (web) no lee el Bearer.
         $uid = $request->user('sanctum')?->id;
+        // El mapa público muestra solo reportes validados; el autor ve además los suyos pendientes,
+        // para no perder de vista el que acaba de enviar mientras espera moderación.
         $reports = $this->withReportData(Report::query(), $uid)
-            ->where('validation_status', '!=', 'rechazado')
+            ->where(fn ($q) => $q->where('validation_status', 'valido')
+                ->when($uid, fn ($q) => $q->orWhere(fn ($q) => $q
+                    ->where('user_id', $uid)
+                    ->where('validation_status', 'pendiente'))))
             ->latest()->latest('id')->get();
 
         return response()->json($reports->map(fn (Report $report) => $this->formatReport($report, $uid)));
@@ -32,7 +37,7 @@ class ReportController extends Controller
         $uid = $user?->id;
         $report = $this->withReportData(Report::query(), $uid)->findOrFail($id);
 
-        // Los reportes rechazados no son visibles públicamente (sí para el dueño o un admin).
+        // Los reportes no validados no son visibles públicamente (sí para el dueño o un admin).
         if (! $report->isVisibleTo($user)) {
             abort(404);
         }
@@ -147,7 +152,7 @@ class ReportController extends Controller
         // Filas planas con join: evita hidratar modelos (y el GeoJSON de cada zona) en un endpoint público.
         $points = DB::table('reports')
             ->leftJoin('zones', 'zones.id', '=', 'reports.zone_id')
-            ->where('reports.validation_status', '!=', 'rechazado')
+            ->where('reports.validation_status', 'valido')
             ->get(['reports.latitude', 'reports.longitude', 'zones.id as zone_id', 'zones.name as zone_name']);
 
         return response()->json($points->map(fn ($point) => [

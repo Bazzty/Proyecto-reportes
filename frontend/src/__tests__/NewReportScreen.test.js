@@ -223,6 +223,21 @@ describe('NewReportScreen', () => {
     expect(navigation.navigate).toHaveBeenCalledWith('Home', { newReport: { id: 10 } });
   });
 
+  it('si el reporte queda pendiente avisa que aparecerá en el mapa al validarse', async () => {
+    api.post.mockResolvedValue({ data: { id: 11, validation_status: 'pendiente' } });
+    await setup();
+    await takePhoto();
+    await screen.findByText(COORDS_TEXT);
+    await fireEvent.changeText(screen.getByPlaceholderText('Ej. Basura acumulada en la esquina...'), 'Basura en la vereda');
+    await fireEvent.press(screen.getByText('aguas'));
+    await fireEvent.press(screen.getByText('Enviar Reporte'));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1));
+    const [title, message] = Alert.alert.mock.calls.at(-1);
+    expect(title).toBe('¡Éxito!');
+    expect(message).toMatch(/cuando un administrador lo valide/);
+  });
+
   it('si el backend devuelve un 422 muestra el primer error de validación', async () => {
     api.post.mockRejectedValue({ response: { data: { errors: { photo: ['La foto es muy pesada.'] } } } });
     await setup();

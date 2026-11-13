@@ -188,4 +188,75 @@ class ReportValidationVisibilityTest extends TestCase
             ->postJson("/api/reports/{$report->id}/comments", ['body' => 'hola'])
             ->assertCreated();
     }
+
+    // Reportes pendientes de validación: no salen en el mapa público hasta que un admin los apruebe.
+
+    public function test_public_index_and_heatmap_exclude_pending_reports()
+    {
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $this->makeReport($user, $category, 'valido');
+        $this->makeReport($user, $category, 'pendiente');
+
+        $this->getJson('/api/reports')
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonMissing(['validation_status' => 'pendiente']);
+
+        $this->getJson('/api/reports/heatmap')->assertOk()->assertJsonCount(1);
+    }
+
+    public function test_owner_sees_own_pending_report_on_map_but_other_users_do_not()
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $this->makeReport($owner, $category, 'valido');
+        $this->makeReport($owner, $category, 'pendiente');
+        $this->makeReport($other, $category, 'pendiente');
+        $this->makeReport($owner, $category, 'rechazado');
+
+        // Bearer real: index es ruta pública y debe leer el token con el guard sanctum.
+        $token = $owner->createToken('test')->plainTextToken;
+
+        $this->withToken($token)->getJson('/api/reports')
+            ->assertOk()
+            ->assertJsonCount(2)
+            ->assertJsonMissing(['validation_status' => 'rechazado']);
+
+        // El heatmap es solo de validados, también para el dueño.
+        $this->withToken($token)->getJson('/api/reports/heatmap')->assertOk()->assertJsonCount(1);
+    }
+
+    public function test_pending_report_detail_comments_and_confirm_are_hidden_from_others()
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->makeReport($owner, $category, 'pendiente');
+
+        $this->getJson("/api/reports/{$report->id}")->assertNotFound();
+        $this->getJson("/api/reports/{$report->id}/comments")->assertNotFound();
+
+        Sanctum::actingAs($other, ['*']);
+        $this->getJson("/api/reports/{$report->id}")->assertNotFound();
+        $this->postJson("/api/reports/{$report->id}/confirm")->assertNotFound();
+
+        Sanctum::actingAs($owner, ['*']);
+        $this->getJson("/api/reports/{$report->id}")->assertOk();
+    }
+
+    public function test_report_becomes_public_once_validated()
+    {
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->makeReport($user, $category, 'pendiente');
+
+        $this->getJson('/api/reports')->assertOk()->assertJsonCount(0);
+
+        $report->update(['validation_status' => 'valido']);
+
+        $this->getJson('/api/reports')->assertOk()->assertJsonCount(1);
+        $this->getJson("/api/reports/{$report->id}")->assertOk();
+    }
 }
