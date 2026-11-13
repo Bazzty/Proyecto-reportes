@@ -150,7 +150,7 @@ POST /reports
 ```
 Requiere token. Se envía como `multipart/form-data` porque incluye una foto.
 
-El reporte nace con `validation_status = "pendiente"`, salvo que lo cree un administrador: en ese caso nace `"valido"`, con `validated_by` igual al autor.
+El reporte nace siempre con `validation_status = "pendiente"`, también si lo crea un administrador: no es público hasta que se aprueba desde el panel de administración.
 
 **Request (form-data):**
 | Campo | Tipo | Requerido |
@@ -309,7 +309,7 @@ Requiere token de **administrador**. Lista los reportes paginados (20 por págin
 - `search`: texto (máx. 100, se aplica `trim`; vacío = sin filtro). Coincide (`LIKE`) con la `description`, el nombre del autor o el nombre de la zona. `%`, `_` y `\` se tratan como texto literal.
 - `sort`: `recientes` (por defecto, más nuevos primero) o `confirmaciones` (más `confirmations_count` primero y, a igualdad, los más recientes). Cualquier otro valor da `422`.
 
-Además de los campos del reporte, cada elemento trae `validated_by` (`{id,name}|null`), `status_updated_by` (`{id,name}|null`), `status_updated_at` (ISO 8601 o `null`) y `auto_validated` (`true` si quien validó es el propio autor, p. ej. un admin que reporta).
+Además de los campos del reporte, cada elemento trae `validated_by` (`{id,name}|null`), `status_updated_by` (`{id,name}|null`), `status_updated_at` (ISO 8601 o `null`) y `auto_validated` (`true` si quien validó es el propio autor, p. ej. un admin que aprueba su propio reporte).
 
 **Response 200:**
 ```json

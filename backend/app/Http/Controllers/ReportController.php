@@ -74,14 +74,11 @@ class ReportController extends Controller
 
         $path = $request->file('photo')->store('photos', 'public');
 
-        // Un administrador es quien valida: su propio reporte nace validado, sin pasar por la cola.
-        $validation = $request->user()->isAdmin()
-            ? ['validation_status' => 'valido', 'validated_by' => $uid, 'validated_at' => now()]
-            : [];
-
         try {
+            // Todo reporte nace pendiente (también el de un administrador): solo es público
+            // cuando alguien lo aprueba desde el panel de administración.
             $report = Report::create([
-                ...$validation,
+                'validation_status' => 'pendiente',
                 'user_id' => $request->user()->id,
                 'client_uuid' => $clientUuid,
                 'category_id' => $data['category_id'],

@@ -308,7 +308,7 @@ class AdminReportTest extends TestCase
         ];
     }
 
-    public function test_report_created_by_admin_is_validated_automatically()
+    public function test_report_created_by_admin_also_starts_pending()
     {
         Storage::fake('public');
         $admin = $this->makeAdmin();
@@ -317,14 +317,24 @@ class AdminReportTest extends TestCase
 
         $id = $this->postJson('/api/reports', $this->reportPayload($category))
             ->assertCreated()
-            ->assertJsonPath('validation_status', 'valido')
+            ->assertJsonPath('validation_status', 'pendiente')
             ->json('id');
 
         $report = Report::findOrFail($id);
-        $this->assertSame($admin->id, $report->validated_by);
-        $this->assertNotNull($report->validated_at);
+        $this->assertNull($report->validated_by);
+        $this->assertNull($report->validated_at);
 
-        $this->patchJson("/api/reports/{$id}/status", ['status' => 'En Progreso'])->assertOk();
+        // Tampoco se le puede cambiar el estado hasta aprobarlo.
+        $this->patchJson("/api/reports/{$id}/status", ['status' => 'En Progreso'])->assertStatus(409);
+
+        $this->patchJson("/api/admin/reports/{$id}/validation", [
+            'validation_status' => 'valido',
+            'expected_validation_status' => 'pendiente',
+        ])->assertOk();
+
+        // Ya aprobado, es público (invitado, sin token).
+        $this->app['auth']->forgetGuards();
+        $this->getJson('/api/reports')->assertOk()->assertJsonCount(1);
     }
 
     public function test_report_created_by_regular_user_stays_pending()
