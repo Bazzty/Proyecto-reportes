@@ -181,6 +181,14 @@ npx eas-cli build -p android --profile preview
 ```
 Al terminar, EAS entrega un enlace/QR para descargar e instalar el APK.
 
+**Antes de compilar:** desplegar en el servidor la versión de `develop` que se va a usar (sección 6,
+con `migrate`). El APK usa endpoints nuevos (`/reports/version`, "Cargar más" por `offset`) que un
+backend anterior no tiene.
+
+**Versión 1.1.0:** guarda el token en el almacén seguro del sistema (`expo-secure-store`, módulo
+nativo) y bloquea el tráfico HTTP sin cifrar. Hay que instalar el APK nuevo: los APK 1.0.0 ya no
+reciben las actualizaciones publicadas desde esta versión (`runtimeVersion` sigue a `version`).
+
 Cambios solo de JavaScript llegan a los APK instalados sin reinstalar (canal `preview`):
 ```bash
 cd frontend
@@ -203,6 +211,9 @@ dc exec app php artisan migrate --force
 dc exec app php artisan config:cache && dc exec app php artisan route:cache
 dc exec app chown -R www-data:www-data storage bootstrap/cache
 ```
+
+`dc up -d --build` también levanta el servicio `scheduler` (`php artisan schedule:work`), que cada
+día borra los tokens de sesión vencidos (`sanctum:prune-expired`). Comprobar con `dc ps`.
 
 **Backup de la BD:**
 ```bash

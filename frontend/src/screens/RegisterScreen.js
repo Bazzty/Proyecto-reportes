@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { setAuthToken } from '../services/api';
 import { claimQueue } from '../services/offlineQueue';
+import { saveToken } from '../services/tokenStorage';
 import { isConnectionError, CONNECTION_ERROR_MESSAGE } from '../services/apiConfig';
 import useKeyboardHeight from '../hooks/useKeyboardHeight';
 
@@ -51,8 +52,8 @@ export default function RegisterScreen({ navigation }) {
       });
       const { token, user } = response.data;
 
+      await saveToken(token);
       await AsyncStorage.multiSet([
-        ['token', token],
         ['userName', user.name],
         ['userId', String(user.id)],
         ['isAdmin', user.is_admin ? '1' : '0'],

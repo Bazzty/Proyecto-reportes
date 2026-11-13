@@ -35,6 +35,7 @@
     "expo-linear-gradient": "~58.0.4",
     "expo-location": "~58.0.22",
     "expo-network": "~58.0.5",
+    "expo-secure-store": "~58.0.3",
     "expo-sharing": "~58.0.23",
     "expo-splash-screen": "~58.0.14",
     "expo-status-bar": "~58.0.5",
@@ -64,6 +65,9 @@
     "testTimeout": 15000,
     "setupFiles": [
       "./jest.setup.js"
+    ],
+    "setupFilesAfterEnv": [
+      "./src/__tests__/setup/resetSecureStore.js"
     ],
     "testMatch": [
       "**/__tests__/**/*.test.js"
