@@ -109,7 +109,9 @@ npx expo start
 
 ### Generar APK (Android)
 
-`eas.json` tiene el perfil `preview` que genera un APK instalable. `EXPO_PUBLIC_API_URL` del APK sale de `eas.json` (no de `.env`, que no se sube a EAS): actualízala a la IP actual del backend o a una URL pública (ngrok) antes de compilar. El APK permite `http://` (`usesCleartextTraffic`) porque el backend local no tiene TLS.
+`eas.json` tiene el perfil `preview` que genera un APK instalable. `EXPO_PUBLIC_API_URL` del APK sale de `eas.json` (no de `.env`, que no se sube a EAS) y apunta al backend desplegado en Azure (`https://lagoenlinea.chilecentral.cloudapp.azure.com/api`, ver `docs/DEPLOY.md`). `GOOGLE_MAPS_API_KEY` es una variable de entorno de EAS (no está en git) que `app.config.js` inyecta; sin ella el mapa sale en blanco en el APK.
+
+Desarrollo: `npx expo start` usa el backend de `frontend/.env` (Docker local); `npm run start:azure` arranca Expo Go contra el servidor de Azure leyendo la URL de `eas.json`, sin editar `.env`.
 
 ```bash
 cd frontend
