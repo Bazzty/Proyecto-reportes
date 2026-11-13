@@ -9,6 +9,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
+import { getToken } from '../services/tokenStorage';
 import { REPORT_STATUSES, reportDisplayStatus, isValidated } from '../constants/reports';
 
 // Gris del botón "Yo también lo vi" mientras espera la respuesta del servidor.
@@ -66,7 +67,10 @@ function DetalleReporte({ route, navigation }) {
   const listRef = useRef(null);
 
   useEffect(() => {
-    AsyncStorage.multiGet(['token', 'userId', 'isAdmin']).then(([[, token], [, uid], [, admin]]) => {
+    Promise.all([
+      getToken().catch(() => null),
+      AsyncStorage.multiGet(['userId', 'isAdmin']),
+    ]).then(([token, [[, uid], [, admin]]]) => {
       setIsGuest(!token);
       setMyUserId(uid ? Number(uid) : null);
       setIsAdmin(admin === '1');

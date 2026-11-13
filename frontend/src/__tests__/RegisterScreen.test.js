@@ -1,6 +1,7 @@
 import { Alert, Keyboard, Platform } from 'react-native';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import RegisterScreen from '../screens/RegisterScreen';
 import api, { setAuthToken } from '../services/api';
 import { CONNECTION_ERROR_MESSAGE } from '../services/apiConfig';
@@ -82,7 +83,9 @@ describe('RegisterScreen', () => {
       password_confirmation: 'password123',
     });
     expect(setAuthToken).toHaveBeenCalledWith('tok');
-    expect(await AsyncStorage.getItem('token')).toBe('tok');
+    // El token va al almacén seguro, no a AsyncStorage (texto plano).
+    expect(await SecureStore.getItemAsync('token')).toBe('tok');
+    expect(await AsyncStorage.getItem('token')).toBeNull();
     expect(await AsyncStorage.getItem('userId')).toBe('3');
   });
 

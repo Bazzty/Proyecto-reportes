@@ -582,4 +582,4 @@ Requiere token.
 | 403 | Forbidden — acción no permitida (ej: confirmar tu propio reporte) |
 | 404 | Not Found — recurso no existe (también un id no numérico, p. ej. `/reports/abc`) |
 | 422 | Unprocessable — datos de entrada inválidos |
-| 429 | Too Many Requests — límite de intentos en login/registro |
+| 429 | Too Many Requests — límite de intentos en login/registro, de reportes creados (10 por minuto y 60 por hora por usuario) o de lecturas públicas (600 por minuto por IP) |

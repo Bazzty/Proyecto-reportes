@@ -14,6 +14,21 @@ services:
     networks:
       - reportes_network
 
+  # Tareas programadas de Laravel (routes/console.php), p. ej. borrar los tokens vencidos.
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan schedule:work
+    volumes:
+      - ./:/var/www
+    depends_on:
+      - db
+    networks:
+      - reportes_network
+
   nginx:
     image: nginx:alpine
     restart: unless-stopped

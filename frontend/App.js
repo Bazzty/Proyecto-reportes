@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { Alert, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 
 import WelcomeScreen from './src/screens/WelcomeScreen';
@@ -15,6 +14,7 @@ import MyReportsScreen from './src/screens/MyReportsScreen';
 import AdminReportsScreen from './src/screens/AdminReportsScreen';
 import { setAuthToken, setUnauthorizedHandler } from './src/services/api';
 import { clearSession } from './src/services/session';
+import { getToken } from './src/services/tokenStorage';
 
 const Stack = createNativeStackNavigator();
 
@@ -46,7 +46,7 @@ export default function App() {
             : Promise.resolve(null);
 
         const [tokenResult, pickerResult] = await Promise.allSettled([
-          AsyncStorage.getItem('token'),
+          getToken(),
           pickerRequest,
           new Promise((resolve) => setTimeout(resolve, 2500)),
         ]);

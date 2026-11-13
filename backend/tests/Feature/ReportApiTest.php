@@ -285,6 +285,33 @@ class ReportApiTest extends TestCase
         ], $overrides);
     }
 
+    public function test_creating_reports_is_rate_limited_per_user()
+    {
+        Storage::fake('public');
+        $category = Category::create(['name' => 'basura']);
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->postJson('/api/reports', $this->validReportPayload($category))->assertCreated();
+        }
+        $this->postJson('/api/reports', $this->validReportPayload($category))->assertStatus(429);
+
+        // El límite es por usuario: otra cuenta puede seguir reportando.
+        Sanctum::actingAs(User::factory()->create(), ['*']);
+        $this->postJson('/api/reports', $this->validReportPayload($category))->assertCreated();
+    }
+
+    public function test_public_reads_are_rate_limited_per_ip()
+    {
+        $limited = false;
+        for ($i = 0; $i < 601 && ! $limited; $i++) {
+            $limited = $this->getJson('/api/reports/version')->status() === 429;
+        }
+
+        $this->assertTrue($limited);
+        $this->assertSame(601, $i);
+    }
+
     public function test_creating_report_is_idempotent_with_client_uuid()
     {
         Storage::fake('public');
