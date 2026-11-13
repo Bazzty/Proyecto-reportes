@@ -201,8 +201,22 @@ describe('HomeScreen', () => {
     mockApi({ mine: [{ id: 1, status: 'Pendiente' }, { id: 3, status: 'Pendiente' }, { id: 2, status: 'Resuelto' }] });
     await setup();
 
-    expect(await screen.findByText('2 pendientes')).toBeTruthy();
+    expect(await screen.findByText('2 en curso')).toBeTruthy();
     expect(screen.getByText('1 resuelto')).toBeTruthy();
+  });
+
+  it('el conteo ignora los rechazados y separa los que esperan moderación', async () => {
+    mockApi({ mine: [
+      { id: 1, status: 'Pendiente', validation_status: 'valido' },
+      { id: 2, status: 'Pendiente', validation_status: 'pendiente' },
+      { id: 3, status: 'Pendiente', validation_status: 'rechazado' },
+      { id: 4, status: 'Resuelto', validation_status: 'rechazado' },
+    ] });
+    await setup();
+
+    expect(await screen.findByText('1 en curso')).toBeTruthy();
+    expect(screen.getByText('0 resueltos')).toBeTruthy();
+    expect(screen.getByText('1 en revisión')).toBeTruthy();
   });
 
   it('un usuario con sesión navega a Mis Reportes y Nuevo Reporte', async () => {

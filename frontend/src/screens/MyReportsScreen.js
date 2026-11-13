@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
 import { subscribe as subscribeQueue, getPending, isSyncing, removeItem } from '../services/offlineQueue';
 import useCategories from '../hooks/useCategories';
+import { reportDisplayStatus } from '../constants/reports';
 
 const PAGE_SIZE = 4;
 
@@ -14,6 +15,9 @@ const getStatusStyle = (status) => {
   switch (s) {
     case 'resuelto':     return { bg: '#dcfce7', text: '#166534', accent: '#16a34a' };
     case 'en progreso':  return { bg: '#dbeafe', text: '#1e40af', accent: '#2563eb' };
+    case 'aprobado':     return { bg: '#ccfbf1', text: '#115e59', accent: '#0d9488' };
+    case 'en revisión':  return { bg: '#f3f4f6', text: '#4b5563', accent: '#9ca3af' };
+    case 'rechazado':    return { bg: '#fee2e2', text: '#991b1b', accent: '#b91c1c' };
     case 'pendiente':
     default:             return { bg: '#fef9c3', text: '#854d0e', accent: '#ca8a04' };
   }
@@ -118,7 +122,7 @@ export default function MyReportsScreen({ navigation }) {
       ? { bg: '#fee2e2', text: '#991b1b', accent: '#b91c1c' }
       : item.isPending
         ? { bg: '#e5e7eb', text: '#374151', accent: '#6b7280' }
-        : getStatusStyle(item.status);
+        : getStatusStyle(reportDisplayStatus(item));
     const onPress = item.failed
       ? () => Alert.alert(
           'No se pudo enviar',
@@ -165,7 +169,7 @@ export default function MyReportsScreen({ navigation }) {
             </View>
             <View style={[styles.badge, { backgroundColor: statusColors.bg }]}>
               <Text style={[styles.badgeText, { color: statusColors.text }]}>
-                {(item.status ?? '').toUpperCase()}
+                {(item.isPending ? item.status : reportDisplayStatus(item)).toUpperCase()}
               </Text>
             </View>
           </View>
@@ -197,7 +201,7 @@ export default function MyReportsScreen({ navigation }) {
   };
 
   const renderGridCard = ({ item }) => {
-    const statusColors = getStatusStyle(item.status);
+    const statusColors = getStatusStyle(reportDisplayStatus(item));
     return (
       <TouchableOpacity
         style={[styles.gridCard, { width: gridCardWidth }]}

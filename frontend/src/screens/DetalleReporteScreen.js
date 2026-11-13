@@ -9,7 +9,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
-import { REPORT_STATUSES } from '../constants/reports';
+import { REPORT_STATUSES, reportDisplayStatus, isValidated } from '../constants/reports';
 
 // Gris del botón "Yo también lo vi" mientras espera la respuesta del servidor.
 const BUSY_COLOR = '#6b7280';
@@ -19,6 +19,7 @@ const statusColor = (status) => {
   const s = status.toLowerCase();
   if (s === 'resuelto')    return '#16a34a';
   if (s === 'en progreso') return '#2563eb';
+  if (s === 'aprobado')    return '#0d9488';
   return '#f59e0b';
 };
 
@@ -249,11 +250,14 @@ function DetalleReporte({ route, navigation }) {
               ? report.category.name.charAt(0).toUpperCase() + report.category.name.slice(1)
               : 'Sin categoría'}
           </Text>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor(report.status) + '22' }]}>
-            <Text style={[styles.statusText, { color: statusColor(report.status) }]}>
-              {report.status}
-            </Text>
-          </View>
+          {/* El estado de gestión solo aplica a reportes aprobados; antes manda la insignia de moderación. */}
+          {isValidated(report) ? (
+            <View style={[styles.statusBadge, { backgroundColor: statusColor(reportDisplayStatus(report)) + '22' }]}>
+              <Text style={[styles.statusText, { color: statusColor(reportDisplayStatus(report)) }]}>
+                {reportDisplayStatus(report)}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={[styles.validationBadge, { backgroundColor: validationInfo(report.validation_status).bg }]}>
