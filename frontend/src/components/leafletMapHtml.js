@@ -247,7 +247,9 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
           var icon = L.divIcon({
             className: '',
             html: '<div style="position:relative;overflow:hidden;width:' + size + 'px;height:' + size + 'px;box-sizing:border-box;border:' + (photo ? 3 : 2) + 'px solid ' + color + ';border-radius:8px;background:' + color + ';display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)">' + inner + '</div>',
-            iconSize: [size, size], iconAnchor: [size / 2, size], popupAnchor: [0, -size],
+            // Anclado al centro: el marcador es un cuadro (no un pin), y así queda justo encima
+            // del foco de calor. Con el ancla abajo se dibujaba ~1 marcador más arriba del punto.
+            iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2],
           });
           var popup = '<div style="min-width:150px">'
             + (photo ? '<img src="' + photo + '" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:6px;" />' : '')
