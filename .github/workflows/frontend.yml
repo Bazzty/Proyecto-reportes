@@ -25,7 +25,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Expo SDK 58 / React Native 0.88 exigen Node 22.13+ o 24.3+. Además el npm 10 de Node 20
+          # resuelve distinto las dependencias opcionales de @napi-rs/wasm-runtime y `npm ci` falla
+          # con "Missing: @emnapi/core"; el npm 11 de Node 24 acepta el lock tal cual.
+          node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
