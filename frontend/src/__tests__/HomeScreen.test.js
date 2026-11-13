@@ -375,6 +375,19 @@ describe('HomeScreen', () => {
       expect(api.get.mock.calls.filter(([u]) => u === '/reports').length).toBe(callsAfterHang);
     });
 
+    it('el botón "Recargar mapa" pide los reportes al instante, sin esperar al intervalo', async () => {
+      await setup();
+      await settle();
+      const count = () => api.get.mock.calls.filter(([u]) => u === '/reports').length;
+      const initial = count();
+
+      await fireEvent.press(screen.getByTestId('refresh-button'));
+      await settle();
+
+      expect(count()).toBe(initial + 1);
+      expect(api.get.mock.calls.filter(([u]) => u === '/reports/heatmap').length).toBeGreaterThan(1);
+    });
+
     it('vuelve a pedir /reports cada 5 segundos', async () => {
       await setup();
       await settle();
