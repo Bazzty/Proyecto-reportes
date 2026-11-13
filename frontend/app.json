@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Reportes Ambientales",
-    "slug": "frontend",
+    "slug": "lagoenlinea",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -55,6 +55,12 @@
           "backgroundColor": "#ffffff"
         }
       ]
-    ]
+    ],
+    "owner": "zeeloved",
+    "extra": {
+      "eas": {
+        "projectId": "fcc17c27-8e19-4898-b20e-70705c228a72"
+      }
+    }
   }
 }

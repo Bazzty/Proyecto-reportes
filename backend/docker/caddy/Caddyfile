@@ -1,0 +1,6 @@
+# Proxy HTTPS delante de nginx. DOMAIN viene de APP_DOMAIN en backend/.env.
+# Caddy obtiene y renueva el certificado de Let's Encrypt automáticamente.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy nginx:80
+}
