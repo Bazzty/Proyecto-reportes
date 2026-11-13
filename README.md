@@ -70,6 +70,16 @@ npx expo start
 
 Escanear el QR con **Expo Go**. El dispositivo y la computadora deben estar en la misma red WiFi.
 
+**¿Contra qué backend corre la app?**
+
+| Comando | Backend | Cuándo usarlo |
+|---|---|---|
+| `npx expo start` | El de tu `.env` (Docker local) | Desarrollo diario |
+| `npm run start:azure` | Servidor en Azure (URL de `eas.json`) | Probar contra el servidor real. Los datos que crees quedan en producción |
+| APK (`eas build`) | Servidor en Azure (URL de `eas.json`) | Distribuir la app |
+
+Ver [docs/DEPLOY.md](docs/DEPLOY.md) para el despliegue del backend y la generación del APK.
+
 ---
 ## Usuarios de prueba (seeder)
 

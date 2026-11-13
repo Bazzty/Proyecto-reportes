@@ -122,7 +122,9 @@ npx expo start
 
 El proyecto usa Expo SDK 58 (requiere Node 22+) y está enlazado a EAS (`@bazztyy/frontend`). `eas.json` tiene el perfil `preview`, que genera un APK instalable en el canal `preview`.
 
-`EXPO_PUBLIC_API_URL` del APK sale de `eas.json` (no de `.env`, que no se sube a EAS): antes de compilar, cámbiala por la URL pública del backend (por ejemplo la de `ngrok http 8000`, terminada en `/api`).
+`EXPO_PUBLIC_API_URL` del APK sale de `eas.json` (no de `.env`, que no se sube a EAS) y apunta al backend desplegado en Azure (`https://lagoenlinea.chilecentral.cloudapp.azure.com/api`, ver `docs/DEPLOY.md`). El mapa es Leaflet en un WebView, así que el APK no necesita API key de Google Maps.
+
+Desarrollo: `npx expo start` usa el backend de `frontend/.env` (Docker local); `npm run start:azure` arranca Expo Go contra el servidor de Azure leyendo la URL de `eas.json`, sin editar `.env`.
 
 ```bash
 cd frontend
