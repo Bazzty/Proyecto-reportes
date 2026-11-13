@@ -151,6 +151,15 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
     }
     map.on('move', scheduleHeatRedraw);
 
+    // Radio del heat según el zoom: alejado, focos chicos que no se funden en una mancha;
+    // acercado, más grandes para que sigan cubriendo el sector.
+    function heatRadius() {
+      return Math.max(14, Math.min(55, Math.round((map.getZoom() - 6) * 9)));
+    }
+    map.on('zoomend', function () {
+      if (heat && heat.setOptions) { heat.setOptions({ radius: heatRadius() }); }
+    });
+
     map.on('click', function (e) {
       if (!pickable) { return; }
       var lat = e.latlng.lat;
@@ -175,7 +184,27 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
       heatClickLayer.clearLayers();
       if (data.showHeat !== false && data.heat && data.heat.length) {
         if (L.heatLayer) {
-          heat = L.heatLayer(data.heat.map(function (p) { return [p.latitude, p.longitude, p.weight || 1]; }), { radius: 35, blur: 25, maxZoom: 12 });
+          // Intensidad relativa: el foco más denso llega al rojo y el resto se gradúa. Con max fijo
+          // en 1, todo lo que tuviera 1+ reportes saturaba igual. La densidad se mide sumando pesos
+          // por celda de ~1 km (en modo Foco los reportes cercanos se apilan). El mínimo de 3 evita
+          // que un único reporte aislado se vea como el peor foco del mapa.
+          var cells = {};
+          var maxWeight = 1;
+          data.heat.forEach(function (p) {
+            var key = Math.round(p.latitude * 100) + ':' + Math.round(p.longitude * 100);
+            cells[key] = (cells[key] || 0) + (p.weight || 1);
+            maxWeight = Math.max(maxWeight, cells[key]);
+          });
+          heat = L.heatLayer(data.heat.map(function (p) { return [p.latitude, p.longitude, p.weight || 1]; }), {
+            radius: heatRadius(),
+            blur: 20,
+            max: Math.max(3, maxWeight),
+            // maxZoom bajo desactiva la atenuación de leaflet.heat al alejar el zoom (con 12 el
+            // mapa, que abre en 10, mostraba el heat a un cuarto de intensidad).
+            maxZoom: 1,
+            minOpacity: 0.35,
+            gradient: { 0.2: '#fde68a', 0.45: '#facc15', 0.7: '#f97316', 1: '#dc2626' },
+          });
           heat.addTo(map);
         }
         data.heat.forEach(function (p) {
@@ -206,12 +235,20 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
           var glyph = code
             ? '<span style="font-family:Ionicons;font-size:20px;color:#fff;line-height:1;">&#x' + code + ';</span>'
             : '<span style="font-size:16px;line-height:1;">&#x1F4CD;</span>';
+          var photo = safeUrl(r.photo_url);
+          // Con foto: miniatura con borde del color del estado y la categoría en una insignia.
+          // El ícono queda debajo de la imagen; si la foto no carga, onerror la quita y se ve el ícono.
+          var size = photo ? 48 : 36;
+          var inner = photo
+            ? glyph
+              + '<img src="' + photo + '" onerror="this.remove()" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;" />'
+              + '<div style="position:absolute;right:0;bottom:0;width:22px;height:22px;border-top-left-radius:8px;background:' + color + ';display:flex;align-items:center;justify-content:center;font-size:0;">' + glyph.replace('font-size:20px', 'font-size:14px').replace('font-size:16px', 'font-size:12px') + '</div>'
+            : glyph;
           var icon = L.divIcon({
             className: '',
-            html: '<div style="width:36px;height:36px;border:2px solid ' + color + ';border-radius:8px;background:' + color + ';display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)">' + glyph + '</div>',
-            iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -36],
+            html: '<div style="position:relative;overflow:hidden;width:' + size + 'px;height:' + size + 'px;box-sizing:border-box;border:' + (photo ? 3 : 2) + 'px solid ' + color + ';border-radius:8px;background:' + color + ';display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)">' + inner + '</div>',
+            iconSize: [size, size], iconAnchor: [size / 2, size], popupAnchor: [0, -size],
           });
-          var photo = safeUrl(r.photo_url);
           var popup = '<div style="min-width:150px">'
             + (photo ? '<img src="' + photo + '" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:6px;" />' : '')
             + '<div style="font-weight:bold;color:#0e7490">' + esc(r.category || 'Sin categoría') + '</div>'
