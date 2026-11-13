@@ -55,6 +55,18 @@
           "backgroundColor": "#ffffff"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "6a8a1555-d75a-4b15-a336-35de88e36218"
+      }
+    },
+    "owner": "bazztyy",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/6a8a1555-d75a-4b15-a336-35de88e36218"
+    }
   }
 }

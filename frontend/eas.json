@@ -6,7 +6,8 @@
   "build": {
     "development": {
       "developmentClient": false,
-      "distribution": "internal"
+      "distribution": "internal",
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
@@ -15,7 +16,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "http://192.168.1.147:8000/api"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "android": {
@@ -23,7 +25,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "http://192.168.1.147:8000/api"
-      }
+      },
+      "channel": "production"
     }
   }
 }

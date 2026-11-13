@@ -15,6 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // La app solo es accesible a través del contenedor nginx / el túnel (ngrok), así que
+        // se confía en sus cabeceras X-Forwarded-*; sin esto las URLs generadas salen en http://.
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
         ]);
