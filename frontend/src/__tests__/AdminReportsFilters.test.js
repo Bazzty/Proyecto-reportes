@@ -274,13 +274,13 @@ describe('AdminReportsScreen: historial', () => {
     expect(screen.getByLabelText('Historial')).toHaveProp('accessibilityState', { expanded: true });
   });
 
-  it('indica "automáticamente" cuando la validación fue automática', async () => {
+  it('indica "(su propio reporte)" cuando lo validó su propio autor', async () => {
     await setup([validReport({ validated_by: null, validated_at: '2026-10-02T10:00:00.000Z', auto_validated: true })]);
     await screen.findByText('Basura en la plaza');
 
     await fireEvent.press(screen.getByLabelText('Historial'));
 
-    expect(screen.getByText(/^Validado automáticamente · /)).toBeTruthy();
+    expect(screen.getByText(/^Validado \(su propio reporte\) · /)).toBeTruthy();
   });
 
   it('muestra rechazo con motivo y el cambio de estado', async () => {

@@ -44,7 +44,8 @@ export const buildHistory = (item) => {
 
   if (item.validation_status === 'valido' && (item.validated_by || item.validated_at || item.auto_validated)) {
     const who = item.validated_by?.name ? `Validado por ${item.validated_by.name}` : 'Validado';
-    lines.push(`${who}${item.auto_validated ? ' automáticamente' : ''}${when(item.validated_at)}`);
+    // auto_validated: lo aprobó su propio autor (un admin). Ya no hay validación automática al crear.
+    lines.push(`${who}${item.auto_validated ? ' (su propio reporte)' : ''}${when(item.validated_at)}`);
   }
 
   if (item.validation_status === 'rechazado' && (item.validated_by || item.validated_at || item.rejection_reason)) {
