@@ -206,12 +206,20 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
           var glyph = code
             ? '<span style="font-family:Ionicons;font-size:20px;color:#fff;line-height:1;">&#x' + code + ';</span>'
             : '<span style="font-size:16px;line-height:1;">&#x1F4CD;</span>';
+          var photo = safeUrl(r.photo_url);
+          // Con foto: miniatura con borde del color del estado y la categoría en una insignia.
+          // El ícono queda debajo de la imagen; si la foto no carga, onerror la quita y se ve el ícono.
+          var size = photo ? 48 : 36;
+          var inner = photo
+            ? glyph
+              + '<img src="' + photo + '" onerror="this.remove()" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;" />'
+              + '<div style="position:absolute;right:0;bottom:0;width:22px;height:22px;border-top-left-radius:8px;background:' + color + ';display:flex;align-items:center;justify-content:center;font-size:0;">' + glyph.replace('font-size:20px', 'font-size:14px').replace('font-size:16px', 'font-size:12px') + '</div>'
+            : glyph;
           var icon = L.divIcon({
             className: '',
-            html: '<div style="width:36px;height:36px;border:2px solid ' + color + ';border-radius:8px;background:' + color + ';display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)">' + glyph + '</div>',
-            iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -36],
+            html: '<div style="position:relative;overflow:hidden;width:' + size + 'px;height:' + size + 'px;box-sizing:border-box;border:' + (photo ? 3 : 2) + 'px solid ' + color + ';border-radius:8px;background:' + color + ';display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)">' + inner + '</div>',
+            iconSize: [size, size], iconAnchor: [size / 2, size], popupAnchor: [0, -size],
           });
-          var photo = safeUrl(r.photo_url);
           var popup = '<div style="min-width:150px">'
             + (photo ? '<img src="' + photo + '" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:6px;" />' : '')
             + '<div style="font-weight:bold;color:#0e7490">' + esc(r.category || 'Sin categoría') + '</div>'
