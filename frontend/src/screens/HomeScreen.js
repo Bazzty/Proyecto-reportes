@@ -190,6 +190,8 @@ export default function HomeScreen({ navigation, route }) {
     // Huella de los datos ya mostrados y cuándo se bajaron completos por última vez.
     let lastVersion = null;
     let lastFull = 0;
+    // Servidor sin /reports/version (404): no se vuelve a pedir en cada tick.
+    let versionMissing = false;
 
     // Devuelve true si la consulta salió bien (la recarga manual lo usa para avisar del fallo).
     // Cada tick pide primero /reports/version (dos conteos): los tres listados solo se descargan si
@@ -197,7 +199,10 @@ export default function HomeScreen({ navigation, route }) {
     const runFetch = async (force = false) => {
       try {
         // Sin huella (servidor anterior o fallo puntual) se descargan los listados como antes.
-        const versionRes = await api.get('/reports/version', opts).catch(() => null);
+        const versionRes = versionMissing ? null : await api.get('/reports/version', opts).catch((err) => {
+          if (err?.response?.status === 404) versionMissing = true;
+          return null;
+        });
         if (signal.aborted) return false;
         const version = versionRes?.data?.version ?? null;
         const fresh = Date.now() - lastFull < FULL_REFRESH_MS;

@@ -31,6 +31,8 @@ const FILTERS = [
 const TOAST_MS = 3500;
 const UNDO_MS = 6000;
 const SEARCH_DEBOUNCE_MS = 400;
+// Filas ya cargadas que "Cargar más" vuelve a pedir (el servidor entrega 20 por vez).
+const LOAD_MORE_OVERLAP = 5;
 const DEFAULT_SORT = 'recientes';
 const CONFLICT_MESSAGE = 'Este reporte cambió mientras tanto. Se actualizó la tarjeta.';
 
@@ -184,10 +186,12 @@ export default function AdminReportsScreen({ navigation }) {
     }
 
     // "Cargar más" pide desde las filas que ya hay (offset) y no la página siguiente: al moderar se
-    // sacan reportes de la lista y una página fija saltaría los que suben a ocupar su lugar.
+    // sacan reportes de la lista y una página fija saltaría los que suben a ocupar su lugar. Se pide
+    // con un solape de LOAD_MORE_OVERLAP filas (los repetidos se descartan abajo): si otro admin
+    // moderó reportes de este filtro, los que suben a ocupar su lugar tampoco se saltan.
     const params = pageToLoad === 1
       ? { ...listParams, page: 1 }
-      : { ...listParams, offset: reportsRef.current.length };
+      : { ...listParams, offset: Math.max(0, reportsRef.current.length - LOAD_MORE_OVERLAP) };
 
     api.get('/admin/reports', { params })
       .then((res) => {
@@ -196,7 +200,7 @@ export default function AdminReportsScreen({ navigation }) {
         const meta = res.data.meta ?? {};
         // Recarga completa (otros filtros o "Mostrar"): el tope se recalcula con la lista nueva.
         if (pageToLoad === 1) newestIdRef.current = 0;
-        // Si entretanto llegó un reporte nuevo arriba, el offset trae repetido el último: se omite.
+        // Repetidos (el solape, o un reporte nuevo que llegó arriba entretanto): se omiten.
         setReports(prev => {
           if (pageToLoad === 1) return rows;
           const known = new Set(prev.map(r => r.id));

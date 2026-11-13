@@ -360,18 +360,18 @@ Requiere token de **administrador**.
 ```json
 { "validation_status": "pendiente", "expected_validation_status": "valido" }
 ```
-`validation_status` acepta `pendiente`, `valido` y `rechazado`. `expected_validation_status` es **obligatorio**: es el estado que el cliente vio al cargar la lista (concurrencia optimista). `rejection_reason` es obligatorio solo al rechazar.
+`validation_status` acepta `pendiente`, `valido` y `rechazado`. `expected_validation_status` es **obligatorio**: es el estado que el cliente vio al cargar la lista (concurrencia optimista). `rejection_reason` es obligatorio solo al rechazar. Repetir el mismo estado es idempotente (`200` sin cambios), salvo `rechazado` → `rechazado` con otro `rejection_reason`, que corrige el motivo.
 
 Al pasar a `pendiente` se limpian `validated_by`, `validated_at`, `rejection_reason`, `status_updated_by` y `status_updated_at`, y `status` vuelve a `Pendiente`. Si se pasa de `valido` a `pendiente` y el reporte ya avanzó de estado (`En Progreso` o `Resuelto`), la respuesta es `409`: deshacer no borra el cambio de estado de otro admin.
 
-Opcional al pasar a `valido` o `rechazado` (deshacer una moderación previa): `restore_previous: true`. Al cambiar un reporte entre `valido` y `rechazado`, el servidor guarda quién lo había moderado y cuándo (`previous_validated_by`/`previous_validated_at`); con `restore_previous` se restauran esos datos en vez de registrar como moderador a quien deshace. El cliente no envía ni el moderador ni la fecha (los antiguos `restore_validated_by`/`restore_validated_at` se ignoran). Sin moderación anterior guardada queda quien actúa. No se acepta al pasar a `pendiente` (`422`).
+Opcional al pasar a `valido` o `rechazado` (deshacer una moderación previa): `restore_previous: true`. Al cambiar un reporte entre `valido` y `rechazado`, el servidor guarda quién lo había moderado y cuándo (`previous_validated_by`/`previous_validated_at`); con `restore_previous` se restauran esos datos en vez de registrar como moderador a quien deshace. El cliente no envía ni el moderador ni la fecha (los antiguos `restore_validated_by`/`restore_validated_at` se ignoran). Sin moderación anterior guardada queda quien actúa; si el moderador anterior ya no existe se restaura la fecha sin moderador. No se acepta al pasar a `pendiente` (`422`).
 ```json
 { "validation_status": "valido", "expected_validation_status": "rechazado", "restore_previous": true }
 ```
 
 **Response 200:** el reporte actualizado (incluye `validation_status`, `rejection_reason`, `validated_at`, `validated_by`, `status_updated_by`, `status_updated_at` y `auto_validated`).
 
-**Response 409 — El estado cambió mientras tanto:** otro admin ya modificó el reporte. El `UPDATE` es atómico (`WHERE id = ? AND validation_status = ?`), así que dos admins simultáneos no pueden pisarse; recargá la lista y reintentá.
+**Response 409 — El estado cambió mientras tanto:** otro admin ya modificó el reporte. La fila se bloquea dentro de una transacción (`SELECT … FOR UPDATE`) y se compara con `expected_validation_status`, así que dos admins simultáneos no pueden pisarse; recargá la lista y reintentá.
 
 > **Visibilidad:** solo los reportes con `validation_status = "valido"` son públicos. Los `"pendiente"` y `"rechazado"` **no** aparecen en el heatmap ni, para otros usuarios, en `GET /reports`; su detalle (`GET /reports/{id}`), sus comentarios (`GET/POST /reports/{id}/comments`) y su confirmación (`POST /reports/{id}/confirm`) devuelven `404` salvo para el autor o un administrador. Excepción: `GET /reports` con token incluye además los reportes **pendientes del propio usuario**, para que vea en el mapa el que acaba de enviar.
 
@@ -410,7 +410,7 @@ Requiere token de **administrador**. Sin parámetros.
 }
 ```
 - `new_this_week`: reportes creados en los últimos 7 días.
-- `avg_validation_hours`: promedio en horas (1 decimal) entre `created_at` y `validated_at` de los últimos 200 reportes validados o rechazados, incluidos los de administradores (también esperan en la cola). `null` si no hay datos.
+- `avg_validation_hours`: promedio en horas (1 decimal) entre `created_at` y `validated_at` de los últimos 200 reportes validados o rechazados, incluidos los de administradores (también esperan en la cola). Se excluye la autovalidación al crear de versiones anteriores (autor = moderador en el mismo minuto). `null` si no hay datos.
 - `top_zone`: zona con más reportes no rechazados (desempate: id menor) o `null`.
 
 ---

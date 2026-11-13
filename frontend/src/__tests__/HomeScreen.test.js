@@ -407,6 +407,22 @@ describe('HomeScreen', () => {
       expect(listCalls()).toBeGreaterThanOrEqual(initial + 2);
     });
 
+    it('si el servidor no tiene /reports/version (404) deja de pedirla', async () => {
+      const ok = api.get.getMockImplementation();
+      api.get.mockImplementation((url) =>
+        url === '/reports/version' ? Promise.reject({ response: { status: 404 } }) : ok(url)
+      );
+      await setup();
+      await settle();
+      await advance(5000);
+      await advance(5000);
+
+      const versionCalls = api.get.mock.calls.filter(([u]) => u === '/reports/version').length;
+      expect(versionCalls).toBe(1);
+      // Sin huella se siguen bajando los listados en cada tick.
+      expect(listCalls()).toBeGreaterThanOrEqual(3);
+    });
+
     it('un fallo aislado no muestra el aviso de conexión', async () => {
       await setup();
       await settle();

@@ -251,6 +251,20 @@ class AdminPanelTest extends TestCase
         $response->assertJsonPath('top_zone', ['id' => $small->id, 'name' => 'Frutillar', 'count' => 2]);
     }
 
+    public function test_summary_excludes_legacy_auto_validation_at_creation()
+    {
+        $admin = $this->actAsAdmin();
+        $created = now()->subDays(3);
+        $this->makeReport(['validation_status' => 'valido', 'validated_by' => $admin->id, 'validated_at' => $created->copy()->addHours(4)])
+            ->forceFill(['created_at' => $created])->save();
+        // Autovalidado al crearse (versiones anteriores): no fue una espera en la cola.
+        $this->makeReport(['user_id' => $admin->id, 'validation_status' => 'valido', 'validated_by' => $admin->id, 'validated_at' => $created])
+            ->forceFill(['created_at' => $created])->save();
+
+        $this->getJson('/api/admin/reports/summary')->assertOk()
+            ->assertJsonPath('avg_validation_hours', 4);
+    }
+
     public function test_summary_top_zone_counts_non_rejected_and_breaks_ties_by_id()
     {
         $this->actAsAdmin();
@@ -356,6 +370,45 @@ class AdminPanelTest extends TestCase
         $this->assertTrue($fresh->validated_at->equalTo($validatedAt));
         $this->assertNull($fresh->rejection_reason);
         $this->assertNull($fresh->previous_validated_by);
+    }
+
+    public function test_undo_restores_the_date_when_the_previous_moderator_was_deleted()
+    {
+        $original = User::factory()->admin()->create();
+        $admin = $this->actAsAdmin();
+        $validatedAt = now()->subDays(2)->startOfSecond();
+        $report = $this->makeReport(['validation_status' => 'rechazado', 'rejection_reason' => 'x', 'validated_by' => $original->id, 'validated_at' => $validatedAt]);
+        $url = "/api/admin/reports/{$report->id}/validation";
+
+        $this->patchJson($url, ['validation_status' => 'valido', 'expected_validation_status' => 'rechazado'])->assertOk();
+        $original->delete();
+
+        $this->patchJson($url, [
+            'validation_status' => 'rechazado',
+            'expected_validation_status' => 'valido',
+            'rejection_reason' => 'x',
+            'restore_previous' => true,
+        ])->assertOk();
+
+        $fresh = $report->fresh();
+        $this->assertSame('rechazado', $fresh->validation_status);
+        $this->assertNull($fresh->validated_by);
+        $this->assertTrue($fresh->validated_at->equalTo($validatedAt));
+        $this->assertNull($fresh->previous_validated_at);
+    }
+
+    public function test_rejecting_again_updates_the_reason()
+    {
+        $admin = $this->actAsAdmin();
+        $report = $this->makeReport(['validation_status' => 'rechazado', 'rejection_reason' => 'Duplicao', 'validated_by' => $admin->id, 'validated_at' => now()]);
+
+        $this->patchJson("/api/admin/reports/{$report->id}/validation", [
+            'validation_status' => 'rechazado',
+            'expected_validation_status' => 'rechazado',
+            'rejection_reason' => 'Duplicado',
+        ])->assertOk()->assertJsonPath('rejection_reason', 'Duplicado');
+
+        $this->assertSame('Duplicado', $report->fresh()->rejection_reason);
     }
 
     public function test_restore_ignores_a_moderator_or_date_sent_by_the_client()

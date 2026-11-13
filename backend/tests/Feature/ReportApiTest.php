@@ -274,6 +274,24 @@ class ReportApiTest extends TestCase
         $this->assertNotSame($changed, $version());
     }
 
+    public function test_version_changes_when_another_report_changes_in_the_same_second()
+    {
+        $category = Category::create(['name' => 'basura']);
+        $author = User::factory()->create();
+        $first = $this->sampleReport($category, $author);
+        $second = $this->sampleReport($category, $author);
+        $version = fn () => $this->getJson('/api/reports/version')->assertOk()->json('version');
+
+        $this->freezeSecond();
+        $this->travel(5)->seconds();
+        $first->update(['status' => 'En Progreso']);
+        $before = $version();
+
+        // Mismo segundo: MAX(updated_at) no cambia, pero sí cuántos reportes lo tienen.
+        $second->update(['status' => 'En Progreso']);
+        $this->assertNotSame($before, $version());
+    }
+
     private function validReportPayload(Category $category, array $overrides = []): array
     {
         return array_merge([
