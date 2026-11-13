@@ -10,9 +10,10 @@ const eas = require('../eas.json');
 const apiUrl = eas.build.preview.env.EXPO_PUBLIC_API_URL;
 console.log(`\n→ Backend: ${apiUrl}\n  (ojo: es el servidor real; lo que crees aquí queda en la base de datos de producción)\n`);
 
-const child = spawn('npx', ['expo', 'start', '--clear', ...process.argv.slice(2)], {
+// Se invoca la CLI de Expo con el mismo Node (sin shell): igual en Windows, macOS y Linux.
+const expoCli = require.resolve('expo/bin/cli');
+const child = spawn(process.execPath, [expoCli, 'start', '--clear', ...process.argv.slice(2)], {
   stdio: 'inherit',
-  shell: process.platform === 'win32',
   env: { ...process.env, EXPO_PUBLIC_API_URL: apiUrl },
 });
 child.on('exit', (code) => process.exit(code ?? 0));
