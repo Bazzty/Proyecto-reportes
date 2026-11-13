@@ -19,6 +19,7 @@ class CommentApiTest extends TestCase
         $category = Category::create(['name' => 'aguas']);
 
         return Report::create([
+            'validation_status' => 'valido',
             'user_id' => $user->id,
             'category_id' => $category->id,
             'description' => 'Reporte de prueba',

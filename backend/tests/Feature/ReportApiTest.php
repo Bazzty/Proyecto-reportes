@@ -69,6 +69,7 @@ class ReportApiTest extends TestCase
         $category = Category::create(['name' => 'escombros']);
 
         $report = Report::create([
+            'validation_status' => 'valido',
             'user_id' => $user->id,
             'category_id' => $category->id,
             'description' => 'Escombros en la vereda',
@@ -101,6 +102,7 @@ class ReportApiTest extends TestCase
         $category = Category::create(['name' => 'aguas']);
 
         Report::create([
+            'validation_status' => 'valido',
             'user_id' => $user->id,
             'category_id' => $category->id,
             'description' => 'Mi reporte',
@@ -111,6 +113,7 @@ class ReportApiTest extends TestCase
         ]);
 
         Report::create([
+            'validation_status' => 'valido',
             'user_id' => $other->id,
             'category_id' => $category->id,
             'description' => 'Reporte de otro usuario',
@@ -136,6 +139,7 @@ class ReportApiTest extends TestCase
         $category = Category::create(['name' => 'otro']);
 
         Report::create([
+            'validation_status' => 'valido',
             'user_id' => $user->id,
             'category_id' => $category->id,
             'description' => 'Reporte público',
@@ -160,6 +164,7 @@ class ReportApiTest extends TestCase
         $category = Category::create(['name' => 'basura']);
 
         $report = Report::create([
+            'validation_status' => 'valido',
             'user_id' => $user->id,
             'category_id' => $category->id,
             'description' => 'Detalle público',
@@ -180,6 +185,7 @@ class ReportApiTest extends TestCase
         $category = Category::create(['name' => 'basura']);
 
         Report::create([
+            'validation_status' => 'valido',
             'user_id' => $user->id,
             'category_id' => $category->id,
             'description' => 'Punto 1',
@@ -190,6 +196,7 @@ class ReportApiTest extends TestCase
         ]);
 
         Report::create([
+            'validation_status' => 'valido',
             'user_id' => $user->id,
             'category_id' => $category->id,
             'description' => 'Punto 2',
@@ -283,6 +290,7 @@ class ReportApiTest extends TestCase
         $user = User::factory()->create();
         $category = Category::create(['name' => 'basura']);
         $make = fn (string $description) => Report::create([
+            'validation_status' => 'valido',
             'user_id' => $user->id,
             'category_id' => $category->id,
             'description' => $description,
@@ -308,6 +316,7 @@ class ReportApiTest extends TestCase
         $other = User::factory()->create();
         $category = Category::create(['name' => 'basura']);
         $report = Report::create([
+            'validation_status' => 'valido',
             'user_id' => $author->id,
             'category_id' => $category->id,
             'description' => 'Con confirmaciones',
@@ -460,6 +469,7 @@ class ReportApiTest extends TestCase
     private function sampleReport(Category $category, User $user): Report
     {
         return Report::create([
+            'validation_status' => 'valido',
             'user_id' => $user->id,
             'category_id' => $category->id,
             'description' => 'Reporte de prueba',
@@ -528,6 +538,7 @@ class ReportApiTest extends TestCase
         $admin = $this->makeAdmin();
         $category = Category::create(['name' => 'basura']);
         $report = Report::create([
+            'validation_status' => 'valido',
             'user_id' => $admin->id,
             'category_id' => $category->id,
             'description' => 'Pendiente de validación',
@@ -568,6 +579,7 @@ class ReportApiTest extends TestCase
         $viewer = User::factory()->create();
         $category = Category::create(['name' => 'basura']);
         $report = Report::create([
+            'validation_status' => 'valido',
             'user_id' => $owner->id,
             'category_id' => $category->id,
             'description' => 'Reporte ajeno',
@@ -593,6 +605,7 @@ class ReportApiTest extends TestCase
         $other = User::factory()->create();
         $category = Category::create(['name' => 'basura']);
         $report = Report::create([
+            'validation_status' => 'valido',
             'user_id' => $owner->id,
             'category_id' => $category->id,
             'description' => 'Reporte intocable',

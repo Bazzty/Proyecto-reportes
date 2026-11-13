@@ -177,7 +177,11 @@ export default function NewReportScreen({ navigation, route = {} }) {
         timeout: UPLOAD_TIMEOUT_MS,
       });
 
-      Alert.alert('¡Éxito!', 'Reporte enviado correctamente.', [
+      // Un reporte de vecino nace pendiente: solo lo ve su autor hasta que un administrador lo valide.
+      const message = newReport?.validation_status === 'pendiente'
+        ? 'Reporte enviado. Aparecerá en el mapa para todos cuando un administrador lo valide.'
+        : 'Reporte enviado correctamente.';
+      Alert.alert('¡Éxito!', message, [
         { text: 'OK', onPress: () => navigation.navigate('Home', { newReport }) },
       ]);
     } catch (error) {

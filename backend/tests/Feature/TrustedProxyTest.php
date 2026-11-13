@@ -15,6 +15,7 @@ class TrustedProxyTest extends TestCase
     public function test_photo_url_uses_forwarded_https_scheme_and_host()
     {
         $report = Report::create([
+            'validation_status' => 'valido',
             'user_id' => User::factory()->create()->id,
             'category_id' => Category::firstOrCreate(['name' => 'basura'])->id,
             'description' => 'Reporte de prueba',

@@ -305,6 +305,7 @@ class ZoneHeatmapTest extends TestCase
     private function makeReport(User $user, Category $category, float $lat, float $lng, ?int $zoneId): void
     {
         Report::create([
+            'validation_status' => 'valido',
             'user_id' => $user->id,
             'category_id' => $category->id,
             'zone_id' => $zoneId,

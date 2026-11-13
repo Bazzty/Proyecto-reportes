@@ -92,7 +92,14 @@ class ReportSeeder extends Seeder
             $user = $createdUsers[$i % count($createdUsers)];
             $zone = $resolver->resolve((float) $r['lat'], (float) $r['lng']);
 
+            // Solo los validados salen en el mapa. Se deja uno de cada cuatro "Pendiente" en la cola
+            // de moderación para la demo del panel; los que ya avanzan de estado están validados.
+            $pending = $r['status'] === 'Pendiente' && $i % 4 === 0;
+
             Report::create([
+                'validation_status' => $pending ? 'pendiente' : 'valido',
+                'validated_by' => $pending ? null : $adminUser?->id,
+                'validated_at' => $pending ? null : now(),
                 'user_id' => $user->id,
                 'category_id' => $cat->id,
                 'zone_id' => $zone?->id,

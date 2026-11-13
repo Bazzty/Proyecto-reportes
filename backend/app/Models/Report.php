@@ -33,11 +33,12 @@ class Report extends Model
     }
 
     /**
-     * Un reporte rechazado solo es visible para su dueño o un administrador.
+     * Solo los reportes validados son públicos. Uno pendiente o rechazado
+     * lo ven únicamente su dueño y los administradores.
      */
     public function isVisibleTo(?User $user): bool
     {
-        if ($this->validation_status !== 'rechazado') {
+        if ($this->validation_status === 'valido') {
             return true;
         }
 
