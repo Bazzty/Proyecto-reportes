@@ -53,7 +53,9 @@ describe('DetalleReporteScreen', () => {
 
     expect(await screen.findByText('Basura acumulada')).toBeTruthy();
     expect(screen.getByText('Basura')).toBeTruthy();
-    expect(screen.getByText('Pendiente')).toBeTruthy();
+    // Aún sin moderar: manda la insignia de revisión, no el estado de gestión "Pendiente".
+    expect(screen.getByText('Pendiente de revisión')).toBeTruthy();
+    expect(screen.queryByText('Pendiente')).toBeNull();
     expect(screen.getByText('Carla')).toBeTruthy();
     expect(screen.getByText('Lo vi ayer también')).toBeTruthy();
     expect(screen.getByText('Comentarios (1)')).toBeTruthy();
@@ -361,6 +363,14 @@ describe('DetalleReporteScreen', () => {
     await fireEvent.press(screen.getByText('icon:send'));
 
     await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Error', 'No se pudo enviar el comentario.'));
+  });
+
+  it('un reporte aprobado sin atender se muestra como "Aprobado"', async () => {
+    mockGet({ report: { ...REPORT, validation_status: 'valido' } });
+    await setup();
+
+    expect(await screen.findByText('Aprobado')).toBeTruthy();
+    expect(screen.queryByText('Pendiente')).toBeNull();
   });
 
   it('un administrador ve los controles de estado y puede cambiarlo', async () => {

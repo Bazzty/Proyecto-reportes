@@ -55,6 +55,22 @@ describe('MyReportsScreen', () => {
     expect(screen.getByText('41.3198°S, 72.9833°O')).toBeTruthy();
   });
 
+  it('muestra la moderación antes que el estado de gestión', async () => {
+    await setup([
+      report({ id: 1, description: 'Aprobado', validation_status: 'valido', status: 'En Progreso' }),
+      report({ id: 2, description: 'Sin revisar', validation_status: 'pendiente' }),
+      report({ id: 3, description: 'Rechazado', validation_status: 'rechazado', status: 'Resuelto' }),
+      report({ id: 4, description: 'Aprobado sin atender', validation_status: 'valido', status: 'Pendiente' }),
+    ]);
+
+    expect(await screen.findByText('EN PROGRESO')).toBeTruthy();
+    expect(screen.getByText('APROBADO')).toBeTruthy();
+    expect(screen.getByText('EN REVISIÓN')).toBeTruthy();
+    expect(screen.getByText('RECHAZADO')).toBeTruthy();
+    expect(screen.queryByText('PENDIENTE')).toBeNull();
+    expect(screen.queryByText('RESUELTO')).toBeNull();
+  });
+
   it('usa singular y plural en el contador', async () => {
     await setup([report()]);
     expect(await screen.findByText('1 reporte encontrado')).toBeTruthy();

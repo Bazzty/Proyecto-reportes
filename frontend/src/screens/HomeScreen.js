@@ -12,6 +12,7 @@ import useNotifications from '../hooks/useNotifications';
 import useCategories from '../hooks/useCategories';
 import { subscribe as subscribeQueue, getPendingCount, isSyncing } from '../services/offlineQueue';
 import confirmAction from '../utils/confirmAction';
+import { isValidated } from '../constants/reports';
 import { syncStatusNotifications, markAllRead } from '../services/notifications';
 
 // Tiempo máximo por petición del polling: una petición colgada no debe bloquear los refrescos.
@@ -287,8 +288,12 @@ export default function HomeScreen({ navigation, route }) {
     });
   };
 
-  const pendientes = myReports.filter(r => r.status?.toLowerCase() === 'pendiente').length;
-  const resueltos  = myReports.filter(r => r.status?.toLowerCase() === 'resuelto').length;
+  // Solo los aprobados tienen estado de gestión; los que esperan moderación se cuentan aparte
+  // y los rechazados no cuentan.
+  const validated  = myReports.filter(isValidated);
+  const resueltos  = validated.filter(r => r.status?.toLowerCase() === 'resuelto').length;
+  const enCurso    = validated.length - resueltos;
+  const enRevision = myReports.filter(r => r.validation_status === 'pendiente').length;
 
   const toggleFilter = (id) =>
     setActiveFilters(prev =>
@@ -390,13 +395,22 @@ export default function HomeScreen({ navigation, route }) {
             <View style={styles.badgeRow}>
               <View style={styles.badge}>
                 <View style={[styles.badgeDot, { backgroundColor: '#f59e0b' }]} />
-                <Text style={styles.badgeText}>{pendientes} pendiente{pendientes !== 1 ? 's' : ''}</Text>
+                <Text style={styles.badgeText}>{enCurso} en curso</Text>
               </View>
               <Text style={styles.badgeSep}>·</Text>
               <View style={styles.badge}>
                 <View style={[styles.badgeDot, { backgroundColor: '#16a34a' }]} />
                 <Text style={styles.badgeText}>{resueltos} resuelto{resueltos !== 1 ? 's' : ''}</Text>
               </View>
+              {enRevision > 0 ? (
+                <>
+                  <Text style={styles.badgeSep}>·</Text>
+                  <View style={styles.badge}>
+                    <View style={[styles.badgeDot, { backgroundColor: '#9ca3af' }]} />
+                    <Text style={styles.badgeText}>{enRevision} en revisión</Text>
+                  </View>
+                </>
+              ) : null}
             </View>
           ) : (
             <Text style={styles.greetingSubtitle}>Reporta incidencias ambientales en tu zona</Text>
@@ -608,7 +622,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
   },
   bellBadgeText:     { color: '#ffffff', fontSize: 10, fontWeight: 'bold' },
-  badgeRow:  { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 },
+  badgeRow:  { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 4, gap: 6 },
   badge:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
   badgeDot:  { width: 7, height: 7, borderRadius: 4 },
   badgeText: { fontSize: 12, color: '#6b7280' },
