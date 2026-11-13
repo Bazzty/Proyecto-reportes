@@ -91,13 +91,39 @@ export const clearQueue = async () => {
   await Promise.all(items.map((q) => removePhoto(q.photoUri)));
 };
 
+// Usuario dueño de la sesión actual (null sin sesión).
+const currentUserId = async () => {
+  try {
+    return (await AsyncStorage.getItem('userId')) || null;
+  } catch {
+    return null;
+  }
+};
+
+// Al iniciar sesión: los reportes que dejó en la cola otro usuario del mismo dispositivo se descartan
+// (no se publican con esta cuenta) y los sin dueño (versiones anteriores) pasan a ser de quien entra.
+// Los del mismo usuario se conservan: si la sesión venció (401) siguen esperando a que vuelva a entrar.
+export const claimQueue = async (userId) => {
+  const owner = String(userId);
+  let discarded = [];
+  await mutateQueue((queue) => {
+    discarded = queue.filter((q) => q.ownerId && q.ownerId !== owner);
+    return queue
+      .filter((q) => !q.ownerId || q.ownerId === owner)
+      .map((q) => (q.ownerId ? q : { ...q, ownerId: owner }));
+  });
+  await Promise.all(discarded.map((q) => removePhoto(q.photoUri)));
+};
+
 export const enqueue = async ({ description, latitude, longitude, categoryId, photoUri, clientUuid }) => {
   const localId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const uuid = clientUuid || randomUUID();
   const storedPhotoUri = await persistPhoto(localId, photoUri);
+  const ownerId = await currentUserId();
 
   await mutateQueue((queue) => [...queue, {
     localId,
+    ownerId,
     clientUuid: uuid,
     description,
     latitude,
@@ -118,12 +144,15 @@ export const syncPending = async () => {
   const mySession = session;
   let synced = 0;
   const initial = await readQueue();
+  const userId = await currentUserId();
 
   try {
     for (const item of initial) {
       // Logout (clearQueue) durante el sync: se aborta para no enviar con otra sesión.
       if (session !== mySession) break;
       if (item.failed) continue;
+      // Solo se envía con la cuenta de quien lo creó (la de otro usuario se descarta al iniciar sesión).
+      if (item.ownerId && item.ownerId !== userId) continue;
 
       // El ítem pudo haberse quitado mientras se iteraba el snapshot inicial.
       const stillQueued = (await readQueue()).some((q) => q.localId === item.localId && !q.failed);

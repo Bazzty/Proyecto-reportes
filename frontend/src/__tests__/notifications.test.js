@@ -63,4 +63,44 @@ describe('notifications', () => {
 
     expect(await getUnreadCount()).toBe(0);
   });
+
+  it('avisa cuando un reporte es aprobado', async () => {
+    await syncStatusNotifications([{ id: 1, status: 'Pendiente', validation_status: 'pendiente' }]);
+    await syncStatusNotifications([{ id: 1, status: 'Pendiente', validation_status: 'valido' }]);
+
+    const list = await getNotifications();
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ type: 'validation', message: 'Tu reporte fue aprobado y ya aparece en el mapa.' });
+  });
+
+  it('avisa del rechazo con su motivo aunque el estado de gestión no cambie', async () => {
+    await syncStatusNotifications([{ id: 1, status: 'Pendiente', validation_status: 'pendiente' }]);
+    await syncStatusNotifications([{ id: 1, status: 'Pendiente', validation_status: 'rechazado', rejection_reason: 'Duplicado' }]);
+
+    expect((await getNotifications())[0].message).toBe('Tu reporte fue rechazado: Duplicado');
+  });
+
+  it('deshacer una validación avisa la vuelta a revisión y no un "pasó a Pendiente"', async () => {
+    await syncStatusNotifications([{ id: 1, status: 'En Progreso', validation_status: 'valido' }]);
+    await syncStatusNotifications([{ id: 1, status: 'Pendiente', validation_status: 'pendiente' }]);
+
+    const list = await getNotifications();
+    expect(list).toHaveLength(1);
+    expect(list[0].message).toBe('Tu reporte volvió a revisión.');
+  });
+
+  it('en un reporte aprobado, "Pendiente" se anuncia como "Aprobado"', async () => {
+    await syncStatusNotifications([{ id: 1, status: 'En Progreso', validation_status: 'valido' }]);
+    await syncStatusNotifications([{ id: 1, status: 'Pendiente', validation_status: 'valido' }]);
+
+    expect((await getNotifications())[0].message).toBe('Tu reporte pasó a "Aprobado".');
+  });
+
+  it('un snapshot de la versión anterior (solo estado) no genera avisos falsos de moderación', async () => {
+    await AsyncStorage.setItem('reportStatusSnapshot', JSON.stringify({ 1: 'Pendiente' }));
+
+    await syncStatusNotifications([{ id: 1, status: 'Pendiente', validation_status: 'valido' }]);
+
+    expect(await getNotifications()).toHaveLength(0);
+  });
 });

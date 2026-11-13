@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import api from '../services/api';
-import { enqueue, getPending, getPendingCount, syncPending, subscribe, clearQueue } from '../services/offlineQueue';
+import { enqueue, getPending, getPendingCount, syncPending, subscribe, clearQueue, claimQueue } from '../services/offlineQueue';
 
 jest.mock('../services/api', () => ({
   __esModule: true,
@@ -145,5 +145,40 @@ describe('offlineQueue', () => {
 
     expect(listener).toHaveBeenCalled();
     unsubscribe();
+  });
+
+  describe('dueño de la cola', () => {
+    it('guarda quién creó el reporte y solo lo envía con esa cuenta', async () => {
+      await AsyncStorage.setItem('userId', '7');
+      await enqueue(report());
+      expect((await getPending())[0].ownerId).toBe('7');
+
+      // Otra cuenta en la sesión: no se envía.
+      await AsyncStorage.setItem('userId', '8');
+      const skipped = await syncPending();
+      expect(api.post).not.toHaveBeenCalled();
+      expect(skipped.remaining).toBe(1);
+
+      // Vuelve su dueño: se envía.
+      await AsyncStorage.setItem('userId', '7');
+      api.post.mockResolvedValue({ data: { id: 10 } });
+      expect((await syncPending()).synced).toBe(1);
+    });
+
+    it('claimQueue descarta lo de otra cuenta, conserva lo propio y adopta lo sin dueño', async () => {
+      await AsyncStorage.setItem('userId', '7');
+      await enqueue(report({ description: 'De 7' }));
+      await AsyncStorage.setItem('userId', '8');
+      await enqueue(report({ description: 'De 8' }));
+      await AsyncStorage.removeItem('userId');
+      await enqueue(report({ description: 'Sin dueño' }));
+
+      await claimQueue(7);
+
+      const pending = await getPending();
+      expect(pending.map((q) => q.description)).toEqual(['De 7', 'Sin dueño']);
+      expect(pending.every((q) => q.ownerId === '7')).toBe(true);
+      expect(FileSystem.deleteAsync).toHaveBeenCalledTimes(1);
+    });
   });
 });

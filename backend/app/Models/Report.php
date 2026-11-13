@@ -22,6 +22,8 @@ class Report extends Model
         'rejection_reason',
         'status_updated_by',
         'status_updated_at',
+        'previous_validated_by',
+        'previous_validated_at',
     ];
 
     protected function casts(): array
@@ -29,6 +31,7 @@ class Report extends Model
         return [
             'validated_at' => 'datetime',
             'status_updated_at' => 'datetime',
+            'previous_validated_at' => 'datetime',
         ];
     }
 

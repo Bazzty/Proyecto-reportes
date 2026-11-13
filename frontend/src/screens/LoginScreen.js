@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { setAuthToken } from '../services/api';
+import { claimQueue } from '../services/offlineQueue';
 import { isConnectionError, CONNECTION_ERROR_MESSAGE } from '../services/apiConfig';
 import useKeyboardHeight from '../hooks/useKeyboardHeight';
 
@@ -45,6 +46,8 @@ export default function LoginScreen({ navigation }) {
         ['isAdmin', user.is_admin ? '1' : '0'],
       ]);
       setAuthToken(token);
+      // La cola offline de otra cuenta no se publica con esta; la propia (sesión vencida) se conserva.
+      await claimQueue(user.id).catch(() => {});
 
       // reset descarta el mapa de invitado que queda debajo y evita volver al Login con "atrás"
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });

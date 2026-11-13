@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { reportDisplayStatus, isValidated } from '../constants/reports';
 
 const STORAGE_KEY = 'notifications';
 const SNAPSHOT_KEY = 'reportStatusSnapshot';
@@ -48,8 +49,23 @@ const pushUnique = async (notification) => {
   await write([notification, ...list].slice(0, MAX_NOTIFICATIONS));
 };
 
-// Compara el estado actual de los reportes del usuario con el último guardado
-// y crea una notificación por cada cambio de estado detectado.
+const moderationMessage = (report) => {
+  switch (report.validation_status) {
+    case 'valido':    return 'Tu reporte fue aprobado y ya aparece en el mapa.';
+    case 'rechazado': return report.rejection_reason
+      ? `Tu reporte fue rechazado: ${report.rejection_reason}`
+      : 'Tu reporte fue rechazado.';
+    default:          return 'Tu reporte volvió a revisión.';
+  }
+};
+
+// Snapshot por reporte: { s: estado de gestión, v: moderación }. Las versiones anteriores guardaban
+// solo el estado (un string): se lee como { s } y la moderación queda como línea base sin avisar.
+const readEntry = (value) => (typeof value === 'string' ? { s: value } : value);
+
+// Compara el estado actual de los reportes del usuario con el último guardado y crea una
+// notificación por cada cambio: de moderación (aprobado, rechazado, vuelta a revisión) o, ya
+// aprobado, de su estado de gestión.
 export const syncStatusNotifications = async (myReports) => {
   let snapshot;
   try {
@@ -62,18 +78,32 @@ export const syncStatusNotifications = async (myReports) => {
   const nextSnapshot = { ...snapshot };
 
   for (const report of myReports) {
-    const previous = snapshot[report.id];
-    const current = report.status;
+    const previous = snapshot[report.id] !== undefined ? readEntry(snapshot[report.id]) : undefined;
+    const current = { s: report.status, v: report.validation_status };
 
-    if (previous !== undefined && previous !== current) {
-      await pushUnique({
-        id: `status-${report.id}-${previous}-${current}`,
-        type: 'status',
-        reportId: report.id,
-        message: `Tu reporte pasó a "${current}".`,
-        createdAt: new Date().toISOString(),
-        read: false,
-      });
+    if (previous !== undefined) {
+      const moderationChanged = previous.v !== undefined && current.v !== undefined && previous.v !== current.v;
+
+      if (moderationChanged) {
+        // Al volver a revisión el estado también se reinicia: basta con el aviso de moderación.
+        await pushUnique({
+          id: `validation-${report.id}-${previous.v}-${current.v}`,
+          type: 'validation',
+          reportId: report.id,
+          message: moderationMessage(report),
+          createdAt: new Date().toISOString(),
+          read: false,
+        });
+      } else if (previous.s !== current.s && isValidated(report)) {
+        await pushUnique({
+          id: `status-${report.id}-${previous.s}-${current.s}`,
+          type: 'status',
+          reportId: report.id,
+          message: `Tu reporte pasó a "${reportDisplayStatus(report)}".`,
+          createdAt: new Date().toISOString(),
+          read: false,
+        });
+      }
     }
 
     nextSnapshot[report.id] = current;

@@ -368,6 +368,45 @@ describe('HomeScreen', () => {
       );
     };
 
+    // Responde la huella indicada en /reports/version y lo demás como mockApi.
+    const withVersion = (getVersion) => {
+      const ok = api.get.getMockImplementation();
+      api.get.mockImplementation((url) =>
+        url === '/reports/version' ? Promise.resolve({ data: { version: getVersion() } }) : ok(url)
+      );
+    };
+    const listCalls = () => api.get.mock.calls.filter(([u]) => u === '/reports').length;
+
+    it('si la huella no cambia no vuelve a bajar los listados en cada tick', async () => {
+      let version = 'v1';
+      withVersion(() => version);
+      await setup();
+      await settle();
+      const initial = listCalls();
+
+      await advance(5000);
+      await advance(5000);
+      expect(listCalls()).toBe(initial);
+
+      version = 'v2';
+      await advance(5000);
+      expect(listCalls()).toBe(initial + 1);
+    });
+
+    it('con la huella igual los baja completos igual cada minuto y al recargar a mano', async () => {
+      withVersion(() => 'v1');
+      await setup();
+      await settle();
+      const initial = listCalls();
+
+      await fireEvent.press(screen.getByTestId('refresh-button'));
+      await settle();
+      expect(listCalls()).toBe(initial + 1);
+
+      await advance(61000);
+      expect(listCalls()).toBeGreaterThanOrEqual(initial + 2);
+    });
+
     it('un fallo aislado no muestra el aviso de conexión', async () => {
       await setup();
       await settle();

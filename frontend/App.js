@@ -31,7 +31,8 @@ export default function App() {
   useEffect(() => {
     // Token vencido o inválido (401): vuelve al mapa como invitado
     setUnauthorizedHandler(async () => {
-      try { await clearSession(); } catch { /* se vuelve al mapa igual */ }
+      // Token vencido: se conserva la cola offline (reportes del mismo usuario sin enviar).
+      try { await clearSession({ keepQueue: true }); } catch { /* se vuelve al mapa igual */ }
       navigationRef.current?.reset({ index: 0, routes: [{ name: 'Home', params: { guest: true } }] });
     });
 

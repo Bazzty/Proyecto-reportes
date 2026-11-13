@@ -18,6 +18,8 @@ import { syncStatusNotifications, markAllRead } from '../services/notifications'
 // Tiempo máximo por petición del polling: una petición colgada no debe bloquear los refrescos.
 const POLL_TIMEOUT_MS = 10000;
 const POLL_INTERVAL_MS = 5000;
+// Aunque la huella no cambie, los listados se vuelven a bajar completos cada minuto (red de seguridad).
+const FULL_REFRESH_MS = 60000;
 
 // El endpoint /reports/heatmap devuelve un punto por reporte (con su zona).
 // Para el heat "por zona" agrupamos los reportes con zona en su centroide; los
@@ -185,10 +187,26 @@ export default function HomeScreen({ navigation, route }) {
     let inFlight = null;
     let lastStart = 0;
     let failures = 0;
+    // Huella de los datos ya mostrados y cuándo se bajaron completos por última vez.
+    let lastVersion = null;
+    let lastFull = 0;
 
     // Devuelve true si la consulta salió bien (la recarga manual lo usa para avisar del fallo).
-    const runFetch = async () => {
+    // Cada tick pide primero /reports/version (dos conteos): los tres listados solo se descargan si
+    // cambió, si se forzó (recarga manual) o si pasó FULL_REFRESH_MS desde la última descarga.
+    const runFetch = async (force = false) => {
       try {
+        // Sin huella (servidor anterior o fallo puntual) se descargan los listados como antes.
+        const versionRes = await api.get('/reports/version', opts).catch(() => null);
+        if (signal.aborted) return false;
+        const version = versionRes?.data?.version ?? null;
+        const fresh = Date.now() - lastFull < FULL_REFRESH_MS;
+        if (!force && fresh && version !== null && version === lastVersion) {
+          failures = 0;
+          setOffline(false);
+          return true;
+        }
+
         const requests = [api.get('/reports', opts), api.get('/reports/heatmap', opts)];
         if (!isGuest) requests.push(api.get('/user/reports', opts));
 
@@ -210,6 +228,8 @@ export default function HomeScreen({ navigation, route }) {
           });
           syncStatusNotifications(myRes.data).catch(() => {});
         }
+        lastVersion = version;
+        lastFull = Date.now();
         failures = 0;
         setOffline(false);
         return true;
@@ -224,17 +244,18 @@ export default function HomeScreen({ navigation, route }) {
 
     // Si ya hay una consulta en vuelo se devuelve esa misma promesa: la recarga manual espera
     // a que termine en vez de lanzar otra en paralelo.
-    const fetchReports = () => {
+    const fetchReports = (force = false) => {
       if (!inFlight) {
         lastStart = Date.now();
-        inFlight = runFetch().finally(() => { inFlight = null; });
+        inFlight = runFetch(force).finally(() => { inFlight = null; });
       }
       return inFlight;
     };
 
-    // Recarga manual: si falla, el aviso de conexión aparece de inmediato (no espera un 2º fallo).
+    // Recarga manual: siempre baja los listados y, si falla, el aviso de conexión aparece de
+    // inmediato (no espera un 2º fallo).
     refreshRef.current = async () => {
-      const ok = await fetchReports();
+      const ok = await fetchReports(true);
       if (!ok && !signal.aborted) setOffline(true);
     };
     fetchReports();
