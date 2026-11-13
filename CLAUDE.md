@@ -70,6 +70,17 @@ docker compose exec app php artisan test
 docker compose exec app php artisan test tests/Feature/AuthTest.php
 ```
 
+### Administradores
+
+El rol admin se asigna por consola a un usuario ya registrado (nunca desde la API):
+
+```bash
+docker compose exec app php artisan user:admin correo@ejemplo.cl            # otorgar
+docker compose exec app php artisan user:admin correo@ejemplo.cl --revoke   # quitar
+```
+
+`php artisan db:seed` carga los datos de demo (usuarios con contraseña `password`) solo fuera de producción.
+
 ### URLs
 
 | Service    | URL                       |
@@ -107,17 +118,28 @@ npm install   # only needed after cloning — dependencies are in package.json
 npx expo start
 ```
 
-### Generar APK (Android)
+### Generar APK (Android) y actualizaciones automáticas
 
-`eas.json` tiene el perfil `preview` que genera un APK instalable. `EXPO_PUBLIC_API_URL` del APK sale de `eas.json` (no de `.env`, que no se sube a EAS) y apunta al backend desplegado en Azure (`https://lagoenlinea.chilecentral.cloudapp.azure.com/api`, ver `docs/DEPLOY.md`). `GOOGLE_MAPS_API_KEY` es una variable de entorno de EAS (no está en git) que `app.config.js` inyecta; sin ella el mapa sale en blanco en el APK.
+El proyecto usa Expo SDK 58 (requiere Node 22+) y está enlazado a EAS (`@bazztyy/frontend`). `eas.json` tiene el perfil `preview`, que genera un APK instalable en el canal `preview`.
+
+`EXPO_PUBLIC_API_URL` del APK sale de `eas.json` (no de `.env`, que no se sube a EAS) y apunta al backend desplegado en Azure (`https://lagoenlinea.chilecentral.cloudapp.azure.com/api`, ver `docs/DEPLOY.md`). El mapa es Leaflet en un WebView, así que el APK no necesita API key de Google Maps.
 
 Desarrollo: `npx expo start` usa el backend de `frontend/.env` (Docker local); `npm run start:azure` arranca Expo Go contra el servidor de Azure leyendo la URL de `eas.json`, sin editar `.env`.
 
 ```bash
 cd frontend
-npx eas-cli login
-npx eas-cli build -p android --profile preview
+npx eas-cli build -p android --profile preview   # entrega un link/QR para instalar el APK
 ```
+
+Cambios solo de JavaScript llegan a los APK ya instalados sin reinstalar (`expo-updates`): la app los descarga al abrirse y los aplica en la siguiente apertura. La URL del backend se toma del entorno al publicar:
+
+```bash
+EXPO_PUBLIC_API_URL=https://<dominio>/api npx eas-cli update --channel preview --message "descripción"
+```
+
+Si cambia código nativo (paquetes con módulos nativos, `app.json`, versión de Expo) hay que subir `version` en `app.json` y compilar un APK nuevo.
+
+En iPhone se usa Expo Go (SDK 58): `npx expo start` (o `--tunnel` fuera de la red local) y escanear el QR.
 
 Structure: `frontend/src/screens/`, `frontend/src/components/`, `frontend/src/services/`. All API calls go through `src/services/api.js` (axios instance with Sanctum token support already configured).
 

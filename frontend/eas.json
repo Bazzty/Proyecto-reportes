@@ -6,26 +6,27 @@
   "build": {
     "development": {
       "developmentClient": false,
-      "distribution": "internal"
+      "distribution": "internal",
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
-      "environment": "preview",
       "android": {
         "buildType": "apk"
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://lagoenlinea.chilecentral.cloudapp.azure.com/api"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
-      "environment": "production",
       "android": {
         "buildType": "app-bundle"
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://lagoenlinea.chilecentral.cloudapp.azure.com/api"
-      }
+      },
+      "channel": "production"
     }
   }
 }

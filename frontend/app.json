@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Reportes Ambientales",
-    "slug": "lagoenlinea",
+    "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -56,11 +56,17 @@
         }
       ]
     ],
-    "owner": "zeeloved",
     "extra": {
       "eas": {
-        "projectId": "fcc17c27-8e19-4898-b20e-70705c228a72"
+        "projectId": "6a8a1555-d75a-4b15-a336-35de88e36218"
       }
+    },
+    "owner": "bazztyy",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/6a8a1555-d75a-4b15-a336-35de88e36218"
     }
   }
 }

@@ -15,8 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // En producción la API va detrás de Caddy (HTTPS). Confiar en X-Forwarded-*
-        // hace que url() genere https:// (p. ej. photo_url). Nginx y app no se exponen.
+        // La app solo es accesible a través del contenedor nginx / el túnel (ngrok), así que
+        // se confía en sus cabeceras X-Forwarded-*; sin esto las URLs generadas salen en http://.
         $middleware->trustProxies(at: '*');
 
         $middleware->alias([

@@ -10,7 +10,7 @@ APK ──HTTPS──▶ https://<DOMINIO>  ──▶  Azure VM (Ubuntu + Docker
 ```
 
 Archivos involucrados: `backend/docker-compose.prod.yml`, `backend/docker/caddy/Caddyfile`,
-`frontend/eas.json`, `frontend/app.config.js`.
+`frontend/eas.json`.
 
 En esta guía `<DOMINIO>` es el nombre DNS de la VM, p. ej.
 `lagoenlinea.chilecentral.cloudapp.azure.com`.
@@ -99,8 +99,8 @@ Reconectar por SSH y verificar: `docker run --rm hello-world`.
 
 ### 4.1 Clonar
 ```bash
-git clone https://github.com/Newt90xz/ProyectoDevelop.git
-cd ProyectoDevelop/backend
+git clone https://github.com/Bazzty/Proyecto-reportes.git
+cd Proyecto-reportes/backend
 ```
 Repo privado: usar como contraseña un *Fine-grained token* de GitHub con permiso de solo
 lectura sobre *Contents*.
@@ -136,10 +136,12 @@ dc exec app composer install --no-dev --optimize-autoloader
 dc exec app php artisan key:generate --force
 dc exec app chown -R www-data:www-data storage bootstrap/cache
 
-# Sin ReportSeeder (datos de prueba)
+# Con APP_ENV=production, db:seed carga categorías y zonas pero no los reportes de prueba
 dc exec app php artisan migrate --force
-dc exec app php artisan db:seed --class=CategorySeeder --force
-dc exec app php artisan db:seed --class=ZoneSeeder --force
+dc exec app php artisan db:seed --force
+
+# Administrador: registrarse desde la app y luego otorgar el rol
+dc exec app php artisan user:admin correo@ejemplo.cl
 
 dc exec app php artisan storage:link
 dc exec app php artisan config:cache
@@ -161,27 +163,21 @@ Si Caddy no obtiene el certificado: revisar que el puerto 80 esté abierto en el
 
 ## 5. Generar el APK
 
-### 5.1 API key de Google Maps
-Sin ella el mapa sale en blanco en el APK (Expo Go usa su propia key; el APK no).
-
-1. <https://console.cloud.google.com> → crear proyecto → **APIs y servicios → Biblioteca** →
-   habilitar **Maps SDK for Android**.
-2. **Credenciales → Crear credenciales → Clave de API**.
-3. Restringir la clave: aplicación Android, paquete `com.reportesambientales.app` + huella SHA-1 del
-   keystore de EAS (`eas credentials -p android` la muestra tras el primer build).
-
-### 5.2 Configurar EAS (desde `frontend/`)
-```bash
-eas init                     # vincula el proyecto y escribe extra.eas.projectId en app.json
-eas env:create --name GOOGLE_MAPS_API_KEY --value <KEY> --environment preview --visibility sensitive
-```
+El proyecto ya está enlazado a EAS (`@bazztyy/frontend`, ver `app.json`); no hace falta `eas init`.
+El mapa es Leaflet dentro de un WebView, así que no se necesita API key de Google Maps.
 `frontend/eas.json` ya apunta a `https://lagoenlinea.chilecentral.cloudapp.azure.com/api`; si el dominio cambia, actualizarlo ahí.
 
-### 5.3 Build
 ```bash
-eas build -p android --profile preview
+cd frontend
+npx eas-cli build -p android --profile preview
 ```
 Al terminar, EAS entrega un enlace/QR para descargar e instalar el APK.
+
+Cambios solo de JavaScript llegan a los APK instalados sin reinstalar (canal `preview`):
+```bash
+EXPO_PUBLIC_API_URL=https://lagoenlinea.chilecentral.cloudapp.azure.com/api \
+  npx eas-cli update --channel preview --message "descripción"
+```
 
 ---
 
@@ -189,7 +185,7 @@ Al terminar, EAS entrega un enlace/QR para descargar e instalar el APK.
 
 **Actualizar tras un merge a `main`:**
 ```bash
-cd ~/ProyectoDevelop && git pull && cd backend
+cd ~/Proyecto-reportes && git pull && cd backend
 dc up -d --build
 dc exec app composer install --no-dev --optimize-autoloader
 dc exec app php artisan migrate --force

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Alert, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -16,7 +16,7 @@ import AdminReportsScreen from './src/screens/AdminReportsScreen';
 import { setAuthToken, setUnauthorizedHandler } from './src/services/api';
 import { clearSession } from './src/services/session';
 
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 
 // En web el stack deja crecer cada pantalla con su contenido y el scroll pasa al documento, que la app
 // tiene bloqueado (body con overflow hidden): lo que queda bajo el borde de la ventana no se puede
@@ -101,7 +101,7 @@ export default function App() {
 
   return (
     <NavigationContainer ref={navigationRef} initialState={initialState}>
-      <Stack.Navigator initialRouteName="Home" screenOptions={{ cardStyle: WEB_CARD_STYLE }}>
+      <Stack.Navigator initialRouteName="Home" screenOptions={{ contentStyle: WEB_CARD_STYLE }}>
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />

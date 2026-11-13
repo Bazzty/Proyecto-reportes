@@ -15,9 +15,8 @@
     "@expo/metro-runtime": "~58.0.17",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@react-navigation/native": "^7.5.1",
-    "@react-navigation/native-stack": "^7.21.0",
-    "@react-navigation/stack": "^7.12.1",
+    "@react-navigation/native": "^7.2.2",
+    "@react-navigation/native-stack": "^7.17.6",
     "axios": "^1.15.2",
     "expo": "~58.0.25",
     "expo-build-properties": "~58.0.12",
@@ -34,6 +33,7 @@
     "expo-sharing": "~58.0.23",
     "expo-splash-screen": "~58.0.14",
     "expo-status-bar": "~58.0.5",
+    "expo-updates": "~58.0.22",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.1",
@@ -55,6 +55,7 @@
   },
   "jest": {
     "preset": "jest-expo",
+    "testEnvironment": "./jest.environment.js",
     "testTimeout": 15000,
     "setupFiles": [
       "./jest.setup.js"
