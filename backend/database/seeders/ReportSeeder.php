@@ -96,10 +96,9 @@ class ReportSeeder extends Seeder
             // de moderación para la demo del panel; los que ya avanzan de estado están validados.
             $pending = $r['status'] === 'Pendiente' && $i % 4 === 0;
 
-            Report::create([
+            $report = Report::create([
                 'validation_status' => $pending ? 'pendiente' : 'valido',
                 'validated_by' => $pending ? null : $adminUser?->id,
-                'validated_at' => $pending ? null : now(),
                 'user_id' => $user->id,
                 'category_id' => $cat->id,
                 'zone_id' => $zone?->id,
@@ -109,6 +108,15 @@ class ReportSeeder extends Seeder
                 'photo_path' => null,
                 'status' => $r['status'],
             ]);
+
+            // Fechas escalonadas para que el resumen del panel (tiempo promedio de validación)
+            // muestre valores realistas en vez de 0 h: created_at no es asignable en masa.
+            $createdAt = now()->subHours(6 * (count($reports) - $i));
+            $report->forceFill([
+                'created_at' => $createdAt,
+                'updated_at' => $createdAt,
+                'validated_at' => $pending ? null : $createdAt->copy()->addHours(2 + $i % 5),
+            ])->save();
         }
     }
 }

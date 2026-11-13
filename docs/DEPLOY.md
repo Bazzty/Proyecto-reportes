@@ -144,6 +144,8 @@ dc exec app php artisan db:seed --force
 
 # Administrador: registrarse desde la app y luego otorgar el rol
 dc exec app php artisan user:admin correo@ejemplo.cl
+# El mapa solo muestra reportes validados. Al actualizar un servidor con reportes previos,
+# quedan ocultos hasta que este administrador los valide desde el panel (validación en lote).
 
 dc exec app php artisan storage:link
 dc exec app php artisan config:cache

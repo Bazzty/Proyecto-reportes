@@ -27,6 +27,9 @@ export const buildPayload = (
     photo_url: r.photo_url ?? null,
     user: r.user?.name ?? null,
     iconCode: r.iconCode ?? null,
+    // Solo el autor recibe sus reportes aún sin validar: se dibujan atenuados para que sepa que
+    // nadie más los ve todavía.
+    pending: r.validation_status === 'pendiente',
   })),
   heat,
   userLocation,
@@ -246,7 +249,7 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
             : glyph;
           var icon = L.divIcon({
             className: '',
-            html: '<div style="position:relative;overflow:hidden;width:' + size + 'px;height:' + size + 'px;box-sizing:border-box;border:' + (photo ? 3 : 2) + 'px solid ' + color + ';border-radius:8px;background:' + color + ';display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)">' + inner + '</div>',
+            html: '<div style="position:relative;overflow:hidden;width:' + size + 'px;height:' + size + 'px;box-sizing:border-box;border:' + (photo ? 3 : 2) + 'px ' + (r.pending ? 'dashed' : 'solid') + ' ' + color + ';border-radius:8px;background:' + color + ';opacity:' + (r.pending ? 0.55 : 1) + ';display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.3)">' + inner + '</div>',
             // Anclado al centro: el marcador es un cuadro (no un pin), y así queda justo encima
             // del foco de calor. Con el ancla abajo se dibujaba ~1 marcador más arriba del punto.
             iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2],
@@ -256,6 +259,7 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
             + '<div style="font-weight:bold;color:#0e7490">' + esc(r.category || 'Sin categoría') + '</div>'
             + '<div style="font-size:12px;color:#374151;margin:4px 0">' + esc(r.description || '') + '</div>'
             + '<div style="font-size:11px;color:#9ca3af">' + esc(r.user || '') + '</div>'
+            + (r.pending ? '<div style="font-size:11px;color:#b45309;font-weight:600;margin:4px 0">Pendiente de validación · solo tú lo ves</div>' : '')
             + '<a href="#" onclick="select(' + r.id + ');return false;" style="color:#0e7490;font-weight:600;font-size:12px">Ver detalle &rarr;</a></div>';
           L.marker([r.latitude, r.longitude], { icon: icon }).bindPopup(popup, popupOptions()).addTo(markersLayer);
         });

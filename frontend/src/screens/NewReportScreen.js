@@ -133,7 +133,7 @@ export default function NewReportScreen({ navigation, route = {} }) {
       });
       Alert.alert(
         'Guardado sin conexión',
-        'Tu reporte se enviará automáticamente cuando recuperes la conexión.',
+        'Tu reporte se enviará automáticamente cuando recuperes la conexión. Aparecerá en el mapa para todos una vez validado.',
         [{ text: 'OK', onPress: () => navigation.navigate('Home') }]
       );
     } catch {
