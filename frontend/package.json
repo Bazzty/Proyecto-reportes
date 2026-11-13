@@ -4,11 +4,12 @@
   "main": "index.js",
   "engines": {
     "node": ">=22.13.0",
-    "npm": ">=11.19.0"
+    "npm": ">=10.9.0"
   },
   "scripts": {
     "start": "expo start",
     "start:azure": "node scripts/start-azure.js",
+    "update:preview": "node scripts/update-preview.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",

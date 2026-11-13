@@ -16,4 +16,5 @@ const child = spawn(process.execPath, [expoCli, 'start', '--clear', ...process.a
   stdio: 'inherit',
   env: { ...process.env, EXPO_PUBLIC_API_URL: apiUrl },
 });
-child.on('exit', (code) => process.exit(code ?? 0));
+// Si Expo muere por una señal (code = null), no se reporta como éxito.
+child.on('exit', (code, signal) => process.exit(code ?? (signal ? 1 : 0)));

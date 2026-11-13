@@ -99,9 +99,11 @@ Reconectar por SSH y verificar: `docker run --rm hello-world`.
 
 ### 4.1 Clonar
 ```bash
-git clone https://github.com/Bazzty/Proyecto-reportes.git
+git clone -b develop https://github.com/Bazzty/Proyecto-reportes.git
 cd Proyecto-reportes/backend
 ```
+Se despliega `develop`: `main` todavía no recibe los cambios del backend (roles, administradores,
+zonas). Cuando `develop` se promueva a `main`, cambiar de rama con `git checkout main`.
 Repo privado: usar como contraseña un *Fine-grained token* de GitHub con permiso de solo
 lectura sobre *Contents*.
 
@@ -146,6 +148,10 @@ dc exec app php artisan user:admin correo@ejemplo.cl
 dc exec app php artisan storage:link
 dc exec app php artisan config:cache
 dc exec app php artisan route:cache
+
+# Los artisan anteriores corren como root: si alguno creó storage/logs/laravel.log, PHP-FPM
+# (www-data) no podría escribirlo y la API respondería 500. Devolver la propiedad al final.
+dc exec app chown -R www-data:www-data storage bootstrap/cache
 ```
 
 ### 4.4 Verificar
@@ -175,21 +181,25 @@ Al terminar, EAS entrega un enlace/QR para descargar e instalar el APK.
 
 Cambios solo de JavaScript llegan a los APK instalados sin reinstalar (canal `preview`):
 ```bash
-EXPO_PUBLIC_API_URL=https://lagoenlinea.chilecentral.cloudapp.azure.com/api \
-  npx eas-cli update --channel preview --message "descripción"
+cd frontend
+npm run update:preview -- --message "descripción"
 ```
+El script toma la URL de `eas.json`. No usar `npx eas-cli update` directo: sin
+`EXPO_PUBLIC_API_URL` en el entorno, el update se publica con la IP de tu `.env` y todos los APK
+pierden la conexión.
 
 ---
 
 ## 6. Mantenimiento
 
-**Actualizar tras un merge a `main`:**
+**Actualizar tras un merge a `develop`** (la rama desplegada, ver 4.1):
 ```bash
 cd ~/Proyecto-reportes && git pull && cd backend
 dc up -d --build
 dc exec app composer install --no-dev --optimize-autoloader
 dc exec app php artisan migrate --force
 dc exec app php artisan config:cache && dc exec app php artisan route:cache
+dc exec app chown -R www-data:www-data storage bootstrap/cache
 ```
 
 **Backup de la BD:**
