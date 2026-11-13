@@ -45,7 +45,8 @@ services:
       - "80:80"
       - "443:443"
     environment:
-      DOMAIN: ${APP_DOMAIN}
+      # Sin dominio Caddy no puede pedir el certificado: falla al levantar con un mensaje claro.
+      DOMAIN: ${APP_DOMAIN:?Falta APP_DOMAIN en backend/.env (dominio público sin https://)}
     volumes:
       - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

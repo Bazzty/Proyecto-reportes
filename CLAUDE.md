@@ -131,10 +131,11 @@ cd frontend
 npx eas-cli build -p android --profile preview   # entrega un link/QR para instalar el APK
 ```
 
-Cambios solo de JavaScript llegan a los APK ya instalados sin reinstalar (`expo-updates`): la app los descarga al abrirse y los aplica en la siguiente apertura. La URL del backend se toma del entorno al publicar:
+Cambios solo de JavaScript llegan a los APK ya instalados sin reinstalar (`expo-updates`): la app los descarga al abrirse y los aplica en la siguiente apertura. Publicar siempre con el script, que toma la URL del backend de `eas.json` (un `eas-cli update` directo usaría la IP de `.env` y dejaría a todos los APK sin conexión):
 
 ```bash
-EXPO_PUBLIC_API_URL=https://<dominio>/api npx eas-cli update --channel preview --message "descripción"
+cd frontend
+npm run update:preview -- --message "descripción"
 ```
 
 Si cambia código nativo (paquetes con módulos nativos, `app.json`, versión de Expo) hay que subir `version` en `app.json` y compilar un APK nuevo.
