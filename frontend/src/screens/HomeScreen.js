@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, FlatList, AppState } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, FlatList, AppState, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
@@ -55,6 +55,9 @@ export default function HomeScreen({ navigation, route }) {
   const isGuest = route.params?.guest === true;
 
   const leafletRef = useRef(null);
+  // Recarga manual: apunta a la consulta del polling activo (null mientras está pausado).
+  const refreshRef = useRef(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [appState, setAppState] = useState(() => {
     // Al montar, "unknown"/null se trata como activo: solo pausamos si sabemos
@@ -177,12 +180,17 @@ export default function HomeScreen({ navigation, route }) {
     const controller = new AbortController();
     const { signal } = controller;
     const opts = { signal, timeout: POLL_TIMEOUT_MS };
-    let inFlight = false;
+    let inFlight = null;
     let failures = 0;
 
-    const fetchReports = async () => {
-      if (inFlight) return;
-      inFlight = true;
+    // Si ya hay una consulta en vuelo se devuelve esa misma promesa: la recarga manual espera
+    // a que termine en vez de lanzar otra en paralelo.
+    const fetchReports = () => {
+      if (!inFlight) inFlight = runFetch().finally(() => { inFlight = null; });
+      return inFlight;
+    };
+
+    const runFetch = async () => {
       try {
         const requests = [api.get('/reports', opts), api.get('/reports/heatmap', opts)];
         if (!isGuest) requests.push(api.get('/user/reports', opts));
@@ -212,18 +220,28 @@ export default function HomeScreen({ navigation, route }) {
         if (signal.aborted) return;
         failures += 1;
         if (failures >= 2) setOffline(true);
-      } finally {
-        inFlight = false;
       }
     };
 
+    refreshRef.current = fetchReports;
     fetchReports();
     const interval = setInterval(fetchReports, 5000);
     return () => {
+      refreshRef.current = null;
       controller.abort();
       clearInterval(interval);
     };
   }, [shouldPoll, isGuest]);
+
+  const handleRefresh = async () => {
+    if (refreshing || !refreshRef.current) return;
+    setRefreshing(true);
+    try {
+      await refreshRef.current();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleLogout = () => {
     if (isGuest) {
@@ -459,6 +477,18 @@ export default function HomeScreen({ navigation, route }) {
       </View>
       </View>
 
+      <TouchableOpacity
+        style={[styles.locationButton, styles.refreshButton]}
+        testID="refresh-button"
+        accessibilityLabel="Recargar mapa"
+        onPress={handleRefresh}
+        disabled={refreshing}
+      >
+        {refreshing
+          ? <ActivityIndicator size="small" color="#0e7490" testID="refresh-spinner" />
+          : <Ionicons name="refresh" size={22} color="#0e7490" />}
+      </TouchableOpacity>
+
       {userLocation && (
         <TouchableOpacity
           style={styles.locationButton}
@@ -612,6 +642,8 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
+  // Encima del botón de ubicación, con la misma forma.
+  refreshButton: { bottom: 212 },
 
   bottomBar: {
     position: 'absolute',
