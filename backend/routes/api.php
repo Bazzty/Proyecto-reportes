@@ -14,6 +14,8 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:lo
 
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/reports/heatmap', [ReportController::class, 'heatmap']);
+// Huella barata de los datos del mapa: la app solo vuelve a pedir los listados si cambió.
+Route::get('/reports/version', [ReportController::class, 'version']);
 Route::get('/reports', [ReportController::class, 'index']);
 Route::get('/reports/{id}', [ReportController::class, 'show']);
 Route::get('/reports/{id}/comments', [CommentController::class, 'index']);

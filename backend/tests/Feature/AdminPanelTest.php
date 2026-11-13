@@ -224,20 +224,19 @@ class AdminPanelTest extends TestCase
             ]);
     }
 
-    public function test_summary_with_data_excludes_auto_validated_from_average()
+    public function test_summary_with_data_counts_own_reports_in_the_average()
     {
         $admin = $this->actAsAdmin();
         $big = $this->makeZone('Puerto Montt');
         $small = $this->makeZone('Frutillar');
 
         $created = now()->subDays(10);
-        // 2 h y 5 h de moderación real -> promedio 3.5.
+        // 2 h, 5 h y 9 h -> promedio 5.3 (el reporte del propio admin también pasó por la cola).
         $this->makeReport(['zone_id' => $big->id, 'validation_status' => 'valido', 'validated_by' => $admin->id, 'validated_at' => $created->copy()->addHours(2)])
             ->forceFill(['created_at' => $created])->save();
         $this->makeReport(['zone_id' => $big->id, 'validation_status' => 'rechazado', 'rejection_reason' => 'x', 'validated_by' => $admin->id, 'validated_at' => $created->copy()->addHours(5)])
             ->forceFill(['created_at' => $created])->save();
-        // Autovalidado instantáneo y en un día lejano: no debe contar.
-        $this->makeReport(['user_id' => $admin->id, 'zone_id' => $small->id, 'validation_status' => 'valido', 'validated_by' => $admin->id, 'validated_at' => $created->copy()->addHours(100)])
+        $this->makeReport(['user_id' => $admin->id, 'zone_id' => $small->id, 'validation_status' => 'valido', 'validated_by' => $admin->id, 'validated_at' => $created->copy()->addHours(9)])
             ->forceFill(['created_at' => $created])->save();
         $this->makeReport(['zone_id' => $small->id]);
         // Rechazado: no cuenta para top_zone.
@@ -247,8 +246,8 @@ class AdminPanelTest extends TestCase
         $response->assertJsonPath('total', 5)
             ->assertJsonPath('pending', 1)
             ->assertJsonPath('new_this_week', 2)
-            ->assertJsonPath('avg_validation_hours', 3.5);
-        // small tiene 2 no rechazados (autovalidado + pendiente); big solo 1 y el rechazado no cuenta.
+            ->assertJsonPath('avg_validation_hours', 5.3);
+        // small tiene 2 no rechazados (el del admin + pendiente); big solo 1 y el rechazado no cuenta.
         $response->assertJsonPath('top_zone', ['id' => $small->id, 'name' => 'Frutillar', 'count' => 2]);
     }
 
@@ -334,13 +333,21 @@ class AdminPanelTest extends TestCase
         $original = User::factory()->admin()->create();
         $admin = $this->actAsAdmin();
         $validatedAt = now()->subDays(5)->startOfSecond();
-        $report = $this->makeReport(['validation_status' => 'rechazado', 'rejection_reason' => 'Duplicado', 'validated_by' => $admin->id, 'validated_at' => now()]);
+        $report = $this->makeReport(['validation_status' => 'valido', 'validated_by' => $original->id, 'validated_at' => $validatedAt]);
+        $url = "/api/admin/reports/{$report->id}/validation";
 
-        $this->patchJson("/api/admin/reports/{$report->id}/validation", [
+        // Rechazar un reporte ya validado: el servidor guarda quién lo había validado.
+        $this->patchJson($url, [
+            'validation_status' => 'rechazado',
+            'expected_validation_status' => 'valido',
+            'rejection_reason' => 'Duplicado',
+        ])->assertOk()->assertJsonPath('validated_by.id', $admin->id);
+
+        // Deshacer: restaura esa moderación sin que el cliente diga quién ni cuándo.
+        $this->patchJson($url, [
             'validation_status' => 'valido',
             'expected_validation_status' => 'rechazado',
-            'restore_validated_by' => $original->id,
-            'restore_validated_at' => $validatedAt->toISOString(),
+            'restore_previous' => true,
         ])->assertOk()->assertJsonPath('validated_by.id', $original->id);
 
         $fresh = $report->fresh();
@@ -348,25 +355,30 @@ class AdminPanelTest extends TestCase
         $this->assertSame($original->id, $fresh->validated_by);
         $this->assertTrue($fresh->validated_at->equalTo($validatedAt));
         $this->assertNull($fresh->rejection_reason);
+        $this->assertNull($fresh->previous_validated_by);
     }
 
-    public function test_restore_validator_rejects_bad_input()
+    public function test_restore_ignores_a_moderator_or_date_sent_by_the_client()
     {
+        $other = User::factory()->admin()->create();
         $admin = $this->actAsAdmin();
         $report = $this->makeReport(['validation_status' => 'rechazado', 'rejection_reason' => 'x', 'validated_by' => $admin->id, 'validated_at' => now()]);
         $url = "/api/admin/reports/{$report->id}/validation";
-        $base = ['validation_status' => 'valido', 'expected_validation_status' => 'rechazado'];
 
-        $this->patchJson($url, $base + ['restore_validated_by' => $admin->id, 'restore_validated_at' => now()->addDay()->toISOString()])
-            ->assertUnprocessable()->assertJsonValidationErrors('restore_validated_at');
-        $this->patchJson($url, $base + ['restore_validated_by' => 99999, 'restore_validated_at' => now()->subDay()->toISOString()])
-            ->assertUnprocessable()->assertJsonValidationErrors('restore_validated_by');
-        $this->patchJson($url, $base + ['restore_validated_by' => $admin->id])
-            ->assertUnprocessable()->assertJsonValidationErrors('restore_validated_at');
-        $this->patchJson($url, ['validation_status' => 'pendiente', 'expected_validation_status' => 'rechazado', 'restore_validated_by' => $admin->id, 'restore_validated_at' => now()->subDay()->toISOString()])
-            ->assertUnprocessable()->assertJsonValidationErrors(['restore_validated_by', 'restore_validated_at']);
+        // Sin moderación anterior guardada: los campos antiguos del cliente se ignoran y queda quien actúa.
+        $this->patchJson($url, [
+            'validation_status' => 'valido',
+            'expected_validation_status' => 'rechazado',
+            'restore_previous' => true,
+            'restore_validated_by' => $other->id,
+            'restore_validated_at' => now()->subYear()->toISOString(),
+        ])->assertOk()->assertJsonPath('validated_by.id', $admin->id);
 
-        $this->assertSame('rechazado', $report->fresh()->validation_status);
+        $this->assertTrue($report->fresh()->validated_at->isToday());
+
+        $this->patchJson($url, ['validation_status' => 'pendiente', 'expected_validation_status' => 'valido', 'restore_previous' => true])
+            ->assertUnprocessable()->assertJsonValidationErrors('restore_previous');
+        $this->assertSame('valido', $report->fresh()->validation_status);
     }
 
     public function test_undo_validation_does_not_require_reason_and_requires_expected()
@@ -445,6 +457,39 @@ class AdminPanelTest extends TestCase
 
         $this->postJson('/api/admin/reports/bulk-validation', ['ids' => $ids->take(50)->all(), 'validation_status' => 'valido'])
             ->assertOk()->assertJsonCount(50, 'updated')->assertJsonCount(0, 'skipped');
+    }
+
+    // ---- Paginación por offset ----
+
+    public function test_offset_paging_does_not_skip_reports_after_moderating()
+    {
+        $this->actAsAdmin();
+        $reports = collect(range(1, 25))->map(fn () => $this->makeReport());
+
+        $first = $this->getJson('/api/admin/reports?validation_status=pendiente&offset=0')->assertOk();
+        $first->assertJsonCount(20, 'data')->assertJsonPath('meta.total', 25)->assertJsonPath('meta.offset', 0);
+        $firstIds = collect($first->json('data'))->pluck('id');
+
+        // Se moderan 5 de la primera página: la app los saca y le quedan 15 filas.
+        Report::whereIn('id', $firstIds->take(5))->update(['validation_status' => 'valido']);
+
+        $next = $this->getJson('/api/admin/reports?validation_status=pendiente&offset=15')->assertOk();
+        $nextIds = collect($next->json('data'))->pluck('id');
+
+        // Las 15 que ya tiene + las 5 nuevas = los 20 pendientes, sin huecos ni repetidos.
+        $this->assertEqualsCanonicalizing(
+            Report::where('validation_status', 'pendiente')->pluck('id')->all(),
+            $firstIds->slice(5)->merge($nextIds)->all()
+        );
+        $this->assertCount(25, $reports);
+    }
+
+    public function test_offset_must_be_a_non_negative_integer()
+    {
+        $this->actAsAdmin();
+
+        $this->getJson('/api/admin/reports?offset=-1')->assertUnprocessable()->assertJsonValidationErrors('offset');
+        $this->getJson('/api/admin/reports?offset=abc')->assertUnprocessable()->assertJsonValidationErrors('offset');
     }
 
     // ---- Exportación CSV ----

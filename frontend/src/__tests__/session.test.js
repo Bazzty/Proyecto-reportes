@@ -39,4 +39,14 @@ describe('clearSession', () => {
     expect(await AsyncStorage.getItem('token')).toBeNull();
     expect(clearAuthToken).toHaveBeenCalled();
   });
+
+  it('con keepQueue (token vencido) conserva la cola offline y borra lo demás', async () => {
+    await AsyncStorage.setItem('token', 't');
+
+    await clearSession({ keepQueue: true });
+
+    expect(clearQueue).not.toHaveBeenCalled();
+    expect(clearNotifications).toHaveBeenCalledTimes(1);
+    expect(await AsyncStorage.getItem('token')).toBeNull();
+  });
 });

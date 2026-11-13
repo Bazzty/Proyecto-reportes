@@ -255,6 +255,14 @@ No requiere token. Devuelve **un punto por reporte validado** (`latitude`, `long
 
 ---
 
+### Huella de los datos del mapa
+```
+GET /reports/version
+```
+Pública. Devuelve `{ "version": "<sha1>" }`, que cambia al crear, moderar o cambiar de estado un reporte y al confirmar o quitar una confirmación. La app la consulta en cada refresco (cada 5 s) y solo vuelve a pedir `/reports`, `/reports/heatmap` y `/user/reports` cuando cambió (o cada minuto como red de seguridad, o al recargar a mano).
+
+---
+
 ### Reportes del usuario autenticado
 ```
 GET /user/reports
@@ -330,6 +338,8 @@ Además de los campos del reporte, cada elemento trae `validated_by` (`{id,name}
 
 `meta.counts` indica cuántos reportes hay en cada estado de validación (con `0` por defecto) y su `total`. Aplica los filtros `zone_id`, `category_id`, `status` y `search`, pero **no** `validation_status`, así que sirve para mostrar el contador de cada pestaña aunque haya una seleccionada. `meta.total` sí respeta todos los filtros.
 
+**Cargar más por offset:** con `offset` (entero ≥ 0, cuántas filas tiene ya la app) se devuelven las 20 siguientes a partir de esa posición, en vez de una página fija. Así, si la app sacó reportes de la lista al moderarlos, no se saltan los que suben a ocupar su lugar. La respuesta trae `meta.offset`, `meta.per_page`, `meta.total` y `meta.counts` (sin `current_page`/`last_page`). Un `offset` negativo o no numérico da `422`.
+
 ---
 
 ### Panel de administración — validar / rechazar un reporte
@@ -354,9 +364,9 @@ Requiere token de **administrador**.
 
 Al pasar a `pendiente` se limpian `validated_by`, `validated_at`, `rejection_reason`, `status_updated_by` y `status_updated_at`, y `status` vuelve a `Pendiente`. Si se pasa de `valido` a `pendiente` y el reporte ya avanzó de estado (`En Progreso` o `Resuelto`), la respuesta es `409`: deshacer no borra el cambio de estado de otro admin.
 
-Opcional al pasar a `valido` o `rechazado` (deshacer una moderación previa): `restore_validated_by` (id de usuario existente) y `restore_validated_at` (fecha ISO 8601, no futura), siempre juntos. En vez de registrar como moderador a quien deshace, se restauran quien moderó antes y cuándo. No se aceptan al pasar a `pendiente` (`422`).
+Opcional al pasar a `valido` o `rechazado` (deshacer una moderación previa): `restore_previous: true`. Al cambiar un reporte entre `valido` y `rechazado`, el servidor guarda quién lo había moderado y cuándo (`previous_validated_by`/`previous_validated_at`); con `restore_previous` se restauran esos datos en vez de registrar como moderador a quien deshace. El cliente no envía ni el moderador ni la fecha (los antiguos `restore_validated_by`/`restore_validated_at` se ignoran). Sin moderación anterior guardada queda quien actúa. No se acepta al pasar a `pendiente` (`422`).
 ```json
-{ "validation_status": "valido", "expected_validation_status": "rechazado", "restore_validated_by": 7, "restore_validated_at": "2026-11-01T10:00:00.000000Z" }
+{ "validation_status": "valido", "expected_validation_status": "rechazado", "restore_previous": true }
 ```
 
 **Response 200:** el reporte actualizado (incluye `validation_status`, `rejection_reason`, `validated_at`, `validated_by`, `status_updated_by`, `status_updated_at` y `auto_validated`).
@@ -400,7 +410,7 @@ Requiere token de **administrador**. Sin parámetros.
 }
 ```
 - `new_this_week`: reportes creados en los últimos 7 días.
-- `avg_validation_hours`: promedio en horas (1 decimal) entre `created_at` y `validated_at` de los últimos 200 reportes validados o rechazados, **sin contar los autovalidados** (`validated_by` = autor). `null` si no hay datos.
+- `avg_validation_hours`: promedio en horas (1 decimal) entre `created_at` y `validated_at` de los últimos 200 reportes validados o rechazados, incluidos los de administradores (también esperan en la cola). `null` si no hay datos.
 - `top_zone`: zona con más reportes no rechazados (desempate: id menor) o `null`.
 
 ---
@@ -439,7 +449,7 @@ GET /admin/reports/export
 ```
 Requiere token de **administrador** (cabecera `Authorization: Bearer`; se descarga con una petición autenticada). Acepta los mismos filtros que el listado: `validation_status`, `zone_id`, `category_id`, `status`, `search` y `sort`.
 
-**Response 200:** `Content-Type: text/csv; charset=UTF-8` y `Content-Disposition: attachment; filename="reportes-2026-11-06.csv"`. El archivo empieza con BOM UTF-8 y tiene como máximo 5000 filas (las más recientes según el orden pedido). Columnas, en este orden:
+**Response 200:** `Content-Type: text/csv; charset=UTF-8` y `Content-Disposition: attachment; filename="reportes-2026-11-06.csv"`. El archivo empieza con BOM UTF-8 y tiene como máximo 5000 filas (las más recientes según el orden pedido). Los ids se fijan al iniciar la descarga, así que un reporte que llegue mientras se escribe no hace repetir ni omitir filas. Columnas, en este orden:
 ```
 id,categoria,descripcion,zona,autor,estado,validacion,motivo_rechazo,confirmaciones,latitud,longitud,creado,validado_por,validado_en,estado_actualizado_por,estado_actualizado_en
 ```
@@ -570,6 +580,6 @@ Requiere token.
 | 201 | Created — recurso creado |
 | 401 | Unauthorized — token inválido o credenciales incorrectas |
 | 403 | Forbidden — acción no permitida (ej: confirmar tu propio reporte) |
-| 404 | Not Found — recurso no existe |
+| 404 | Not Found — recurso no existe (también un id no numérico, p. ej. `/reports/abc`) |
 | 422 | Unprocessable — datos de entrada inválidos |
 | 429 | Too Many Requests — límite de intentos en login/registro |

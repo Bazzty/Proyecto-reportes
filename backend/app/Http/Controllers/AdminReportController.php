@@ -6,7 +6,6 @@ use App\Http\Controllers\Concerns\FormatsReports;
 use App\Models\Report;
 use App\Models\Zone;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -18,6 +17,8 @@ class AdminReportController extends Controller
     private const EXPORT_LIMIT = 5000;
 
     private const EXPORT_PAGE = 500;
+
+    private const PAGE_SIZE = 20;
 
     private const EXPORT_COLUMNS = [
         'id', 'categoria', 'descripcion', 'zona', 'autor', 'estado', 'validacion', 'motivo_rechazo',
@@ -44,10 +45,31 @@ class AdminReportController extends Controller
         ];
         $counts['total'] = array_sum($counts);
 
-        $reports = $this->applySort(
+        $query = $this->applySort(
             $this->applyFilters($this->adminQuery($uid), $filters),
             $filters['sort'] ?? 'recientes'
-        )->paginate(20);
+        );
+
+        // "Cargar más" pide por offset (cuántas filas tiene ya la app) y no por número de página:
+        // al moderar, la app saca reportes de la lista y una página fija saltaría los que suben.
+        $offset = $request->validate(['offset' => ['sometimes', 'integer', 'min:0']])['offset'] ?? null;
+
+        if ($offset !== null) {
+            $total = (clone $query)->toBase()->getCountForPagination();
+            $rows = $query->skip((int) $offset)->take(self::PAGE_SIZE)->get();
+
+            return response()->json([
+                'data' => $rows->map(fn (Report $report) => $this->formatAdminReport($report, $uid)),
+                'meta' => [
+                    'offset' => (int) $offset,
+                    'per_page' => self::PAGE_SIZE,
+                    'total' => $total,
+                    'counts' => $counts,
+                ],
+            ]);
+        }
+
+        $reports = $query->paginate(self::PAGE_SIZE);
 
         return response()->json([
             'data' => $reports->getCollection()->map(fn (Report $report) => $this->formatAdminReport($report, $uid)),
@@ -68,12 +90,11 @@ class AdminReportController extends Controller
 
     public function summary()
     {
-        // Promedio calculado en PHP (sin funciones de fecha de la BD): últimos 200 moderados,
-        // sin contar los autovalidados (el admin que reporta se valida solo y no mide la cola).
+        // Promedio calculado en PHP (sin funciones de fecha de la BD): últimos 200 moderados. Cuentan
+        // todos, también los de administradores: sus reportes esperan en la misma cola que el resto.
         $moderated = Report::query()
             ->whereIn('validation_status', ['valido', 'rechazado'])
             ->whereNotNull('validated_at')
-            ->where(fn ($q) => $q->whereNull('validated_by')->orWhereColumn('validated_by', '!=', 'user_id'))
             ->latest('validated_at')->latest('id')
             ->limit(200)
             ->get(['id', 'created_at', 'validated_at']);
@@ -174,16 +195,30 @@ class AdminReportController extends Controller
             $filters['sort'] ?? 'recientes'
         );
 
-        return response()->streamDownload(function () use ($query, $limit) {
+        // Foto fija de los ids (en el orden pedido) antes de escribir: un reporte que llegue o cambie
+        // durante la descarga no desplaza las páginas, así que no se repiten ni se omiten filas.
+        $ids = (clone $query)->limit($limit)->pluck('reports.id')->all();
+
+        return response()->streamDownload(function () use ($ids) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
             $this->csvRow($out, self::EXPORT_COLUMNS);
 
             // Páginas con eager loading (cursor() no lo permite): sin N+1 y sin cargar todo en memoria.
-            for ($offset = 0; $offset < $limit; $offset += self::EXPORT_PAGE) {
-                $page = (clone $query)->offset($offset)->limit(min(self::EXPORT_PAGE, $limit - $offset))->get();
+            foreach (array_chunk($ids, self::EXPORT_PAGE) as $chunk) {
+                $page = $this->withReportData(Report::query(), null)
+                    ->with(['validatedBy:id,name', 'statusUpdatedBy:id,name'])
+                    ->whereIn('reports.id', $chunk)
+                    ->get()
+                    ->keyBy('id');
 
-                foreach ($page as $r) {
+                // Se respeta el orden de la foto; un reporte que ya no existe se omite.
+                foreach ($chunk as $id) {
+                    $r = $page->get($id);
+                    if ($r === null) {
+                        continue;
+                    }
+
                     $this->csvRow($out, [
                         $r->id,
                         $r->category?->name,
@@ -203,10 +238,6 @@ class AdminReportController extends Controller
                         $r->status_updated_at?->toISOString(),
                     ]);
                 }
-
-                if ($page->count() < self::EXPORT_PAGE) {
-                    break;
-                }
             }
 
             fclose($out);
@@ -222,55 +253,81 @@ class AdminReportController extends Controller
             'rejection_reason' => ['nullable', 'string', 'max:500', 'required_if:validation_status,rechazado'],
             // Obligatorio: el cliente debe declarar el estado que vio (concurrencia optimista).
             'expected_validation_status' => ['required', Rule::in(['pendiente', 'valido', 'rechazado'])],
-            // Deshacer hacia valido/rechazado: quién moderó antes y cuándo, para restaurarlo en vez de
-            // registrar como moderador a quien deshace. Van juntos y no aplican al volver a pendiente.
-            'restore_validated_by' => ['nullable', 'integer', 'exists:users,id', 'required_with:restore_validated_at', 'prohibited_if:validation_status,pendiente'],
-            'restore_validated_at' => ['nullable', 'date', 'before_or_equal:now', 'required_with:restore_validated_by', 'prohibited_if:validation_status,pendiente'],
+            // Deshacer hacia valido/rechazado: restaura la moderación anterior que guardó el servidor
+            // (previous_validated_by/at) en vez de registrar como moderador a quien deshace. El cliente
+            // no elige ni el moderador ni la fecha.
+            'restore_previous' => ['sometimes', 'boolean', 'prohibited_if:validation_status,pendiente'],
         ]);
 
         $uid = $request->user('sanctum')->id;
         $report = Report::findOrFail($id);
-        $restore = isset($data['restore_validated_by'], $data['restore_validated_at']);
+        $target = $data['validation_status'];
+        $restore = (bool) ($data['restore_previous'] ?? false);
 
-        // UPDATE atómico: solo aplica si el estado sigue siendo el esperado. Si dos admins
-        // validan a la vez, el segundo afecta 0 filas y recibe 409.
-        $affected = Report::whereKey($id)
-            ->where('validation_status', $data['expected_validation_status'])
-            // Deshacer una validación: si otro admin ya avanzó el estado (En Progreso / Resuelto),
-            // volver a pendiente borraría ese cambio. Se trata como conflicto (409).
-            ->when(
-                $data['validation_status'] === 'pendiente' && $data['expected_validation_status'] === 'valido',
-                fn ($q) => $q->where('status', 'Pendiente')
-            )
-            ->update($data['validation_status'] === 'pendiente'
-                // Deshacer: vuelve al estado inicial y borra todo rastro de la moderación y del cambio de estado.
-                ? [
+        // Fila bloqueada dentro de la transacción: si dos admins moderan a la vez, el segundo ve el
+        // estado nuevo, no coincide con el esperado y recibe 409.
+        $applied = DB::transaction(function () use ($id, $data, $target, $restore, $uid) {
+            $row = Report::whereKey($id)->lockForUpdate()->firstOrFail();
+
+            if ($row->validation_status !== $data['expected_validation_status']) {
+                return false;
+            }
+
+            // Re-envío idempotente del mismo estado: nada que cambiar.
+            if ($row->validation_status === $target) {
+                return true;
+            }
+
+            if ($target === 'pendiente') {
+                // Deshacer una validación: si otro admin ya avanzó el estado (En Progreso / Resuelto),
+                // volver a pendiente borraría ese cambio. Se trata como conflicto (409).
+                if ($row->validation_status === 'valido' && $row->status !== 'Pendiente') {
+                    return false;
+                }
+
+                // Vuelve al estado inicial y borra todo rastro de la moderación y del cambio de estado.
+                $row->forceFill([
                     'validation_status' => 'pendiente',
                     'rejection_reason' => null,
                     'validated_by' => null,
                     'validated_at' => null,
+                    'previous_validated_by' => null,
+                    'previous_validated_at' => null,
                     'status' => 'Pendiente',
                     'status_updated_by' => null,
                     'status_updated_at' => null,
-                ]
-                : [
-                    'validation_status' => $data['validation_status'],
-                    'rejection_reason' => $data['validation_status'] === 'rechazado'
-                        ? ($data['rejection_reason'] ?? null)
-                        : null,
-                    'validated_by' => $restore ? (int) $data['restore_validated_by'] : $uid,
-                    'validated_at' => $restore ? Carbon::parse($data['restore_validated_at']) : now(),
-                ]);
+                ])->save();
 
-        if ($affected === 0) {
-            // MySQL cuenta filas modificadas: un re-envío idempotente del mismo estado
-            // (expected == nuevo) puede dar 0 sin que exista un conflicto real.
-            $isIdempotent = $data['expected_validation_status'] === $data['validation_status']
-                && Report::whereKey($id)->where('validation_status', $data['expected_validation_status'])->exists();
-
-            if (! $isIdempotent) {
-                abort(409, 'El estado del reporte cambió; recargá la lista antes de volver a intentarlo.');
+                return true;
             }
+
+            $wasModerated = $row->validation_status !== 'pendiente';
+
+            if ($restore && $row->previous_validated_by !== null) {
+                $by = $row->previous_validated_by;
+                $at = $row->previous_validated_at ?? now();
+                $previous = [null, null];
+            } else {
+                $by = $uid;
+                $at = now();
+                // Cambio entre válido y rechazado: se guarda quién moderó antes para poder deshacerlo.
+                $previous = $wasModerated ? [$row->validated_by, $row->validated_at] : [null, null];
+            }
+
+            $row->forceFill([
+                'validation_status' => $target,
+                'rejection_reason' => $target === 'rechazado' ? ($data['rejection_reason'] ?? null) : null,
+                'validated_by' => $by,
+                'validated_at' => $at,
+                'previous_validated_by' => $previous[0],
+                'previous_validated_at' => $previous[1],
+            ])->save();
+
+            return true;
+        });
+
+        if (! $applied) {
+            abort(409, 'El estado del reporte cambió; recargá la lista antes de volver a intentarlo.');
         }
 
         // Respuesta liviana: se cargan solo las relaciones necesarias en vez de re-consultar todo.
@@ -353,7 +410,7 @@ class AdminReportController extends Controller
                 'name' => $report->validatedBy->name,
             ] : null,
             ...$this->formatStatusUpdate($report),
-            // El admin que reporta se valida solo; el panel lo distingue de una moderación real.
+            // El admin aprobó o rechazó su propio reporte: el panel lo indica en el historial.
             'auto_validated' => $report->validated_by !== null && (int) $report->validated_by === (int) $report->user_id,
         ]);
     }

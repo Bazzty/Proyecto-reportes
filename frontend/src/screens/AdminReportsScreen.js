@@ -56,8 +56,6 @@ export default function AdminReportsScreen({ navigation }) {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [page, setPage] = useState(1);
-  const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState(null);
   // Motivo de rechazo: un reporte ({ id, validationStatus, description }) o un lote ({ bulk, count }).
@@ -137,12 +135,10 @@ export default function AdminReportsScreen({ navigation }) {
 
   const undoAction = (entry) => ({ label: 'Deshacer', onPress: () => undoHandlerRef.current(entry) });
 
-  // Quién moderó el reporte antes de la acción, para que deshacer lo restaure. Solo tiene sentido si
-  // ya estaba moderado (válido o rechazado) y se conocen ambos datos.
-  const previousModeration = (validationStatus, validatedBy, validatedAt) => (
-    validationStatus !== 'pendiente' && validatedBy?.id && validatedAt
-      ? { prevValidatedBy: validatedBy.id, prevValidatedAt: validatedAt }
-      : {}
+  // Si el reporte ya estaba moderado (válido o rechazado), deshacer pide al servidor que restaure
+  // esa moderación anterior, que guarda él mismo: el cliente no envía ni el moderador ni la fecha.
+  const previousModeration = (validationStatus) => (
+    validationStatus !== 'pendiente' ? { restorePrevious: true } : {}
   );
 
   // Búsqueda con debounce: el valor aplicado (y la recarga) sigue al escrito 400 ms después.
@@ -187,16 +183,25 @@ export default function AdminReportsScreen({ navigation }) {
       setLoadingMore(true);
     }
 
-    api.get('/admin/reports', { params: { ...listParams, page: pageToLoad } })
+    // "Cargar más" pide desde las filas que ya hay (offset) y no la página siguiente: al moderar se
+    // sacan reportes de la lista y una página fija saltaría los que suben a ocupar su lugar.
+    const params = pageToLoad === 1
+      ? { ...listParams, page: 1 }
+      : { ...listParams, offset: reportsRef.current.length };
+
+    api.get('/admin/reports', { params })
       .then((res) => {
         if (requestId !== requestRef.current) return;
         const rows = res.data.data ?? [];
         const meta = res.data.meta ?? {};
         // Recarga completa (otros filtros o "Mostrar"): el tope se recalcula con la lista nueva.
         if (pageToLoad === 1) newestIdRef.current = 0;
-        setReports(prev => (pageToLoad === 1 ? rows : [...prev, ...rows]));
-        setPage(meta.current_page ?? 1);
-        setLastPage(meta.last_page ?? 1);
+        // Si entretanto llegó un reporte nuevo arriba, el offset trae repetido el último: se omite.
+        setReports(prev => {
+          if (pageToLoad === 1) return rows;
+          const known = new Set(prev.map(r => r.id));
+          return [...prev, ...rows.filter(r => !known.has(r.id))];
+        });
         setTotal(meta.total ?? rows.length);
         if (meta.counts) setCounts(meta.counts);
       })
@@ -290,8 +295,8 @@ export default function AdminReportsScreen({ navigation }) {
   };
 
   const loadMore = () => {
-    if (loading || loadingMore || page >= lastPage) return;
-    load(page + 1);
+    if (loading || loadingMore || reports.length >= total) return;
+    load(2);
   };
 
   // Mueve reportes de un contador al otro sin pedir de nuevo. Si la lista se recargó, los
@@ -349,7 +354,7 @@ export default function AdminReportsScreen({ navigation }) {
         duration: UNDO_MS,
         action: undoAction({
           kind: 'validation', id: item.id, from: item.validation_status, to: 'valido', reason: item.rejection_reason,
-          ...previousModeration(item.validation_status, item.validated_by, item.validated_at),
+          ...previousModeration(item.validation_status),
         }),
       });
     } catch (err) {
@@ -384,10 +389,7 @@ export default function AdminReportsScreen({ navigation }) {
           validation_status: entry.from,
           expected_validation_status: entry.to,
           ...(entry.from === 'rechazado' && entry.reason ? { rejection_reason: entry.reason } : {}),
-          ...(entry.prevValidatedBy ? {
-            restore_validated_by: entry.prevValidatedBy,
-            restore_validated_at: entry.prevValidatedAt,
-          } : {}),
+          ...(entry.restorePrevious ? { restore_previous: true } : {}),
         }));
         if (listVersion === listVersionRef.current) adjustCounts(entry.to, entry.from);
       }
@@ -414,7 +416,7 @@ export default function AdminReportsScreen({ navigation }) {
       id: item.id,
       validationStatus: item.validation_status,
       description: item.description,
-      ...previousModeration(item.validation_status, item.validated_by, item.validated_at),
+      ...previousModeration(item.validation_status),
     });
     setReason('');
     setReasonTouched(false);
@@ -563,10 +565,7 @@ export default function AdminReportsScreen({ navigation }) {
         duration: UNDO_MS,
         action: undoAction({
           kind: 'validation', id: rejecting.id, from: rejecting.validationStatus, to: 'rechazado',
-          ...(rejecting.prevValidatedBy ? {
-            prevValidatedBy: rejecting.prevValidatedBy,
-            prevValidatedAt: rejecting.prevValidatedAt,
-          } : {}),
+          ...(rejecting.restorePrevious ? { restorePrevious: true } : {}),
         }),
       });
     } catch (err) {

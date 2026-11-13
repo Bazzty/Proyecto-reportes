@@ -9,8 +9,12 @@ export const SESSION_KEYS = ['token', 'userName', 'userId', 'isAdmin', 'reportSt
 // Borra todo lo que es del usuario: la cola offline, las notificaciones y los datos de sesión.
 // Se usa al cerrar sesión y cuando el token vence (401), para que un segundo usuario en el mismo
 // dispositivo no publique los reportes pendientes del anterior ni vea sus notificaciones.
-export async function clearSession() {
-  try { await clearQueue(); } catch { /* se sigue limpiando el resto */ }
+// Con un token vencido (`keepQueue`) la cola se conserva: son reportes del mismo usuario que se
+// enviarán cuando vuelva a entrar; si entra otra cuenta, claimQueue los descarta.
+export async function clearSession({ keepQueue = false } = {}) {
+  if (!keepQueue) {
+    try { await clearQueue(); } catch { /* se sigue limpiando el resto */ }
+  }
   try { await clearNotifications(); } catch { /* se sigue limpiando el resto */ }
   await AsyncStorage.multiRemove(SESSION_KEYS);
   clearAuthToken();

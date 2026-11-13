@@ -5,6 +5,7 @@ import api from '../services/api';
 import { resetSummaryPreference } from '../components/admin/SummaryCard';
 import {
   report, validReport, setup, setupValid, reportsCalls, lastReportsParams, openFilters,
+  makeNavigation, COUNTS, SUMMARY,
 } from './helpers/adminScreen';
 
 jest.mock('../services/api', () => ({
@@ -638,5 +639,32 @@ describe('AdminReportsScreen', () => {
 
     expect(screen.queryByText('Reporte viejo')).toBeNull();
     expect(screen.getByText('Reporte válido')).toBeTruthy();
+  });
+
+  it('"cargar más" pide por offset desde las filas que quedan tras moderar', async () => {
+    const page1 = [report({ id: 3, description: 'Tercero' }), report({ id: 2, description: 'Segundo' })];
+    api.get.mockImplementation((url, config) => {
+      if (url === '/admin/reports') {
+        if (config?.params?.offset !== undefined) {
+          return Promise.resolve({ data: { data: [report({ id: 1, description: 'Primero' })], meta: { offset: config.params.offset, total: 2, counts: COUNTS } } });
+        }
+        return Promise.resolve({ data: { data: page1, meta: { current_page: 1, last_page: 2, per_page: 2, total: 3, counts: COUNTS } } });
+      }
+      if (url === '/admin/reports/summary') return Promise.resolve({ data: SUMMARY });
+      return Promise.resolve({ data: [] });
+    });
+    api.patch.mockResolvedValue({ data: report({ id: 3, description: 'Tercero', validation_status: 'valido' }) });
+    await render(<AdminReportsScreen navigation={makeNavigation()} />);
+    expect(await screen.findByText('Tercero')).toBeTruthy();
+
+    // Se valida uno: sale de "Pendientes" y quedan 1 fila de 2.
+    await fireEvent.press(screen.getAllByText('Validar')[0]);
+    await waitFor(() => expect(screen.queryByText('Tercero')).toBeNull());
+
+    await fireEvent(screen.getByTestId('admin-report-list'), 'onEndReached');
+
+    await waitFor(() => expect(lastReportsParams()).toEqual({ validation_status: 'pendiente', offset: 1 }));
+    expect(await screen.findByText('Primero')).toBeTruthy();
+    expect(screen.getByText('Segundo')).toBeTruthy();
   });
 });

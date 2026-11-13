@@ -144,6 +144,24 @@ class ReportController extends Controller
         return response()->json(array_merge($this->formatReport($report, $uid), $this->formatStatusUpdate($report)));
     }
 
+    /**
+     * Huella de lo que muestran /reports, /reports/heatmap y /user/reports: cambia al crear, moderar
+     * o cambiar de estado un reporte (updated_at) y al confirmar o quitar una confirmación. Son dos
+     * agregados sobre índices, mucho más baratos que los listados completos que la app pide cada 5 s.
+     */
+    public function version()
+    {
+        $reports = DB::table('reports')->selectRaw('COUNT(*) as total, MAX(id) as max_id, MAX(updated_at) as updated')->first();
+        $confirmations = DB::table('confirmations')->selectRaw('COUNT(*) as total, MAX(id) as max_id')->first();
+
+        return response()->json([
+            'version' => sha1(json_encode([
+                (int) $reports->total, (int) $reports->max_id, (string) $reports->updated,
+                (int) $confirmations->total, (int) $confirmations->max_id,
+            ])),
+        ]);
+    }
+
     public function heatmap()
     {
         // Filas planas con join: evita hidratar modelos (y el GeoJSON de cada zona) en un endpoint público.

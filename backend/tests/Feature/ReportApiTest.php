@@ -241,6 +241,39 @@ class ReportApiTest extends TestCase
         $this->assertSame(1, Report::where('user_id', $other->id)->where('client_uuid', $uuid)->count());
     }
 
+    public function test_non_numeric_report_ids_return_404_instead_of_500()
+    {
+        Sanctum::actingAs(User::factory()->create());
+
+        $this->getJson('/api/reports/abc')->assertNotFound();
+        $this->getJson('/api/reports/abc/comments')->assertNotFound();
+        $this->postJson('/api/reports/abc/confirm')->assertNotFound();
+        $this->postJson('/api/reports/abc/comments', ['body' => 'hola'])->assertNotFound();
+    }
+
+    public function test_version_changes_when_map_data_changes()
+    {
+        $category = Category::create(['name' => 'basura']);
+        $author = User::factory()->create();
+        $version = fn () => $this->getJson('/api/reports/version')->assertOk()->json('version');
+
+        $empty = $version();
+        $this->assertSame($empty, $version());
+
+        $report = $this->sampleReport($category, $author);
+        $created = $version();
+        $this->assertNotSame($empty, $created);
+
+        $this->travel(2)->seconds();
+        $report->update(['status' => 'En Progreso']);
+        $changed = $version();
+        $this->assertNotSame($created, $changed);
+
+        Sanctum::actingAs(User::factory()->create());
+        $this->postJson("/api/reports/{$report->id}/confirm")->assertOk();
+        $this->assertNotSame($changed, $version());
+    }
+
     private function validReportPayload(Category $category, array $overrides = []): array
     {
         return array_merge([

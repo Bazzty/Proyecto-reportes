@@ -305,7 +305,7 @@ describe('AdminReportsScreen: deshacer', () => {
     timeoutSpy.mockRestore();
   });
 
-  it('deshacer el rechazo de un reporte ya válido restaura a quien lo validó y cuándo', async () => {
+  it('deshacer el rechazo de un reporte ya válido pide al servidor restaurar la moderación anterior', async () => {
     api.patch
       .mockResolvedValueOnce({ data: report({ validation_status: 'rechazado', rejection_reason: 'Reporte duplicado' }) })
       .mockResolvedValueOnce({ data: report({ validation_status: 'valido' }) });
@@ -323,8 +323,7 @@ describe('AdminReportsScreen: deshacer', () => {
     await waitFor(() => expect(api.patch).toHaveBeenLastCalledWith('/admin/reports/1/validation', {
       validation_status: 'valido',
       expected_validation_status: 'rechazado',
-      restore_validated_by: 7,
-      restore_validated_at: '2026-11-01T10:00:00.000Z',
+      restore_previous: true,
     }));
   });
 
@@ -340,6 +339,7 @@ describe('AdminReportsScreen: deshacer', () => {
 
     await waitFor(() => expect(api.patch).toHaveBeenLastCalledWith('/admin/reports/1/validation', {
       validation_status: 'rechazado', expected_validation_status: 'valido', rejection_reason: 'Foto poco clara',
+      restore_previous: true,
     }));
   });
 
