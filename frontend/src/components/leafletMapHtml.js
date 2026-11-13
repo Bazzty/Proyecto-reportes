@@ -151,6 +151,15 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
     }
     map.on('move', scheduleHeatRedraw);
 
+    // Radio del heat según el zoom: alejado, focos chicos que no se funden en una mancha;
+    // acercado, más grandes para que sigan cubriendo el sector.
+    function heatRadius() {
+      return Math.max(14, Math.min(55, Math.round((map.getZoom() - 6) * 9)));
+    }
+    map.on('zoomend', function () {
+      if (heat && heat.setOptions) { heat.setOptions({ radius: heatRadius() }); }
+    });
+
     map.on('click', function (e) {
       if (!pickable) { return; }
       var lat = e.latlng.lat;
@@ -175,7 +184,27 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
       heatClickLayer.clearLayers();
       if (data.showHeat !== false && data.heat && data.heat.length) {
         if (L.heatLayer) {
-          heat = L.heatLayer(data.heat.map(function (p) { return [p.latitude, p.longitude, p.weight || 1]; }), { radius: 35, blur: 25, maxZoom: 12 });
+          // Intensidad relativa: el foco más denso llega al rojo y el resto se gradúa. Con max fijo
+          // en 1, todo lo que tuviera 1+ reportes saturaba igual. La densidad se mide sumando pesos
+          // por celda de ~1 km (en modo Foco los reportes cercanos se apilan). El mínimo de 3 evita
+          // que un único reporte aislado se vea como el peor foco del mapa.
+          var cells = {};
+          var maxWeight = 1;
+          data.heat.forEach(function (p) {
+            var key = Math.round(p.latitude * 100) + ':' + Math.round(p.longitude * 100);
+            cells[key] = (cells[key] || 0) + (p.weight || 1);
+            maxWeight = Math.max(maxWeight, cells[key]);
+          });
+          heat = L.heatLayer(data.heat.map(function (p) { return [p.latitude, p.longitude, p.weight || 1]; }), {
+            radius: heatRadius(),
+            blur: 20,
+            max: Math.max(3, maxWeight),
+            // maxZoom bajo desactiva la atenuación de leaflet.heat al alejar el zoom (con 12 el
+            // mapa, que abre en 10, mostraba el heat a un cuarto de intensidad).
+            maxZoom: 1,
+            minOpacity: 0.35,
+            gradient: { 0.2: '#fde68a', 0.45: '#facc15', 0.7: '#f97316', 1: '#dc2626' },
+          });
           heat.addTo(map);
         }
         data.heat.forEach(function (p) {
