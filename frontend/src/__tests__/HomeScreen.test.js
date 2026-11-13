@@ -126,6 +126,22 @@ describe('HomeScreen', () => {
     expect(mockLeafletProps.heat[1]).toEqual(expect.objectContaining({ reportId: 2, weight: 1 }));
   });
 
+  it('el modo "Foco" no cuenta los reportes propios aún pendientes de validación', async () => {
+    mockApi();
+    const ok = api.get.getMockImplementation();
+    api.get.mockImplementation((url) => (url === '/reports'
+      ? Promise.resolve({ data: [...REPORTS, { ...REPORTS[0], id: 3, validation_status: 'pendiente' }] })
+      : ok(url)));
+    await setup();
+
+    await fireEvent.press(screen.getByText('Foco'));
+
+    await waitFor(() => expect(mockLeafletProps.heat).toHaveLength(2));
+    expect(mockLeafletProps.heat.map(p => p.reportId)).toEqual([1, 2]);
+    // El marcador sí se muestra (solo al autor), para que vea el reporte que envió.
+    expect(mockLeafletProps.reports.map(r => r.id)).toContain(3);
+  });
+
   it('el modo "Zona" vuelve a usar los centroides por zona', async () => {
     await setup();
     await fireEvent.press(screen.getByText('Foco'));
@@ -386,6 +402,31 @@ describe('HomeScreen', () => {
 
       expect(count()).toBe(initial + 1);
       expect(api.get.mock.calls.filter(([u]) => u === '/reports/heatmap').length).toBeGreaterThan(1);
+    });
+
+    it('tras una recarga manual el polling no repite la consulta enseguida', async () => {
+      await setup();
+      await settle();
+      const count = () => api.get.mock.calls.filter(([u]) => u === '/reports').length;
+      const initial = count();
+
+      await advance(4000);
+      await fireEvent.press(screen.getByTestId('refresh-button'));
+      await settle();
+      await advance(1000);
+
+      expect(count()).toBe(initial + 1);
+    });
+
+    it('si la recarga manual falla muestra el aviso de conexión al instante', async () => {
+      await setup();
+      await settle();
+      failReports();
+
+      await fireEvent.press(screen.getByTestId('refresh-button'));
+      await settle();
+
+      expect(await screen.findByText(/Sin conexión/)).toBeTruthy();
     });
 
     it('vuelve a pedir /reports cada 5 segundos', async () => {

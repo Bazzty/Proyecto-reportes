@@ -19,6 +19,18 @@ describe('leafletMapHtml', () => {
     expect(HTML).toContain("PARENT_ORIGIN === '__PARENT_ORIGIN__' ? '*' : PARENT_ORIGIN");
   });
 
+  it('buildPayload marca como pendientes los reportes aún sin validar', () => {
+    const payload = buildPayload(
+      [
+        { id: 1, latitude: 0, longitude: 0, status: 'Pendiente', validation_status: 'pendiente' },
+        { id: 2, latitude: 0, longitude: 0, status: 'Pendiente', validation_status: 'valido' },
+      ],
+      [],
+      null
+    );
+    expect(payload.reports.map(r => r.pending)).toEqual([true, false]);
+  });
+
   it('buildPayload mapea los reportes al formato del mapa', () => {
     const payload = buildPayload(
       [{
@@ -46,6 +58,7 @@ describe('leafletMapHtml', () => {
       photo_url: null,
       user: 'Ana',
       iconCode: null,
+      pending: false,
     });
     expect(payload.heat).toHaveLength(1);
     expect(payload.userLocation).toEqual({ latitude: -41.3, longitude: -72.9 });

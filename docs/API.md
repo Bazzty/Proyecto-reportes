@@ -115,7 +115,7 @@ Requiere token.
 ```
 GET /reports
 ```
-No requiere token (si se envía, se calcula `confirmed_by_me`).
+No requiere token. Devuelve solo reportes validados (`validation_status = "valido"`). Si se envía token, se calcula `confirmed_by_me` y se incluyen también los reportes **pendientes del propio usuario** (nunca los rechazados ni los pendientes de otros).
 
 **Response 200:**
 ```json
@@ -241,7 +241,7 @@ No requiere token (si se envía, se calcula `confirmed_by_me`).
 ```
 GET /reports/heatmap
 ```
-No requiere token. Devuelve **un punto por reporte** (`latitude`, `longitude`) junto con su `zone` (`{ id, name }`, o `null` si el reporte no cae en ninguna zona). No agrupa: se mantiene la densidad y la agrupación visual por zona, si se necesita, la resuelve el cliente.
+No requiere token. Devuelve **un punto por reporte validado** (`latitude`, `longitude`) junto con su `zone` (`{ id, name }`, o `null` si el reporte no cae en ninguna zona). No agrupa: se mantiene la densidad y la agrupación visual por zona, si se necesita, la resuelve el cliente.
 
 **Response 200:**
 ```json
@@ -363,7 +363,7 @@ Opcional al pasar a `valido` o `rechazado` (deshacer una moderación previa): `r
 
 **Response 409 — El estado cambió mientras tanto:** otro admin ya modificó el reporte. El `UPDATE` es atómico (`WHERE id = ? AND validation_status = ?`), así que dos admins simultáneos no pueden pisarse; recargá la lista y reintentá.
 
-> **Visibilidad:** los reportes con `validation_status = "pendiente"` **sí** son públicos (aparecen en `GET /reports` y en el heatmap; esto es intencional para no perder reportes aún no moderados). Los reportes `"rechazado"` **no** aparecen en `GET /reports` ni en el heatmap, y su detalle (`GET /reports/{id}`), sus comentarios (`GET/POST /reports/{id}/comments`) y su confirmación (`POST /reports/{id}/confirm`) devuelven `404` salvo para el autor o un administrador.
+> **Visibilidad:** solo los reportes con `validation_status = "valido"` son públicos. Los `"pendiente"` y `"rechazado"` **no** aparecen en el heatmap ni, para otros usuarios, en `GET /reports`; su detalle (`GET /reports/{id}`), sus comentarios (`GET/POST /reports/{id}/comments`) y su confirmación (`POST /reports/{id}/confirm`) devuelven `404` salvo para el autor o un administrador. Excepción: `GET /reports` con token incluye además los reportes **pendientes del propio usuario**, para que vea en el mapa el que acaba de enviar.
 
 ---
 

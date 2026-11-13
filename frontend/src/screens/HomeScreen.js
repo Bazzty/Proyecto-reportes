@@ -16,6 +16,7 @@ import { syncStatusNotifications, markAllRead } from '../services/notifications'
 
 // Tiempo máximo por petición del polling: una petición colgada no debe bloquear los refrescos.
 const POLL_TIMEOUT_MS = 10000;
+const POLL_INTERVAL_MS = 5000;
 
 // El endpoint /reports/heatmap devuelve un punto por reporte (con su zona).
 // Para el heat "por zona" agrupamos los reportes con zona en su centroide; los
@@ -181,15 +182,10 @@ export default function HomeScreen({ navigation, route }) {
     const { signal } = controller;
     const opts = { signal, timeout: POLL_TIMEOUT_MS };
     let inFlight = null;
+    let lastStart = 0;
     let failures = 0;
 
-    // Si ya hay una consulta en vuelo se devuelve esa misma promesa: la recarga manual espera
-    // a que termine en vez de lanzar otra en paralelo.
-    const fetchReports = () => {
-      if (!inFlight) inFlight = runFetch().finally(() => { inFlight = null; });
-      return inFlight;
-    };
-
+    // Devuelve true si la consulta salió bien (la recarga manual lo usa para avisar del fallo).
     const runFetch = async () => {
       try {
         const requests = [api.get('/reports', opts), api.get('/reports/heatmap', opts)];
@@ -215,17 +211,36 @@ export default function HomeScreen({ navigation, route }) {
         }
         failures = 0;
         setOffline(false);
+        return true;
       } catch {
         // Un fallo aislado se ignora; dos seguidos indican que los datos mostrados están desactualizados
-        if (signal.aborted) return;
+        if (signal.aborted) return false;
         failures += 1;
         if (failures >= 2) setOffline(true);
+        return false;
       }
     };
 
-    refreshRef.current = fetchReports;
+    // Si ya hay una consulta en vuelo se devuelve esa misma promesa: la recarga manual espera
+    // a que termine en vez de lanzar otra en paralelo.
+    const fetchReports = () => {
+      if (!inFlight) {
+        lastStart = Date.now();
+        inFlight = runFetch().finally(() => { inFlight = null; });
+      }
+      return inFlight;
+    };
+
+    // Recarga manual: si falla, el aviso de conexión aparece de inmediato (no espera un 2º fallo).
+    refreshRef.current = async () => {
+      const ok = await fetchReports();
+      if (!ok && !signal.aborted) setOffline(true);
+    };
     fetchReports();
-    const interval = setInterval(fetchReports, 5000);
+    // El tick se salta si hubo una consulta hace poco (p. ej. una recarga manual recién hecha).
+    const interval = setInterval(() => {
+      if (Date.now() - lastStart >= POLL_INTERVAL_MS - 1000) fetchReports();
+    }, POLL_INTERVAL_MS);
     return () => {
       refreshRef.current = null;
       controller.abort();
@@ -299,8 +314,10 @@ export default function HomeScreen({ navigation, route }) {
     [visibleReports, categories]
   );
 
+  // El heat es público: igual que /reports/heatmap, solo cuenta reportes validados (no los
+  // pendientes propios que /reports le devuelve al autor).
   const focusHeatPoints = useMemo(
-    () => visibleReports.map(r => ({
+    () => visibleReports.filter(r => r.validation_status !== 'pendiente').map(r => ({
       latitude: r.latitude,
       longitude: r.longitude,
       weight: 1,
