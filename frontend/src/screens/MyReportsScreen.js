@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Modal, StatusBar, Alert, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -54,14 +54,29 @@ export default function MyReportsScreen({ navigation }) {
     setPending(await getPending());
   }, []);
 
+  // requestRef descarta respuestas obsoletas; loadedRef evita el spinner de pantalla completa al recargar.
+  const requestRef = useRef(0);
+  const loadedRef = useRef(false);
+
   const loadReports = useCallback(() => {
-    setLoading(true);
+    const requestId = ++requestRef.current;
+    if (!loadedRef.current) setLoading(true);
     setError(false);
     setVisible(PAGE_SIZE);
     api.get('/user/reports')
-      .then(res => setAllReports(res.data))
-      .catch(() => { setAllReports([]); setError(true); })
-      .finally(() => setLoading(false));
+      .then(res => {
+        if (requestId !== requestRef.current) return;
+        loadedRef.current = true;
+        setAllReports(res.data);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (requestId !== requestRef.current) return;
+        loadedRef.current = false;
+        setAllReports([]);
+        setError(true);
+        setLoading(false);
+      });
   }, []);
 
   useFocusEffect(useCallback(() => {
@@ -289,6 +304,13 @@ export default function MyReportsScreen({ navigation }) {
       ) : (
         <FlatList
           key={viewMode}
+          ListHeaderComponent={
+            viewMode === 'grid' && pendingItems.length > 0 ? (
+              <Text style={styles.pendingNotice}>
+                {`${pendingItems.length} reporte${pendingItems.length !== 1 ? 's' : ''} pendiente${pendingItems.length !== 1 ? 's' : ''} de envío: cámbiate a la vista de lista para verlos.`}
+              </Text>
+            ) : null
+          }
           numColumns={viewMode === 'grid' ? 2 : 1}
           columnWrapperStyle={viewMode === 'grid' ? styles.gridRow : undefined}
           data={viewMode === 'grid' ? reports : combined}
@@ -346,6 +368,7 @@ const styles = StyleSheet.create({
   counter:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
   counterText: { fontSize: 13, color: '#0e7490', fontWeight: '500' },
   listContent: { paddingBottom: 40 },
+  pendingNotice: { fontSize: 13, color: '#854d0e', backgroundColor: '#fef9c3', borderRadius: 10, padding: 10, marginBottom: 12 },
 
   segmented:    { flexDirection: 'row', borderWidth: 1, borderColor: '#0e7490', borderRadius: 12, overflow: 'hidden', marginTop: 12, marginBottom: 20 },
   segBtn:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10 },

@@ -91,41 +91,54 @@ export default function NewReportScreen({ navigation, route = {} }) {
   };
 
   const handleTakePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permiso denegado', 'Se necesita acceso a la cámara.');
-      return;
+    try {
+      const { status, canAskAgain } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permiso denegado',
+          canAskAgain === false
+            ? 'Ve a Configuración > Lago en línea y activa el acceso a la cámara.'
+            : 'Se necesita acceso a la cámara.'
+        );
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.7,
+      });
+      if (!result.canceled) setPhoto(await toJpeg(result.assets[0]));
+    } catch {
+      Alert.alert('Error', 'No se pudo procesar la foto.');
     }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      quality: 0.7,
-    });
-    if (!result.canceled) setPhoto(await toJpeg(result.assets[0]));
   };
 
   const handlePickFromGallery = async () => {
-    const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permiso denegado',
-        canAskAgain
-          ? 'Se necesita acceso a la galería.'
-          : 'Ve a Configuración > Lago en línea y activa el acceso a fotos.'
-      );
-      return;
+    try {
+      const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permiso denegado',
+          canAskAgain
+            ? 'Se necesita acceso a la galería.'
+            : 'Ve a Configuración > Lago en línea y activa el acceso a fotos.'
+        );
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 1,
+        allowsEditing: false,
+      });
+      if (!result.canceled) setPhoto(await toJpeg(result.assets[0]));
+    } catch {
+      Alert.alert('Error', 'No se pudo procesar la foto.');
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 1,
-      allowsEditing: false,
-    });
-    if (!result.canceled) setPhoto(await toJpeg(result.assets[0]));
   };
 
   const saveOffline = async (clientUuid) => {
     try {
       await enqueue({
-        description,
+        description: description.trim(),
         latitude: effectiveLocation.latitude,
         longitude: effectiveLocation.longitude,
         categoryId,
@@ -164,7 +177,7 @@ export default function NewReportScreen({ navigation, route = {} }) {
       }
 
       const form = new FormData();
-      form.append('description', description);
+      form.append('description', description.trim());
       form.append('latitude',    String(effectiveLocation.latitude));
       form.append('longitude',   String(effectiveLocation.longitude));
       form.append('category_id', String(categoryId));

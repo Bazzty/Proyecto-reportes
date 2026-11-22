@@ -186,6 +186,9 @@ export const syncPending = async () => {
         // Sin sesión válida no tiene sentido seguir intentando: se reintenta tras iniciar sesión.
         if (status === 401) break;
 
+        // Red caída (sin respuesta), 429 o 5xx afectan a todos los ítems: se corta y se reintenta luego.
+        if (!error.response || status === 429 || status >= 500) break;
+
         // Solo los errores de datos (400/413/422) son permanentes: reintentar no los resuelve.
         // 403/404/408/429 y los 5xx pueden ser transitorios: se reintentan.
         if (status === 400 || status === 413 || status === 422) {

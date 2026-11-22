@@ -139,3 +139,51 @@ describe('popups bajo los controles superpuestos', () => {
     expect(HTML).not.toContain('.bindPopup(popup)');
   });
 });
+
+describe('ids numéricos (anti-inyección en onclick)', () => {
+  it('buildPayload descarta el reporte cuyo id no es numérico y fuerza Number en el resto', () => {
+    const payload = buildPayload([
+      { id: '1);alert(1', latitude: 0, longitude: 0, status: 'Pendiente' },
+      { id: '7', latitude: 0, longitude: 0, status: 'Pendiente' },
+    ]);
+
+    expect(payload.reports.map(r => r.id)).toEqual([7]);
+    expect(JSON.stringify(payload)).not.toContain('alert(1');
+  });
+
+  it('buildPayload descarta los puntos de calor con reportId no numérico y conserva los de zona', () => {
+    const payload = buildPayload([], [
+      { latitude: 0, longitude: 0, reportId: '2);alert(1' },
+      { latitude: 0, longitude: 0, reportId: '3' },
+      { latitude: 0, longitude: 0, zoneName: 'Puerto Varas', count: 4 },
+    ]);
+
+    expect(payload.heat).toHaveLength(2);
+    expect(payload.heat[0].reportId).toBe(3);
+    expect(payload.heat[1].reportId).toBeUndefined();
+    expect(JSON.stringify(payload)).not.toContain('alert(1');
+  });
+
+  it('el HTML fuerza Number() al interpolar el id en onclick', () => {
+    expect(HTML).toContain("select(' + Number(p.reportId) + ');");
+    expect(HTML).toContain("select(' + Number(r.id) + ');");
+  });
+});
+
+describe('escape de la descripción en el popup', () => {
+  // Evalúa la función esc() real que viaja dentro del HTML del WebView.
+  const esc = new Function(`${HTML.match(/function esc\(value\) \{[\s\S]*?\n  \}/)[0]}; return esc;`)();
+
+  it('la descripción con <img onerror> sale escapada al construir el popup', () => {
+    const payload = buildPayload([{
+      id: 1, latitude: 0, longitude: 0, status: 'Pendiente',
+      description: '<img src=x onerror="alert(1)">',
+    }]);
+
+    const escaped = esc(payload.reports[0].description);
+
+    expect(escaped).not.toContain('<');
+    expect(escaped).not.toContain('"');
+    expect(escaped).toBe('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
+  });
+});

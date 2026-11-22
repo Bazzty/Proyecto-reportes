@@ -17,8 +17,9 @@ export const buildPayload = (
   topInset = 0
 ) => ({
   type: 'update',
-  reports: reports.map(r => ({
-    id: r.id,
+  // El id se interpola en un onclick del popup: solo pasan ids numéricos (el resto se descarta).
+  reports: reports.filter(r => Number.isFinite(Number(r.id))).map(r => ({
+    id: Number(r.id),
     latitude: r.latitude,
     longitude: r.longitude,
     description: r.description,
@@ -31,7 +32,9 @@ export const buildPayload = (
     // nadie más los ve todavía.
     pending: r.validation_status === 'pendiente',
   })),
-  heat,
+  heat: heat
+    .filter(p => p.reportId == null || Number.isFinite(Number(p.reportId)))
+    .map(p => (p.reportId == null ? p : { ...p, reportId: Number(p.reportId) })),
   userLocation,
   showMarkers,
   showHeat,
@@ -219,7 +222,7 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
               + '<div style="font-weight:bold;color:#0e7490">' + esc(p.category || 'Sin categoría') + '</div>'
               + '<div style="font-size:12px;color:#374151;margin:4px 0">' + esc(p.description || '') + '</div>'
               + '<div style="font-size:11px;color:#9ca3af">' + esc(p.user || '') + '</div>'
-              + '<a href="#" onclick="select(' + p.reportId + ');return false;" style="color:#0e7490;font-weight:600;font-size:12px">Ver detalle &rarr;</a></div>';
+              + '<a href="#" onclick="select(' + Number(p.reportId) + ');return false;" style="color:#0e7490;font-weight:600;font-size:12px">Ver detalle &rarr;</a></div>';
           } else {
             var n = p.count || 0;
             popup = '<div style="min-width:120px">'
@@ -260,7 +263,7 @@ html,body,#map{height:100%;margin:0;padding:0;background:#e5e7eb;}
             + '<div style="font-size:12px;color:#374151;margin:4px 0">' + esc(r.description || '') + '</div>'
             + '<div style="font-size:11px;color:#9ca3af">' + esc(r.user || '') + '</div>'
             + (r.pending ? '<div style="font-size:11px;color:#b45309;font-weight:600;margin:4px 0">Pendiente de validación · solo tú lo ves</div>' : '')
-            + '<a href="#" onclick="select(' + r.id + ');return false;" style="color:#0e7490;font-weight:600;font-size:12px">Ver detalle &rarr;</a></div>';
+            + '<a href="#" onclick="select(' + Number(r.id) + ');return false;" style="color:#0e7490;font-weight:600;font-size:12px">Ver detalle &rarr;</a></div>';
           L.marker([r.latitude, r.longitude], { icon: icon }).bindPopup(popup, popupOptions()).addTo(markersLayer);
         });
       }

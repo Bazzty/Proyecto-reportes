@@ -33,7 +33,7 @@ export default function RegisterScreen({ navigation }) {
   };
 
   const handleRegister = async () => {
-    if (!name || !email || !password || !passwordConfirm) {
+    if (!name || !email.trim() || !password || !passwordConfirm) {
       Alert.alert('Error', 'Por favor completa todos los campos.');
       return;
     }
@@ -43,13 +43,15 @@ export default function RegisterScreen({ navigation }) {
     }
 
     setLoading(true);
+    let serverOk = false;
     try {
       const response = await api.post('/register', {
         name,
-        email,
+        email: email.trim(),
         password,
         password_confirmation: passwordConfirm,
       });
+      serverOk = true;
       const { token, user } = response.data;
 
       await saveToken(token);
@@ -65,7 +67,10 @@ export default function RegisterScreen({ navigation }) {
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (error) {
       const errors = error.response?.data?.errors;
-      if (errors) {
+      if (serverOk) {
+        // El servidor aceptó el registro: el fallo es del guardado local, no de la conexión.
+        Alert.alert('Error', 'No se pudo guardar la sesión en este dispositivo.');
+      } else if (errors) {
         const primerError = Object.values(errors)[0][0];
         Alert.alert('Error de validación', primerError);
       } else {
@@ -130,6 +135,8 @@ export default function RegisterScreen({ navigation }) {
           <TouchableOpacity
             style={styles.eyeButton}
             testID="toggle-password"
+            accessibilityRole="button"
+            accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
             onPressIn={() => setShowPassword(true)}
             onPressOut={() => setShowPassword(false)}
           >
@@ -149,6 +156,8 @@ export default function RegisterScreen({ navigation }) {
           <TouchableOpacity
             style={styles.eyeButton}
             testID="toggle-confirm"
+            accessibilityRole="button"
+            accessibilityLabel={showConfirm ? 'Ocultar confirmación de contraseña' : 'Mostrar confirmación de contraseña'}
             onPressIn={() => setShowConfirm(true)}
             onPressOut={() => setShowConfirm(false)}
           >

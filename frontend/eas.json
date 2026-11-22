@@ -7,6 +7,9 @@
     "development": {
       "developmentClient": false,
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://lagoenlinea.chilecentral.cloudapp.azure.com/api"
+      },
       "channel": "development"
     },
     "preview": {

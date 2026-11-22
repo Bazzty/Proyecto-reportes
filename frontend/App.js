@@ -48,7 +48,7 @@ export default function App() {
         const [tokenResult, pickerResult] = await Promise.allSettled([
           getToken(),
           pickerRequest,
-          new Promise((resolve) => setTimeout(resolve, 2500)),
+          new Promise((resolve) => setTimeout(resolve, 1000)),
         ]);
 
         token = tokenResult.status === 'fulfilled' ? tokenResult.value : null;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import * as Location from 'expo-location';
 
 const LAST_KNOWN_MAX_AGE_MS = 60 * 1000;
+const CURRENT_POSITION_TIMEOUT_MS = 15000;
 
 export default function useAutoLocation() {
   const [location, setLocation] = useState(null);
@@ -35,8 +36,20 @@ export default function useAutoLocation() {
         hasPosition = true;
       }
 
-      const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      if (current?.coords) setLocation(current.coords);
+      // getCurrentPositionAsync puede no responder nunca (sin señal GPS): se corta a los 15 s.
+      let timer;
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('location-timeout')), CURRENT_POSITION_TIMEOUT_MS);
+      });
+      try {
+        const current = await Promise.race([
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+          timeout,
+        ]);
+        if (current?.coords) setLocation(current.coords);
+      } finally {
+        clearTimeout(timer);
+      }
     } catch {
       if (!hasPosition) setError('unavailable');
     } finally {

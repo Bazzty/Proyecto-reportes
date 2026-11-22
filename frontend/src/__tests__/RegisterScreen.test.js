@@ -143,4 +143,35 @@ describe('RegisterScreen', () => {
       expect(dismiss).not.toHaveBeenCalled();
     });
   });
+
+  it('envía el correo sin espacios sobrantes', async () => {
+    api.post.mockResolvedValue({ data: { token: 'tok', user: { id: 7, name: 'Ana' } } });
+    await setup();
+    await fill({ email: '  ana@example.com ' });
+    await fireEvent.press(screen.getByText('Registrarse'));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalled());
+    expect(api.post.mock.calls[0][1].email).toBe('ana@example.com');
+  });
+
+  it('si el registro fue bien pero falla el guardado local avisa de la sesión, no de la conexión', async () => {
+    api.post.mockResolvedValue({ data: { token: 'tok', user: { id: 7, name: 'Ana' } } });
+    jest.spyOn(SecureStore, 'setItemAsync').mockRejectedValueOnce(new Error('keystore'));
+    const navigation = await setup();
+    await fill();
+    await fireEvent.press(screen.getByText('Registrarse'));
+
+    await waitFor(() =>
+      expect(Alert.alert).toHaveBeenCalledWith('Error', 'No se pudo guardar la sesión en este dispositivo.')
+    );
+    expect(navigation.reset).not.toHaveBeenCalled();
+  });
+
+  it('el ojo de contraseña tiene rol y etiqueta accesibles', async () => {
+    await setup();
+
+    expect(screen.getByLabelText('Mostrar contraseña').props.accessibilityRole).toBe('button');
+    await fireEvent(screen.getByTestId('toggle-password'), 'pressIn');
+    expect(screen.getByLabelText('Ocultar contraseña')).toBeTruthy();
+  });
 });

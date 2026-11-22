@@ -26,10 +26,25 @@ describe('api service', () => {
     setUnauthorizedHandler(handler);
     setAuthToken('abc123');
 
-    await expect(rejected({ response: { status: 401 } })).rejects.toBeDefined();
+    await expect(
+      rejected({ response: { status: 401 }, config: { headers: { Authorization: 'Bearer abc123' } } })
+    ).rejects.toBeDefined();
 
     expect(api.defaults.headers.common.Authorization).toBeUndefined();
     expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('un 401 de una petición hecha con el token anterior no cierra la sesión nueva', async () => {
+    const handler = jest.fn();
+    setUnauthorizedHandler(handler);
+    setAuthToken('tokenA');
+    const config = { headers: { Authorization: api.defaults.headers.common.Authorization } };
+    setAuthToken('tokenB');
+
+    await expect(rejected({ response: { status: 401 }, config })).rejects.toBeDefined();
+
+    expect(handler).not.toHaveBeenCalled();
+    expect(api.defaults.headers.common.Authorization).toBe('Bearer tokenB');
   });
 
   it('un 401 sin sesión (contraseña incorrecta en /login) no llama al handler', async () => {
