@@ -46,7 +46,7 @@ jest.mock('../screens/MyReportsScreen', () => () => null);
 
 const renderApp = async () => {
   await render(<App />);
-  await act(async () => { jest.advanceTimersByTime(2500); });
+  await act(async () => { jest.advanceTimersByTime(1000); });
 };
 
 describe('App', () => {

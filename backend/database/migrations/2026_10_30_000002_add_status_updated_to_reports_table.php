@@ -17,6 +17,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('reports', function (Blueprint $table) {
+            // MySQL no deja borrar una columna con FK: primero se quita la restricción.
+            $table->dropForeign(['status_updated_by']);
             $table->dropColumn(['status_updated_by', 'status_updated_at']);
         });
     }

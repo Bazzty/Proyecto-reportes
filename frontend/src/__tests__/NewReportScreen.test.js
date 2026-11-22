@@ -196,6 +196,61 @@ describe('NewReportScreen', () => {
     expect(ImagePicker.launchCameraAsync).not.toHaveBeenCalled();
   });
 
+  it('permiso de cámara denegado permanentemente indica activar el acceso en Configuración', async () => {
+    await setup();
+    ImagePicker.requestCameraPermissionsAsync.mockResolvedValue({ status: 'denied', canAskAgain: false });
+    await fireEvent.press(screen.getByText('Tomar Foto'));
+
+    await waitFor(() =>
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Permiso denegado',
+        'Ve a Configuración > Lago en línea y activa el acceso a la cámara.'
+      )
+    );
+  });
+
+  it('si falla el procesamiento de la foto de la cámara avisa en vez de romperse', async () => {
+    await setup();
+    ImagePicker.requestCameraPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    ImagePicker.launchCameraAsync.mockRejectedValue(new Error('boom'));
+    await fireEvent.press(screen.getByText('Tomar Foto'));
+
+    await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Error', 'No se pudo procesar la foto.'));
+  });
+
+  it('si falla la galería avisa en vez de romperse', async () => {
+    await setup();
+    ImagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    ImagePicker.launchImageLibraryAsync.mockRejectedValue(new Error('boom'));
+    await fireEvent.press(screen.getByText('Galería'));
+
+    await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Error', 'No se pudo procesar la foto.'));
+  });
+
+  it('envía la descripción sin espacios sobrantes (online y en la cola offline)', async () => {
+    api.post.mockResolvedValue({ data: { id: 10 } });
+    await setup();
+    await takePhoto();
+    await screen.findByText(COORDS_TEXT);
+    await fireEvent.changeText(screen.getByPlaceholderText('Ej. Basura acumulada en la esquina...'), '  Basura en la vereda  ');
+    await fireEvent.press(screen.getByText('aguas'));
+    await fireEvent.press(screen.getByText('Enviar Reporte'));
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(1));
+    expect(api.post.mock.calls[0][1].get('description')).toBe('Basura en la vereda');
+  });
+
+  it('sin conexión encola la descripción recortada', async () => {
+    Network.getNetworkStateAsync.mockResolvedValue({ isConnected: false, isInternetReachable: false });
+    await setup();
+    await takePhoto();
+    await screen.findByText(COORDS_TEXT);
+    await fireEvent.changeText(screen.getByPlaceholderText('Ej. Basura acumulada en la esquina...'), '  Basura en la vereda  ');
+    await fireEvent.press(screen.getByText('aguas'));
+    await fireEvent.press(screen.getByText('Enviar Reporte'));
+    await waitFor(() => expect(enqueue).toHaveBeenCalledTimes(1));
+    expect(enqueue.mock.calls[0][0].description).toBe('Basura en la vereda');
+  });
+
   it('con todo completo envía el reporte como multipart y navega a Home', async () => {
     api.post.mockResolvedValue({ data: { id: 10 } });
     const navigation = await setup();
@@ -268,6 +323,21 @@ describe('NewReportScreen', () => {
     expect(title).toBe('Guardado sin conexión');
     buttons[0].onPress();
     expect(navigation.navigate).toHaveBeenCalledWith('Home');
+  });
+
+  it('dos toques seguidos sin conexión encolan una sola vez', async () => {
+    Network.getNetworkStateAsync.mockResolvedValue({ isConnected: false, isInternetReachable: false });
+    enqueue.mockImplementationOnce(() => new Promise((resolve) => { setTimeout(resolve, 100); }));
+    await setup();
+    await fillForm();
+    const button = screen.getByText('Enviar Reporte');
+    await fireEvent.press(button);
+    await fireEvent.press(button);
+
+    await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Guardado sin conexión', expect.any(String), expect.any(Array)));
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    // Espera a que el botón se libere para no dejar estado pendiente entre tests.
+    await screen.findByText('Enviar Reporte');
   });
 
   it('si el envío falla por red guarda el reporte en la cola', async () => {

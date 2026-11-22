@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\FormatsReports;
 use App\Models\Report;
+use App\Services\PhotoMetadataStripper;
 use App\Services\ZoneResolver;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -15,6 +17,13 @@ class ReportController extends Controller
 {
     use FormatsReports;
 
+    // Topes duros (los más recientes) para que un listado no crezca sin límite; sin paginar para no romper APKs instalados.
+    private const INDEX_LIMIT = 2000;
+
+    private const USER_REPORTS_LIMIT = 500;
+
+    private const HEATMAP_LIMIT = 5000;
+
     public function index(Request $request)
     {
         // index y show son rutas públicas: el guard por defecto (web) no lee el Bearer.
@@ -22,11 +31,12 @@ class ReportController extends Controller
         // El mapa público muestra solo reportes validados; el autor ve además los suyos pendientes,
         // para no perder de vista el que acaba de enviar mientras espera moderación.
         $reports = $this->withReportData(Report::query(), $uid)
+            ->with('user:id,name')
             ->where(fn ($q) => $q->where('validation_status', 'valido')
                 ->when($uid, fn ($q) => $q->orWhere(fn ($q) => $q
                     ->where('user_id', $uid)
                     ->where('validation_status', 'pendiente'))))
-            ->latest()->latest('id')->get();
+            ->latest()->latest('id')->limit(self::INDEX_LIMIT)->get();
 
         return response()->json($reports->map(fn (Report $report) => $this->formatReport($report, $uid)));
     }
@@ -45,7 +55,7 @@ class ReportController extends Controller
         return response()->json($this->formatReport($report, $uid));
     }
 
-    public function store(Request $request, ZoneResolver $zones)
+    public function store(Request $request, ZoneResolver $zones, PhotoMetadataStripper $stripper)
     {
         $data = $request->validate([
             'description' => 'required|string|max:1000',
@@ -72,7 +82,7 @@ class ReportController extends Controller
             }
         }
 
-        $path = $request->file('photo')->store('photos', 'public');
+        $path = $this->storePhoto($request->file('photo'), $stripper);
 
         try {
             // Todo reporte nace pendiente (también el de un administrador): solo es público
@@ -110,10 +120,32 @@ class ReportController extends Controller
         return response()->json($this->formatReport($report, $uid), 201);
     }
 
+    /**
+     * Guarda la foto en el disco público. A un JPEG se le quitan antes el EXIF (con el GPS del
+     * teléfono) y el IPTC, porque las fotos de los reportes validados son públicas.
+     */
+    private function storePhoto(UploadedFile $photo, PhotoMetadataStripper $stripper): string
+    {
+        if ($photo->getMimeType() === 'image/jpeg') {
+            $clean = $stripper->stripJpeg((string) file_get_contents($photo->getRealPath()));
+
+            if ($clean !== null) {
+                $path = $photo->hashName('photos');
+                Storage::disk('public')->put($path, $clean);
+
+                return $path;
+            }
+        }
+
+        return $photo->store('photos', 'public');
+    }
+
     public function userReports(Request $request)
     {
         $uid = $request->user()->id;
-        $reports = $this->withReportData($request->user()->reports(), $uid)->latest()->latest('id')->get();
+        $reports = $this->withReportData($request->user()->reports(), $uid)
+            ->with('user:id,name')
+            ->latest()->latest('id')->limit(self::USER_REPORTS_LIMIT)->get();
 
         return response()->json($reports->map(fn (Report $report) => $this->formatReport($report, $uid)));
     }
@@ -124,17 +156,25 @@ class ReportController extends Controller
             'status' => ['required', Rule::in(['Pendiente', 'En Progreso', 'Resuelto'])],
         ]);
 
-        $report = Report::findOrFail($id);
+        $adminId = $request->user()->id;
 
-        // Solo se cambia el estado de un reporte validado (no rechazado ni pendiente de validación).
-        if ($report->validation_status !== 'valido') {
-            abort(409, 'Solo se puede cambiar el estado de un reporte validado.');
-        }
+        // Lectura, chequeo y escritura bajo un mismo bloqueo de fila: si otro admin modera el
+        // reporte (p. ej. lo devuelve a pendiente) mientras tanto, este request ve el estado nuevo.
+        $report = DB::transaction(function () use ($id, $data, $adminId) {
+            $report = Report::whereKey($id)->lockForUpdate()->firstOrFail();
 
-        $report->status = $data['status'];
-        $report->status_updated_by = $request->user()->id;
-        $report->status_updated_at = now();
-        $report->save();
+            // Solo se cambia el estado de un reporte validado (no rechazado ni pendiente de validación).
+            if ($report->validation_status !== 'valido') {
+                abort(409, 'Solo se puede cambiar el estado de un reporte validado.');
+            }
+
+            $report->status = $data['status'];
+            $report->status_updated_by = $adminId;
+            $report->status_updated_at = now();
+            $report->save();
+
+            return $report;
+        });
 
         $uid = $request->user()->id;
         $report = $this->withReportData(Report::query(), $uid)->with('statusUpdatedBy:id,name')->findOrFail($report->id);
@@ -151,16 +191,20 @@ class ReportController extends Controller
      */
     public function version()
     {
-        $reports = DB::table('reports')->selectRaw('COUNT(*) as total, MAX(id) as max_id, MAX(updated_at) as updated')->first();
+        // Suma de timestamps y de zone_id: detectan lo que COUNT/MAX no ven (dos cambios en el mismo
+        // segundo, o `zones:assign`, que cambia zone_id sin tocar updated_at).
+        $epoch = DB::getDriverName() === 'sqlite'
+            ? "CAST(strftime('%s', updated_at) AS INTEGER)"
+            : 'UNIX_TIMESTAMP(updated_at)';
+        $reports = DB::table('reports')->selectRaw(
+            "COUNT(*) as total, MAX(id) as max_id, MAX(updated_at) as updated, SUM(COALESCE(zone_id, 0)) as zones, SUM(COALESCE($epoch, 0)) as epochs"
+        )->first();
         $confirmations = DB::table('confirmations')->selectRaw('COUNT(*) as total, MAX(id) as max_id')->first();
-        // updated_at tiene precisión de segundo: si otro reporte cambia en el mismo segundo que el
-        // último sondeo, MAX no varía pero sí cuántos reportes tienen ese updated_at.
-        $atLatest = $reports->updated === null ? 0
-            : DB::table('reports')->where('updated_at', $reports->updated)->count();
 
         return response()->json([
             'version' => sha1(json_encode([
-                (int) $reports->total, (int) $reports->max_id, (string) $reports->updated, $atLatest,
+                (int) $reports->total, (int) $reports->max_id, (string) $reports->updated,
+                (int) $reports->zones, (int) $reports->epochs,
                 (int) $confirmations->total, (int) $confirmations->max_id,
             ])),
         ]);
@@ -172,6 +216,8 @@ class ReportController extends Controller
         $points = DB::table('reports')
             ->leftJoin('zones', 'zones.id', '=', 'reports.zone_id')
             ->where('reports.validation_status', 'valido')
+            ->orderByDesc('reports.id')
+            ->limit(self::HEATMAP_LIMIT)
             ->get(['reports.latitude', 'reports.longitude', 'zones.id as zone_id', 'zones.name as zone_name']);
 
         return response()->json($points->map(fn ($point) => [

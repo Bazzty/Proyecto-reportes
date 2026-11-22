@@ -39,6 +39,7 @@ export default function NewReportScreen({ navigation, route = {} }) {
   const [showPicker, setShowPicker]         = useState(false);
   const pickerRef = useRef(null);
   const scrollRef = useRef(null);
+  const submittingRef = useRef(false);
 
   const keyboardHeight = useKeyboardHeight();
   const { location, locating, error: locationError, permanentlyDenied, refresh: refreshLocation } = useAutoLocation();
@@ -90,41 +91,54 @@ export default function NewReportScreen({ navigation, route = {} }) {
   };
 
   const handleTakePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permiso denegado', 'Se necesita acceso a la cámara.');
-      return;
+    try {
+      const { status, canAskAgain } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permiso denegado',
+          canAskAgain === false
+            ? 'Ve a Configuración > Lago en línea y activa el acceso a la cámara.'
+            : 'Se necesita acceso a la cámara.'
+        );
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.7,
+      });
+      if (!result.canceled) setPhoto(await toJpeg(result.assets[0]));
+    } catch {
+      Alert.alert('Error', 'No se pudo procesar la foto.');
     }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      quality: 0.7,
-    });
-    if (!result.canceled) setPhoto(await toJpeg(result.assets[0]));
   };
 
   const handlePickFromGallery = async () => {
-    const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permiso denegado',
-        canAskAgain
-          ? 'Se necesita acceso a la galería.'
-          : 'Ve a Configuración > Lago en línea y activa el acceso a fotos.'
-      );
-      return;
+    try {
+      const { status, canAskAgain } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permiso denegado',
+          canAskAgain
+            ? 'Se necesita acceso a la galería.'
+            : 'Ve a Configuración > Lago en línea y activa el acceso a fotos.'
+        );
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 1,
+        allowsEditing: false,
+      });
+      if (!result.canceled) setPhoto(await toJpeg(result.assets[0]));
+    } catch {
+      Alert.alert('Error', 'No se pudo procesar la foto.');
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 1,
-      allowsEditing: false,
-    });
-    if (!result.canceled) setPhoto(await toJpeg(result.assets[0]));
   };
 
   const saveOffline = async (clientUuid) => {
     try {
       await enqueue({
-        description,
+        description: description.trim(),
         latitude: effectiveLocation.latitude,
         longitude: effectiveLocation.longitude,
         categoryId,
@@ -147,19 +161,23 @@ export default function NewReportScreen({ navigation, route = {} }) {
     if (!description.trim()){ Alert.alert('Falta descripción', 'Escribe una descripción.'); return; }
     if (!categoryId)        { Alert.alert('Falta categoría', 'Selecciona una categoría.');   return; }
 
+    // Guarda síncrona: evita que dos toques rápidos generen dos reportes (state llega tarde).
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+
     // Se genera una sola vez para el intento online y su eventual reenvío offline,
     // así el backend deduplica con client_uuid si el POST falla sin respuesta.
     const clientUuid = randomUUID();
 
-    if (!isConnected) {
-      await saveOffline(clientUuid);
-      return;
-    }
-
     setLoading(true);
     try {
+      if (!isConnected) {
+        await saveOffline(clientUuid);
+        return;
+      }
+
       const form = new FormData();
-      form.append('description', description);
+      form.append('description', description.trim());
       form.append('latitude',    String(effectiveLocation.latitude));
       form.append('longitude',   String(effectiveLocation.longitude));
       form.append('category_id', String(categoryId));
@@ -198,6 +216,7 @@ export default function NewReportScreen({ navigation, route = {} }) {
         || 'No se pudo enviar el reporte.';
       Alert.alert('Error', message);
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };

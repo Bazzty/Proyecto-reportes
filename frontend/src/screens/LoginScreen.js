@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { setAuthToken } from '../services/api';
 import { claimQueue } from '../services/offlineQueue';
+import { saveToken } from '../services/tokenStorage';
 import { isConnectionError, CONNECTION_ERROR_MESSAGE } from '../services/apiConfig';
 import useKeyboardHeight from '../hooks/useKeyboardHeight';
 
@@ -29,18 +30,20 @@ export default function LoginScreen({ navigation }) {
   };
 
   const handleLogin = async () => {
-    if (!email || !password) {
+    if (!email.trim() || !password) {
       Alert.alert('Error', 'Por favor completa todos los campos.');
       return;
     }
 
     setLoading(true);
+    let serverOk = false;
     try {
-      const response = await api.post('/login', { email, password });
+      const response = await api.post('/login', { email: email.trim(), password });
+      serverOk = true;
       const { token, user } = response.data;
 
+      await saveToken(token);
       await AsyncStorage.multiSet([
-        ['token', token],
         ['userName', user.name],
         ['userId', String(user.id)],
         ['isAdmin', user.is_admin ? '1' : '0'],
@@ -53,9 +56,12 @@ export default function LoginScreen({ navigation }) {
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (error) {
       // Sin respuesta no son credenciales malas: no se llegó al servidor.
-      const message = isConnectionError(error)
-        ? CONNECTION_ERROR_MESSAGE
-        : error.response?.data?.message || 'Credenciales incorrectas.';
+      // Si el servidor aceptó el login, el fallo es del guardado local, no de la conexión.
+      const message = serverOk
+        ? 'No se pudo guardar la sesión en este dispositivo.'
+        : isConnectionError(error)
+          ? CONNECTION_ERROR_MESSAGE
+          : error.response?.data?.message || 'Credenciales incorrectas.';
       Alert.alert('Error al iniciar sesión', message);
     } finally {
       setLoading(false);
@@ -112,6 +118,8 @@ export default function LoginScreen({ navigation }) {
         <TouchableOpacity
           style={styles.eyeButton}
           testID="toggle-password"
+          accessibilityRole="button"
+          accessibilityLabel={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
           onPressIn={() => setShowPassword(true)}
           onPressOut={() => setShowPassword(false)}
         >

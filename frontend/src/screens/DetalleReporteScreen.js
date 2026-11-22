@@ -9,6 +9,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
+import { getToken } from '../services/tokenStorage';
 import { REPORT_STATUSES, reportDisplayStatus, isValidated } from '../constants/reports';
 
 // Gris del botón "Yo también lo vi" mientras espera la respuesta del servidor.
@@ -66,7 +67,10 @@ function DetalleReporte({ route, navigation }) {
   const listRef = useRef(null);
 
   useEffect(() => {
-    AsyncStorage.multiGet(['token', 'userId', 'isAdmin']).then(([[, token], [, uid], [, admin]]) => {
+    Promise.all([
+      getToken().catch(() => null),
+      AsyncStorage.multiGet(['userId', 'isAdmin']),
+    ]).then(([token, [[, uid], [, admin]]]) => {
       setIsGuest(!token);
       setMyUserId(uid ? Number(uid) : null);
       setIsAdmin(admin === '1');
@@ -186,8 +190,21 @@ function DetalleReporte({ route, navigation }) {
         validation_status: data.validation_status,
         rejection_reason: data.rejection_reason,
       }));
-    } catch {
-      Alert.alert('Error', 'No se pudo actualizar la validación del reporte.');
+      return true;
+    } catch (error) {
+      if (error.response?.status === 409) {
+        // Otro admin ya resolvió el reporte: se recarga para mostrar su estado actual.
+        Alert.alert('Error', 'El reporte cambió mientras lo revisabas. Se recargó con su estado actual.');
+        try {
+          const { data } = await api.get(`/reports/${reportId}`);
+          setReport(data);
+        } catch {
+          // Si falla la recarga se mantiene lo mostrado; el admin puede volver a abrir el reporte.
+        }
+      } else {
+        Alert.alert('Error', 'No se pudo actualizar la validación del reporte.');
+      }
+      return false;
     }
   };
 
@@ -199,9 +216,11 @@ function DetalleReporte({ route, navigation }) {
     }
     setSavingValidation(true);
     try {
-      await handleValidation('rechazado', trimmed);
-      setRejecting(false);
-      setReason('');
+      const ok = await handleValidation('rechazado', trimmed);
+      if (ok) {
+        setRejecting(false);
+        setReason('');
+      }
     } finally {
       setSavingValidation(false);
     }

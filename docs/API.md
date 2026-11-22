@@ -45,9 +45,9 @@ No requiere token.
 **Response 422 — Validación fallida:**
 ```json
 {
-  "message": "The email has already been taken.",
+  "message": "El correo ya está registrado.",
   "errors": {
-    "email": ["The email has already been taken."]
+    "email": ["El correo ya está registrado."]
   }
 }
 ```
@@ -90,7 +90,7 @@ No requiere token.
 }
 ```
 
-**Response 429 — Demasiados intentos:** máximo 5 intentos de login por minuto por combinación email + IP. Esperar el tiempo indicado en el header `Retry-After`.
+**Response 429 — Demasiados intentos:** máximo 5 intentos de login por minuto por combinación email + IP y, además, 30 por minuto por IP en total (aunque se prueben emails distintos). Esperar el tiempo indicado en el header `Retry-After`.
 
 ---
 
@@ -115,7 +115,7 @@ Requiere token.
 ```
 GET /reports
 ```
-No requiere token. Devuelve solo reportes validados (`validation_status = "valido"`). Si se envía token, se calcula `confirmed_by_me` y se incluyen también los reportes **pendientes del propio usuario** (nunca los rechazados ni los pendientes de otros).
+No requiere token. Devuelve solo reportes validados (`validation_status = "valido"`). Si se envía token, se calcula `confirmed_by_me` y se incluyen también los reportes **pendientes del propio usuario** (nunca los rechazados ni los pendientes de otros). Devuelve como máximo los **2000 reportes más recientes**.
 
 **Response 200:**
 ```json
@@ -127,10 +127,14 @@ No requiere token. Devuelve solo reportes validados (`validation_status = "valid
     "longitude": -70.6483,
     "photo_url": "http://localhost:8000/storage/photos/reporte_1.jpg",
     "status": "Pendiente",
+    "validation_status": "valido",
+    "rejection_reason": null,
+    "validated_at": "2026-06-05T13:00:00.000000Z",
     "category": {
       "id": 1,
       "name": "basura"
     },
+    "zone": { "id": 1, "name": "Puerto Varas" },
     "user": {
       "id": 1,
       "name": "Bastian Contreras"
@@ -159,7 +163,7 @@ El reporte nace siempre con `validation_status = "pendiente"`, también si lo cr
 | latitude | number | Sí |
 | longitude | number | Sí |
 | category_id | integer | Sí |
-| photo | file (jpg/png, max 5MB) | Sí |
+| photo | file (jpeg, jpg, png, webp o gif; max 5MB) | Sí |
 | client_uuid | uuid | No |
 
 > **Idempotencia:** si se repite el mismo `client_uuid` (p. ej. reintento de la cola offline), el endpoint devuelve **200** con el reporte original en lugar de crear otro distinto; no compara el resto del payload. Con un `client_uuid` nuevo responde **201**.
@@ -173,10 +177,14 @@ El reporte nace siempre con `validation_status = "pendiente"`, también si lo cr
   "longitude": -70.6500,
   "photo_url": "http://localhost:8000/storage/photos/reporte_2.jpg",
   "status": "Pendiente",
+  "validation_status": "valido",
+  "rejection_reason": null,
+  "validated_at": "2026-06-05T13:00:00.000000Z",
   "category": {
     "id": 2,
     "name": "escombros"
   },
+  "zone": { "id": 1, "name": "Puerto Varas" },
   "user": {
     "id": 1,
     "name": "Bastian Contreras"
@@ -187,12 +195,14 @@ El reporte nace siempre con `validation_status = "pendiente"`, también si lo cr
 }
 ```
 
+**Response 429:** máximo 10 reportes por minuto y 60 por hora por usuario. La cola offline de la app reintenta más tarde.
+
 **Response 422 — Validación fallida:**
 ```json
 {
-  "message": "The photo field is required.",
+  "message": "El campo foto es obligatorio.",
   "errors": {
-    "photo": ["The photo field is required."]
+    "photo": ["El campo foto es obligatorio."]
   }
 }
 ```
@@ -214,10 +224,14 @@ No requiere token (si se envía, se calcula `confirmed_by_me`).
   "longitude": -70.6483,
   "photo_url": "http://localhost:8000/storage/photos/reporte_1.jpg",
   "status": "Pendiente",
+  "validation_status": "valido",
+  "rejection_reason": null,
+  "validated_at": "2026-06-05T13:00:00.000000Z",
   "category": {
     "id": 1,
     "name": "basura"
   },
+  "zone": { "id": 1, "name": "Puerto Varas" },
   "user": {
     "id": 1,
     "name": "Bastian Contreras"
@@ -241,7 +255,7 @@ No requiere token (si se envía, se calcula `confirmed_by_me`).
 ```
 GET /reports/heatmap
 ```
-No requiere token. Devuelve **un punto por reporte validado** (`latitude`, `longitude`) junto con su `zone` (`{ id, name }`, o `null` si el reporte no cae en ninguna zona). No agrupa: se mantiene la densidad y la agrupación visual por zona, si se necesita, la resuelve el cliente.
+No requiere token. Devuelve **un punto por reporte validado** (`latitude`, `longitude`) junto con su `zone` (`{ id, name }`, o `null` si el reporte no cae en ninguna zona). Devuelve como máximo **5000** puntos (los de los reportes más recientes). No agrupa: se mantiene la densidad y la agrupación visual por zona, si se necesita, la resuelve el cliente.
 
 **Response 200:**
 ```json
@@ -251,7 +265,7 @@ No requiere token. Devuelve **un punto por reporte validado** (`latitude`, `long
   { "latitude": -33.4569, "longitude": -70.6483, "zone": null }
 ]
 ```
-> Para asignar `zone` a los reportes ya existentes, ejecutá una vez tras el deploy: `php artisan db:seed --class=ZoneSeeder` (carga las zonas) y luego `php artisan zones:assign` (backfill).
+> Para asignar `zone` a los reportes ya existentes, ejecuta una vez tras el deploy: `php artisan db:seed --class=ZoneSeeder` (carga las zonas) y luego `php artisan zones:assign` (backfill).
 
 ---
 
@@ -259,7 +273,7 @@ No requiere token. Devuelve **un punto por reporte validado** (`latitude`, `long
 ```
 GET /reports/version
 ```
-Pública. Devuelve `{ "version": "<sha1>" }`, que cambia al crear, moderar o cambiar de estado un reporte y al confirmar o quitar una confirmación. La app la consulta en cada refresco (cada 5 s) y solo vuelve a pedir `/reports`, `/reports/heatmap` y `/user/reports` cuando cambió (o cada minuto como red de seguridad, o al recargar a mano).
+Pública. Devuelve `{ "version": "<sha1>" }`, que cambia al crear, moderar o cambiar de estado un reporte y al confirmar o quitar una confirmación, y al reasignar la zona de un reporte (`zones:assign`). La app la consulta en cada refresco (cada 5 s) y solo vuelve a pedir `/reports`, `/reports/heatmap` y `/user/reports` cuando cambió (o cada minuto como red de seguridad, o al recargar a mano).
 
 ---
 
@@ -267,7 +281,7 @@ Pública. Devuelve `{ "version": "<sha1>" }`, que cambia al crear, moderar o cam
 ```
 GET /user/reports
 ```
-Requiere token. Devuelve solo los reportes del usuario que hace la petición.
+Requiere token. Devuelve solo los reportes del usuario que hace la petición (en cualquier estado de validación, con el mismo formato que `GET /reports`), hasta un máximo de **500** (los más recientes).
 
 **Response 200:**
 ```json
@@ -279,10 +293,20 @@ Requiere token. Devuelve solo los reportes del usuario que hace la petición.
     "longitude": -70.6500,
     "photo_url": "http://localhost:8000/storage/photos/reporte_2.jpg",
     "status": "Pendiente",
+    "validation_status": "valido",
+    "rejection_reason": null,
+    "validated_at": "2026-06-05T13:00:00.000000Z",
     "category": {
       "id": 2,
       "name": "escombros"
     },
+    "zone": { "id": 1, "name": "Puerto Varas" },
+    "user": {
+      "id": 1,
+      "name": "Bastian Contreras"
+    },
+    "confirmations_count": 0,
+    "confirmed_by_me": true,
     "created_at": "2026-06-05T12:05:00Z"
   }
 ]
@@ -305,6 +329,8 @@ Requiere token de un **usuario administrador** (investigadores de "Más Azul"). 
 **Response 200:** mismo formato que el detalle de un reporte, con el `status` actualizado.
 
 **Response 403:** el usuario no es administrador.
+
+**Response 409:** el reporte no está validado (`validation_status` distinto de `valido`); solo se cambia el estado de reportes validados. La lectura, la comprobación y la escritura ocurren bajo un mismo bloqueo de fila.
 
 ---
 
@@ -371,7 +397,7 @@ Opcional al pasar a `valido` o `rechazado` (deshacer una moderación previa): `r
 
 **Response 200:** el reporte actualizado (incluye `validation_status`, `rejection_reason`, `validated_at`, `validated_by`, `status_updated_by`, `status_updated_at` y `auto_validated`).
 
-**Response 409 — El estado cambió mientras tanto:** otro admin ya modificó el reporte. La fila se bloquea dentro de una transacción (`SELECT … FOR UPDATE`) y se compara con `expected_validation_status`, así que dos admins simultáneos no pueden pisarse; recargá la lista y reintentá.
+**Response 409 — El estado cambió mientras tanto:** otro admin ya modificó el reporte. La fila se bloquea dentro de una transacción (`SELECT … FOR UPDATE`) y se compara con `expected_validation_status`, así que dos admins simultáneos no pueden pisarse; recarga la lista y reintenta.
 
 > **Visibilidad:** solo los reportes con `validation_status = "valido"` son públicos. Los `"pendiente"` y `"rechazado"` **no** aparecen en el heatmap ni, para otros usuarios, en `GET /reports`; su detalle (`GET /reports/{id}`), sus comentarios (`GET/POST /reports/{id}/comments`) y su confirmación (`POST /reports/{id}/confirm`) devuelven `404` salvo para el autor o un administrador. Excepción: `GET /reports` con token incluye además los reportes **pendientes del propio usuario**, para que vea en el mapa el que acaba de enviar.
 
@@ -491,7 +517,7 @@ No requiere token.
 ```
 POST /reports/{id}/confirm
 ```
-Requiere token. Sin body. Alterna la confirmación del usuario sobre el reporte.
+Requiere token. Sin body. Alterna la confirmación del usuario sobre el reporte. Límite: 30 por minuto (`429` al superarlo).
 
 **Reglas acordadas por el equipo:**
 - Cada usuario confirma un reporte **una sola vez** (restricción `unique(user_id, report_id)` en la tabla `confirmations`).
@@ -512,7 +538,7 @@ Requiere token. Sin body. Alterna la confirmación del usuario sobre el reporte.
 
 **Response 401 — Sin token o token inválido:**
 ```json
-{ "message": "Unauthenticated." }
+{ "message": "No autenticado." }
 ```
 
 **Response 403 — Es tu propio reporte:**
@@ -520,7 +546,7 @@ Requiere token. Sin body. Alterna la confirmación del usuario sobre el reporte.
 { "message": "No puedes confirmar tu propio reporte." }
 ```
 
-**Response 404 — El reporte no existe.**
+**Response 404 — El reporte no existe o no es visible:** `{ "message": "Reporte no encontrado." }` (el mismo cuerpo en ambos casos).
 
 ---
 
@@ -528,7 +554,7 @@ Requiere token. Sin body. Alterna la confirmación del usuario sobre el reporte.
 ```
 GET /reports/{id}/comments
 ```
-No requiere token. Ordenados del más nuevo al más antiguo.
+No requiere token. Ordenados del más nuevo al más antiguo. Devuelve como máximo los **200 comentarios más recientes**.
 
 **Response 200:**
 ```json
@@ -548,7 +574,7 @@ No requiere token. Ordenados del más nuevo al más antiguo.
 ```
 POST /reports/{id}/comments
 ```
-Requiere token.
+Requiere token. Límite: 10 por minuto (`429` al superarlo).
 
 **Request:**
 ```json
@@ -578,8 +604,8 @@ Requiere token.
 |---|---|
 | 200 | OK — consulta exitosa |
 | 201 | Created — recurso creado |
-| 401 | Unauthorized — token inválido o credenciales incorrectas |
+| 401 | Unauthorized — token inválido o credenciales incorrectas (sin token: `{ "message": "No autenticado." }`) |
 | 403 | Forbidden — acción no permitida (ej: confirmar tu propio reporte) |
-| 404 | Not Found — recurso no existe (también un id no numérico, p. ej. `/reports/abc`) |
-| 422 | Unprocessable — datos de entrada inválidos |
-| 429 | Too Many Requests — límite de intentos en login/registro |
+| 404 | Not Found — recurso no existe (también un id no numérico, p. ej. `/reports/abc`). Cuerpo `{ "message": "Reporte no encontrado." }` en rutas de reportes y `"Recurso no encontrado."` en el resto; un reporte oculto responde igual que uno inexistente |
+| 422 | Unprocessable — datos de entrada inválidos (los mensajes de `message`/`errors` vienen en español) |
+| 429 | Too Many Requests — límite de intentos en login (5 por minuto por email + IP y 30 por minuto por IP) y registro (10 por minuto por IP), de confirmaciones (30 por minuto), de comentarios (10 por minuto), de reportes creados (10 por minuto y 60 por hora por usuario) o de lecturas públicas (600 por minuto por IP) |

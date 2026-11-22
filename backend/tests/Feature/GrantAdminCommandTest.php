@@ -51,4 +51,37 @@ class GrantAdminCommandTest extends TestCase
 
         $this->assertSame($before, User::count());
     }
+
+    public function test_revoke_on_a_non_admin_says_so_and_changes_nothing()
+    {
+        $user = User::factory()->create(['email' => 'ana@example.com']);
+        User::factory()->admin()->create();
+
+        $this->artisan('user:admin', ['email' => 'ana@example.com', '--revoke' => true])
+            ->expectsOutputToContain('El usuario no era admin.')
+            ->doesntExpectOutputToContain('Rol admin removido')
+            ->assertSuccessful();
+
+        $this->assertFalse($user->fresh()->isAdmin());
+    }
+
+    public function test_revoking_the_last_admin_warns_that_none_remain()
+    {
+        User::factory()->admin()->create(['email' => 'ana@example.com']);
+
+        $this->artisan('user:admin', ['email' => 'ana@example.com', '--revoke' => true])
+            ->expectsOutputToContain('Rol admin removido de ana@example.com.')
+            ->expectsOutputToContain('No queda ningún administrador.')
+            ->assertSuccessful();
+    }
+
+    public function test_revoking_one_of_several_admins_does_not_warn()
+    {
+        User::factory()->admin()->create(['email' => 'ana@example.com']);
+        User::factory()->admin()->create();
+
+        $this->artisan('user:admin', ['email' => 'ana@example.com', '--revoke' => true])
+            ->doesntExpectOutputToContain('No queda ningún administrador.')
+            ->assertSuccessful();
+    }
 }

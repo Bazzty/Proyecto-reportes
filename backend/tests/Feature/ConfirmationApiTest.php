@@ -8,6 +8,7 @@ use App\Models\Report;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -190,5 +191,25 @@ class ConfirmationApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('confirmations_count', 1)
             ->assertJsonPath('confirmed_by_me', false);
+    }
+
+    public function test_concurrent_duplicate_insert_returns_confirmed_instead_of_500()
+    {
+        $owner = User::factory()->create();
+        $reporter = User::factory()->create();
+        $report = $this->makeReport($owner);
+        Sanctum::actingAs($reporter);
+
+        // Simula la carrera: otro toggle del mismo usuario inserta la fila justo antes que este.
+        Confirmation::creating(function (Confirmation $confirmation) {
+            DB::table('confirmations')->insert([
+                'user_id' => $confirmation->user_id,
+                'report_id' => $confirmation->report_id,
+            ]);
+        });
+
+        $this->postJson("/api/reports/{$report->id}/confirm")
+            ->assertOk()
+            ->assertJsonPath('confirmed', true);
     }
 }

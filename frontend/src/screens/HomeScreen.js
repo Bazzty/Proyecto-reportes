@@ -296,7 +296,9 @@ export default function HomeScreen({ navigation, route }) {
       confirmText: 'Salir',
       destructive: true,
       onConfirm: async () => {
-        try { await api.post('/logout'); } catch {}
+        // Se lanza primero y sin esperar: axios toma el header de auth al construir la petición,
+        // antes de que clearSession lo borre, y un servidor lento no retrasa la salida.
+        api.post('/logout', null, { timeout: 3000 }).catch(() => {});
         // La cola, el snapshot y las notificaciones son por usuario: no deben sobrevivir
         // al cierre de sesión (si no, un segundo usuario vería datos del anterior).
         await clearSession();
@@ -446,6 +448,8 @@ export default function HomeScreen({ navigation, route }) {
           <TouchableOpacity
             style={styles.bell}
             testID="admin-button"
+            accessibilityRole="button"
+            accessibilityLabel="Panel de administración"
             onPress={() => navigation.navigate('AdminReports')}
           >
             <Ionicons name="shield-checkmark-outline" size={22} color="#0e7490" />
@@ -454,6 +458,8 @@ export default function HomeScreen({ navigation, route }) {
         <TouchableOpacity
           style={styles.bell}
           testID="notifications-button"
+          accessibilityRole="button"
+          accessibilityLabel="Notificaciones"
           onPress={() => { markAllRead(); setShowNotifications(true); }}
         >
           <Ionicons name="notifications-outline" size={22} color="#0e7490" />
@@ -537,6 +543,7 @@ export default function HomeScreen({ navigation, route }) {
       <TouchableOpacity
         style={[styles.locationButton, styles.refreshButton]}
         testID="refresh-button"
+        accessibilityRole="button"
         accessibilityLabel="Recargar mapa"
         onPress={handleRefresh}
         disabled={refreshing}
@@ -549,6 +556,8 @@ export default function HomeScreen({ navigation, route }) {
       {userLocation && (
         <TouchableOpacity
           style={styles.locationButton}
+          accessibilityRole="button"
+          accessibilityLabel="Centrar en mi ubicación"
           onPress={() => leafletRef.current?.centerOn(userLocation.latitude, userLocation.longitude, 15)}
         >
           <Ionicons name="locate" size={22} color="#0e7490" />
@@ -567,6 +576,8 @@ export default function HomeScreen({ navigation, route }) {
         <View style={styles.fabWrapper}>
           <TouchableOpacity
             style={styles.fab}
+            accessibilityRole="button"
+            accessibilityLabel="Crear reporte"
             onPress={() => isGuest ? handleGuestBlock('crear un reporte') : navigation.navigate('NewReport')}
           >
             <Ionicons name="add" size={36} color="white" />

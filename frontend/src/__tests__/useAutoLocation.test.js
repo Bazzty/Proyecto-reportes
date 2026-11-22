@@ -96,5 +96,39 @@ describe('useAutoLocation', () => {
 
     expect(result.current.location).toEqual({ latitude: 9, longitude: 9 });
   });
-});
 
+  describe('timeout de la posición actual', () => {
+    afterEach(() => jest.useRealTimers());
+
+    it('si getCurrentPositionAsync nunca responde, termina con error unavailable y permite reintentar', async () => {
+      jest.useFakeTimers();
+      Location.getCurrentPositionAsync.mockReturnValue(new Promise(() => {}));
+
+      const { result } = await renderHook(() => useAutoLocation());
+      await act(async () => { await jest.advanceTimersByTimeAsync(14000); });
+      expect(result.current.locating).toBe(true);
+
+      await act(async () => { await jest.advanceTimersByTimeAsync(1500); });
+      expect(result.current.locating).toBe(false);
+      expect(result.current.error).toBe('unavailable');
+
+      Location.getCurrentPositionAsync.mockResolvedValue({ coords: { latitude: 5, longitude: 6 } });
+      await act(async () => { await result.current.refresh(); });
+      expect(result.current.error).toBeNull();
+      expect(result.current.location).toEqual({ latitude: 5, longitude: 6 });
+    });
+
+    it('conserva la última conocida cuando se agota el tiempo', async () => {
+      jest.useFakeTimers();
+      Location.getLastKnownPositionAsync.mockResolvedValue({ coords: { latitude: 1, longitude: 2 } });
+      Location.getCurrentPositionAsync.mockReturnValue(new Promise(() => {}));
+
+      const { result } = await renderHook(() => useAutoLocation());
+      await act(async () => { await jest.advanceTimersByTimeAsync(15500); });
+
+      expect(result.current.locating).toBe(false);
+      expect(result.current.error).toBeNull();
+      expect(result.current.location).toEqual({ latitude: 1, longitude: 2 });
+    });
+  });
+});
