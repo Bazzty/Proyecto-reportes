@@ -15,6 +15,13 @@ class ReportController extends Controller
 {
     use FormatsReports;
 
+    // Topes duros (los más recientes) para que un listado no crezca sin límite; sin paginar para no romper APKs instalados.
+    private const INDEX_LIMIT = 2000;
+
+    private const USER_REPORTS_LIMIT = 500;
+
+    private const HEATMAP_LIMIT = 5000;
+
     public function index(Request $request)
     {
         // index y show son rutas públicas: el guard por defecto (web) no lee el Bearer.
@@ -22,11 +29,12 @@ class ReportController extends Controller
         // El mapa público muestra solo reportes validados; el autor ve además los suyos pendientes,
         // para no perder de vista el que acaba de enviar mientras espera moderación.
         $reports = $this->withReportData(Report::query(), $uid)
+            ->with('user:id,name')
             ->where(fn ($q) => $q->where('validation_status', 'valido')
                 ->when($uid, fn ($q) => $q->orWhere(fn ($q) => $q
                     ->where('user_id', $uid)
                     ->where('validation_status', 'pendiente'))))
-            ->latest()->latest('id')->get();
+            ->latest()->latest('id')->limit(self::INDEX_LIMIT)->get();
 
         return response()->json($reports->map(fn (Report $report) => $this->formatReport($report, $uid)));
     }
@@ -113,7 +121,9 @@ class ReportController extends Controller
     public function userReports(Request $request)
     {
         $uid = $request->user()->id;
-        $reports = $this->withReportData($request->user()->reports(), $uid)->latest()->latest('id')->get();
+        $reports = $this->withReportData($request->user()->reports(), $uid)
+            ->with('user:id,name')
+            ->latest()->latest('id')->limit(self::USER_REPORTS_LIMIT)->get();
 
         return response()->json($reports->map(fn (Report $report) => $this->formatReport($report, $uid)));
     }
@@ -124,17 +134,25 @@ class ReportController extends Controller
             'status' => ['required', Rule::in(['Pendiente', 'En Progreso', 'Resuelto'])],
         ]);
 
-        $report = Report::findOrFail($id);
+        $adminId = $request->user()->id;
 
-        // Solo se cambia el estado de un reporte validado (no rechazado ni pendiente de validación).
-        if ($report->validation_status !== 'valido') {
-            abort(409, 'Solo se puede cambiar el estado de un reporte validado.');
-        }
+        // Lectura, chequeo y escritura bajo un mismo bloqueo de fila: si otro admin modera el
+        // reporte (p. ej. lo devuelve a pendiente) mientras tanto, este request ve el estado nuevo.
+        $report = DB::transaction(function () use ($id, $data, $adminId) {
+            $report = Report::whereKey($id)->lockForUpdate()->firstOrFail();
 
-        $report->status = $data['status'];
-        $report->status_updated_by = $request->user()->id;
-        $report->status_updated_at = now();
-        $report->save();
+            // Solo se cambia el estado de un reporte validado (no rechazado ni pendiente de validación).
+            if ($report->validation_status !== 'valido') {
+                abort(409, 'Solo se puede cambiar el estado de un reporte validado.');
+            }
+
+            $report->status = $data['status'];
+            $report->status_updated_by = $adminId;
+            $report->status_updated_at = now();
+            $report->save();
+
+            return $report;
+        });
 
         $uid = $request->user()->id;
         $report = $this->withReportData(Report::query(), $uid)->with('statusUpdatedBy:id,name')->findOrFail($report->id);
@@ -168,6 +186,8 @@ class ReportController extends Controller
         $points = DB::table('reports')
             ->leftJoin('zones', 'zones.id', '=', 'reports.zone_id')
             ->where('reports.validation_status', 'valido')
+            ->orderByDesc('reports.id')
+            ->limit(self::HEATMAP_LIMIT)
             ->get(['reports.latitude', 'reports.longitude', 'zones.id as zone_id', 'zones.name as zone_name']);
 
         return response()->json($points->map(fn ($point) => [

@@ -45,9 +45,9 @@ No requiere token.
 **Response 422 — Validación fallida:**
 ```json
 {
-  "message": "The email has already been taken.",
+  "message": "El correo ya está registrado.",
   "errors": {
-    "email": ["The email has already been taken."]
+    "email": ["El correo ya está registrado."]
   }
 }
 ```
@@ -115,7 +115,7 @@ Requiere token.
 ```
 GET /reports
 ```
-No requiere token. Devuelve solo reportes validados (`validation_status = "valido"`). Si se envía token, se calcula `confirmed_by_me` y se incluyen también los reportes **pendientes del propio usuario** (nunca los rechazados ni los pendientes de otros).
+No requiere token. Devuelve solo reportes validados (`validation_status = "valido"`). Si se envía token, se calcula `confirmed_by_me` y se incluyen también los reportes **pendientes del propio usuario** (nunca los rechazados ni los pendientes de otros). Devuelve como máximo los **2000 reportes más recientes**.
 
 **Response 200:**
 ```json
@@ -190,9 +190,9 @@ El reporte nace siempre con `validation_status = "pendiente"`, también si lo cr
 **Response 422 — Validación fallida:**
 ```json
 {
-  "message": "The photo field is required.",
+  "message": "El campo foto es obligatorio.",
   "errors": {
-    "photo": ["The photo field is required."]
+    "photo": ["El campo foto es obligatorio."]
   }
 }
 ```
@@ -241,7 +241,7 @@ No requiere token (si se envía, se calcula `confirmed_by_me`).
 ```
 GET /reports/heatmap
 ```
-No requiere token. Devuelve **un punto por reporte validado** (`latitude`, `longitude`) junto con su `zone` (`{ id, name }`, o `null` si el reporte no cae en ninguna zona). No agrupa: se mantiene la densidad y la agrupación visual por zona, si se necesita, la resuelve el cliente.
+No requiere token. Devuelve **un punto por reporte validado** (`latitude`, `longitude`) junto con su `zone` (`{ id, name }`, o `null` si el reporte no cae en ninguna zona). Devuelve como máximo **5000** puntos (los de los reportes más recientes). No agrupa: se mantiene la densidad y la agrupación visual por zona, si se necesita, la resuelve el cliente.
 
 **Response 200:**
 ```json
@@ -267,7 +267,7 @@ Pública. Devuelve `{ "version": "<sha1>" }`, que cambia al crear, moderar o cam
 ```
 GET /user/reports
 ```
-Requiere token. Devuelve solo los reportes del usuario que hace la petición.
+Requiere token. Devuelve solo los reportes del usuario que hace la petición, hasta un máximo de **500** (los más recientes).
 
 **Response 200:**
 ```json
@@ -512,7 +512,7 @@ Requiere token. Sin body. Alterna la confirmación del usuario sobre el reporte.
 
 **Response 401 — Sin token o token inválido:**
 ```json
-{ "message": "Unauthenticated." }
+{ "message": "No autenticado." }
 ```
 
 **Response 403 — Es tu propio reporte:**
@@ -520,7 +520,7 @@ Requiere token. Sin body. Alterna la confirmación del usuario sobre el reporte.
 { "message": "No puedes confirmar tu propio reporte." }
 ```
 
-**Response 404 — El reporte no existe.**
+**Response 404 — El reporte no existe o no es visible:** `{ "message": "Reporte no encontrado." }` (el mismo cuerpo en ambos casos).
 
 ---
 
@@ -528,7 +528,7 @@ Requiere token. Sin body. Alterna la confirmación del usuario sobre el reporte.
 ```
 GET /reports/{id}/comments
 ```
-No requiere token. Ordenados del más nuevo al más antiguo.
+No requiere token. Ordenados del más nuevo al más antiguo. Devuelve como máximo los **200 comentarios más recientes**.
 
 **Response 200:**
 ```json
@@ -578,8 +578,8 @@ Requiere token.
 |---|---|
 | 200 | OK — consulta exitosa |
 | 201 | Created — recurso creado |
-| 401 | Unauthorized — token inválido o credenciales incorrectas |
+| 401 | Unauthorized — token inválido o credenciales incorrectas (sin token: `{ "message": "No autenticado." }`) |
 | 403 | Forbidden — acción no permitida (ej: confirmar tu propio reporte) |
-| 404 | Not Found — recurso no existe (también un id no numérico, p. ej. `/reports/abc`) |
-| 422 | Unprocessable — datos de entrada inválidos |
+| 404 | Not Found — recurso no existe (también un id no numérico, p. ej. `/reports/abc`). Cuerpo `{ "message": "Reporte no encontrado." }` en rutas de reportes y `"Recurso no encontrado."` en el resto; un reporte oculto responde igual que uno inexistente |
+| 422 | Unprocessable — datos de entrada inválidos (los mensajes de `message`/`errors` vienen en español) |
 | 429 | Too Many Requests — límite de intentos en login/registro, de reportes creados (10 por minuto y 60 por hora por usuario) o de lecturas públicas (600 por minuto por IP) |

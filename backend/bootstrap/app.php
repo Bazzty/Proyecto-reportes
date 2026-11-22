@@ -1,11 +1,13 @@
 <?php
 
 use App\Http\Middleware\EnsureUserIsAdmin;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -32,6 +34,22 @@ return Application::configure(basePath: dirname(__DIR__))
                     429,
                     $e->getHeaders()
                 );
+            }
+        });
+
+        // 404 uniforme: un id inexistente (ModelNotFoundException llega aquí como NotFoundHttpException)
+        // y un reporte oculto (abort(404)) devuelven el mismo cuerpo, sin filtrar "No query results".
+        $exceptions->render(function (NotFoundHttpException $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                $message = $request->is('api/*reports*') ? 'Reporte no encontrado.' : 'Recurso no encontrado.';
+
+                return response()->json(['message' => $message], 404);
+            }
+        });
+
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json(['message' => 'No autenticado.'], 401);
             }
         });
     })->create();
