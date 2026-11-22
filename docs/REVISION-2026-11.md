@@ -26,36 +26,44 @@ Estado: `pendiente` = aún no corregido · `corregido` · `descartado`.
 
 | id | orig | eje | archivo | resumen | estado |
 |---|---|---|---|---|---|
-| M-1 | R2-1 | seguridad | `database/seeders/ReportSeeder.php` | El guard de producción solo está en `DatabaseSeeder`: `--class=ReportSeeder` crea el admin demo `password`. Prod usa `APP_ENV=production` → riesgo solo por uso manual | pendiente |
-| M-2 | R1-3 | funcionamiento | `AppServiceProvider.php:31-32` | `email` como array en login → "Array to string" → 500 en vez de 422 | pendiente |
-| M-3 | R1-4 | seguridad | `AppServiceProvider.php:31-32` | Sin tope por IP en login: password spraying sobre N emails | pendiente |
-| M-4 | R1-6 | privacidad | `ReportController.php:75` | EXIF (GPS del teléfono) servido públicamente; fotos de rechazados accesibles por URL | pendiente |
-| M-5 | R1-7 | contrato | `docs/API.md` | Docs desalineados (MIME, campos de respuesta, 409 de status, límites 429, voseo) | pendiente |
-| M-6 | R2-3 | caché | `ZoneResolver.php:42`, `AssignZones.php:23` | `zones:assign` no cambia la huella de `/version` → los APK no ven las zonas nuevas | pendiente |
-| M-7 | R2-4 | caché | `ReportController.php:134-143` | Dos cambios en el mismo segundo → misma versión | pendiente |
-| M-8 | R2-5 | migración | `2026_10_30_000001_scope_client_uuid_unique_to_user.php` | `down()` puede fallar en MySQL (índice usado por la FK) | pendiente |
-| M-9 | R2-6 | migración | `2026_10_15_200200_add_bounds_to_zones_table.php` | Migración acoplada al modelo `Zone` | pendiente |
-| M-10 | R2-8 | integridad | `AuditReportPhotos.php` | Fotos huérfanas sin detectar ni limpiar | pendiente |
-| M-11 | R2-9 | integridad | `database/audit.sql` | No verifica los invariantes de moderación | pendiente |
-| M-12 | R2-10 | tests | `DatabaseIntegrityTest.php` | Skip innecesario en SQLite; `rejection_reason` máx. 500 vs columna de 255 → 500 en MySQL | pendiente |
-| M-13 | R2-11 | tests | `backend/tests/**` | Huecos: rollback, ReportSeeder, concurrencia de confirmaciones, GrantAdmin | pendiente |
-| M-14 | R2-12 | UX consola | `GrantAdmin.php:29-33` | `--revoke` dice "removido" aunque no fuera admin; no advierte al quitar el último admin | pendiente |
-| M-15 | R3-6 | sesión | `frontend/src/services/api.js:34-38` | 401 obsoleto del token A cierra la sesión recién abierta de B | pendiente |
-| M-16 | R3-7 | UX GPS | `hooks/useAutoLocation.js:38` | Sin timeout: "Obteniendo ubicación…" infinito | pendiente |
-| M-17 | R3-8 | funcionamiento | `NewReportScreen.js:92-121` | Errores de cámara o conversión sin capturar; sin "Abrir Ajustes"; descripción enviada sin `trim` | pendiente |
-| M-18 | R3-9 | UX | `MyReportsScreen.js:294` | La cuadrícula oculta los pendientes y fallidos de la cola | pendiente |
-| M-19 | R3-10 | rendimiento | `MyReportsScreen.js:57-79` | Cargas concurrentes sin guarda; spinner de pantalla completa en cada `emit` | pendiente |
-| M-20 | R3-11 | UX | `App.js:48-52` | Bienvenida mínima de 2,5 s en cada arranque | pendiente |
-| M-21 | R3-12 | funcionamiento | `offlineQueue.js:181-196` | Con el servidor caído recorre toda la cola (60 s por ítem); un 429 no corta el bucle | pendiente |
-| M-22 | R3-13 | UX | `LoginScreen.js`, `RegisterScreen.js` | Fallo de `saveToken` mostrado como error de red; email sin `trim` | pendiente |
-| M-23 | R3-14 | UX | `HomeScreen.js:288-300` | Logout offline espera 15 s antes de limpiar la sesión | pendiente |
-| M-24 | R3-15 | accesibilidad | `HomeScreen.js`, Login/Register | Botones de solo ícono sin `accessibilityLabel` | pendiente |
-| M-25 | R3-16 | config | `eas.json:6-11` | Perfil `development` sin URL (cae a localhost HTTP con cleartext desactivado) | pendiente |
-| M-26 | R3-17 | robustez | `leafletMapHtml.js:222,263` | `id` concatenado en `onclick` sin forzar a número | pendiente |
-| M-27 | R3 | tests | `frontend/src/__tests__` | Sin tests de `useOfflineSync` ni `useReportsPolling`; `leafletMapHtml.test` solo usa `toContain` | pendiente |
+| M-1 | R2-1 | seguridad | `database/seeders/ReportSeeder.php` | El guard de producción solo está en `DatabaseSeeder`: `--class=ReportSeeder` crea el admin demo `password`. Prod usa `APP_ENV=production` → riesgo solo por uso manual | corregido |
+| M-2 | R1-3 | funcionamiento | `AppServiceProvider.php:31-32` | `email` como array en login → "Array to string" → 500 en vez de 422 | corregido |
+| M-3 | R1-4 | seguridad | `AppServiceProvider.php:31-32` | Sin tope por IP en login: password spraying sobre N emails | corregido |
+| M-4 | R1-6 | privacidad | `ReportController.php:75` | EXIF (GPS del teléfono) servido públicamente; fotos de rechazados accesibles por URL | pendiente: el GD del contenedor no soporta JPEG; la app ya re-codifica a JPEG sin EXIF |
+| M-5 | R1-7 | contrato | `docs/API.md` | Docs desalineados (MIME, campos de respuesta, 409 de status, límites 429, voseo) | corregido |
+| M-6 | R2-3 | caché | `ZoneResolver.php:42`, `AssignZones.php:23` | `zones:assign` no cambia la huella de `/version` → los APK no ven las zonas nuevas | corregido |
+| M-7 | R2-4 | caché | `ReportController.php:134-143` | Dos cambios en el mismo segundo → misma versión | corregido |
+| M-8 | R2-5 | migración | `2026_10_30_000001_scope_client_uuid_unique_to_user.php` | `down()` puede fallar en MySQL (índice usado por la FK) | corregido |
+| M-9 | R2-6 | migración | `2026_10_15_200200_add_bounds_to_zones_table.php` | Migración acoplada al modelo `Zone` | no corregido: exige editar una migración aplicada |
+| M-10 | R2-8 | integridad | `AuditReportPhotos.php` | Fotos huérfanas sin detectar ni limpiar | corregido |
+| M-11 | R2-9 | integridad | `database/audit.sql` | No verifica los invariantes de moderación | corregido |
+| M-12 | R2-10 | tests | `DatabaseIntegrityTest.php` | Skip innecesario en SQLite; `rejection_reason` máx. 500 vs columna de 255 → 500 en MySQL | corregido |
+| M-13 | R2-11 | tests | `backend/tests/**` | Huecos: rollback, ReportSeeder, concurrencia de confirmaciones, GrantAdmin | corregido |
+| M-14 | R2-12 | UX consola | `GrantAdmin.php:29-33` | `--revoke` dice "removido" aunque no fuera admin; no advierte al quitar el último admin | corregido |
+| M-15 | R3-6 | sesión | `frontend/src/services/api.js:34-38` | 401 obsoleto del token A cierra la sesión recién abierta de B | corregido |
+| M-16 | R3-7 | UX GPS | `hooks/useAutoLocation.js:38` | Sin timeout: "Obteniendo ubicación…" infinito | corregido |
+| M-17 | R3-8 | funcionamiento | `NewReportScreen.js:92-121` | Errores de cámara o conversión sin capturar; sin "Abrir Ajustes"; descripción enviada sin `trim` | corregido |
+| M-18 | R3-9 | UX | `MyReportsScreen.js:294` | La cuadrícula oculta los pendientes y fallidos de la cola | corregido |
+| M-19 | R3-10 | rendimiento | `MyReportsScreen.js:57-79` | Cargas concurrentes sin guarda; spinner de pantalla completa en cada `emit` | corregido |
+| M-20 | R3-11 | UX | `App.js:48-52` | Bienvenida mínima de 2,5 s en cada arranque | corregido |
+| M-21 | R3-12 | funcionamiento | `offlineQueue.js:181-196` | Con el servidor caído recorre toda la cola (60 s por ítem); un 429 no corta el bucle | corregido |
+| M-22 | R3-13 | UX | `LoginScreen.js`, `RegisterScreen.js` | Fallo de `saveToken` mostrado como error de red; email sin `trim` | corregido |
+| M-23 | R3-14 | UX | `HomeScreen.js:288-300` | Logout offline espera 15 s antes de limpiar la sesión | corregido |
+| M-24 | R3-15 | accesibilidad | `HomeScreen.js`, Login/Register | Botones de solo ícono sin `accessibilityLabel` | corregido |
+| M-25 | R3-16 | config | `eas.json:6-11` | Perfil `development` sin URL (cae a localhost HTTP con cleartext desactivado) | corregido |
+| M-26 | R3-17 | robustez | `leafletMapHtml.js:222,263` | `id` concatenado en `onclick` sin forzar a número | corregido |
+| M-27 | R3 | tests | `frontend/src/__tests__` | Sin tests de `useOfflineSync` ni `useReportsPolling`; `leafletMapHtml.test` solo usa `toContain` | corregido |
 
 ## Descartado tras verificar
 IDOR (todo pasa por `isVisibleTo` y el middleware `admin`), mass assignment, fuga de emails, validación de foto (MIME por contenido, nombre aleatorio, 5 MB), revocación y expiración de tokens, trusted proxies en producción, duplicados de confirmaciones (unique + lock), cascadas de FK, decimales de coordenadas, XSS en los popups de Leaflet (`esc`, `safeUrl`, iframe sandbox), idempotencia de `client_uuid`, limpieza de los pollings.
 
 ## Nota
 Esta rama ya introduce `expo-secure-store` (módulo nativo): los APK 1.0.0 necesitan el APK 1.1.0. Ningún arreglo de esta lista exige otro APK, salvo M-25 si se quiere un build de desarrollo.
+
+## Hallazgo nuevo durante la verificación
+
+| id | eje | archivo | resumen | estado |
+|---|---|---|---|---|
+| N-1 | migración | `2026_10_30_000002_add_status_updated_to_reports_table.php` | `down()` hace `dropColumn('status_updated_by')` sin `dropForeign` antes: en MySQL `migrate:rollback` falla en ese paso (por eso M-8 solo quedó probado hasta ahí). Corregirlo exige editar el `down()` de una migración aplicada | pendiente |
+
+Notas: M-13 (d) sin cambios, porque `register` guarda el email tal cual y la búsqueda solo ignora mayúsculas en MySQL. M-12 amplió `rejection_reason` a `text` (la app permite 500 caracteres).
