@@ -29,11 +29,11 @@ Estado: `pendiente` = aún no corregido · `corregido` · `descartado`.
 | M-1 | R2-1 | seguridad | `database/seeders/ReportSeeder.php` | El guard de producción solo está en `DatabaseSeeder`: `--class=ReportSeeder` crea el admin demo `password`. Prod usa `APP_ENV=production` → riesgo solo por uso manual | corregido |
 | M-2 | R1-3 | funcionamiento | `AppServiceProvider.php:31-32` | `email` como array en login → "Array to string" → 500 en vez de 422 | corregido |
 | M-3 | R1-4 | seguridad | `AppServiceProvider.php:31-32` | Sin tope por IP en login: password spraying sobre N emails | corregido |
-| M-4 | R1-6 | privacidad | `ReportController.php:75` | EXIF (GPS del teléfono) servido públicamente; fotos de rechazados accesibles por URL | pendiente: el GD del contenedor no soporta JPEG; la app ya re-codifica a JPEG sin EXIF |
+| M-4 | R1-6 | privacidad | `ReportController.php:75` | EXIF (GPS del teléfono) servido públicamente; fotos de rechazados accesibles por URL | corregido: se quitan APP1 (EXIF/XMP) y APP13 (IPTC) del JPEG en PHP, sin GD |
 | M-5 | R1-7 | contrato | `docs/API.md` | Docs desalineados (MIME, campos de respuesta, 409 de status, límites 429, voseo) | corregido |
 | M-6 | R2-3 | caché | `ZoneResolver.php:42`, `AssignZones.php:23` | `zones:assign` no cambia la huella de `/version` → los APK no ven las zonas nuevas | corregido |
 | M-7 | R2-4 | caché | `ReportController.php:134-143` | Dos cambios en el mismo segundo → misma versión | corregido |
-| M-8 | R2-5 | migración | `2026_10_30_000001_scope_client_uuid_unique_to_user.php` | `down()` puede fallar en MySQL (índice usado por la FK) | corregido |
+| M-8 | R2-5 | migración | `2026_10_30_000001_scope_client_uuid_unique_to_user.php` | `down()` puede fallar en MySQL (índice usado por la FK) | corregido: el down() crea un índice en user_id antes de borrar el unique |
 | M-9 | R2-6 | migración | `2026_10_15_200200_add_bounds_to_zones_table.php` | Migración acoplada al modelo `Zone` | no corregido: exige editar una migración aplicada |
 | M-10 | R2-8 | integridad | `AuditReportPhotos.php` | Fotos huérfanas sin detectar ni limpiar | corregido |
 | M-11 | R2-9 | integridad | `database/audit.sql` | No verifica los invariantes de moderación | corregido |
@@ -64,6 +64,6 @@ Esta rama ya introduce `expo-secure-store` (módulo nativo): los APK 1.0.0 neces
 
 | id | eje | archivo | resumen | estado |
 |---|---|---|---|---|
-| N-1 | migración | `2026_10_30_000002_add_status_updated_to_reports_table.php` | `down()` hace `dropColumn('status_updated_by')` sin `dropForeign` antes: en MySQL `migrate:rollback` falla en ese paso (por eso M-8 solo quedó probado hasta ahí). Corregirlo exige editar el `down()` de una migración aplicada | pendiente |
+| N-1 | migración | `2026_10_30_000002_add_status_updated_to_reports_table.php` | `down()` hace `dropColumn('status_updated_by')` sin `dropForeign` antes: en MySQL `migrate:rollback` falla en ese paso (por eso M-8 solo quedó probado hasta ahí). Corregirlo exige editar el `down()` de una migración aplicada | corregido: dropForeign antes de dropColumn; migrate:reset completo verificado en MySQL |
 
 Notas: M-13 (d) sin cambios, porque `register` guarda el email tal cual y la búsqueda solo ignora mayúsculas en MySQL. M-12 amplió `rejection_reason` a `text` (la app permite 500 caracteres).

@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\FormatsReports;
 use App\Models\Report;
+use App\Services\PhotoMetadataStripper;
 use App\Services\ZoneResolver;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -53,7 +55,7 @@ class ReportController extends Controller
         return response()->json($this->formatReport($report, $uid));
     }
 
-    public function store(Request $request, ZoneResolver $zones)
+    public function store(Request $request, ZoneResolver $zones, PhotoMetadataStripper $stripper)
     {
         $data = $request->validate([
             'description' => 'required|string|max:1000',
@@ -80,7 +82,7 @@ class ReportController extends Controller
             }
         }
 
-        $path = $request->file('photo')->store('photos', 'public');
+        $path = $this->storePhoto($request->file('photo'), $stripper);
 
         try {
             // Todo reporte nace pendiente (también el de un administrador): solo es público
@@ -116,6 +118,26 @@ class ReportController extends Controller
         $report = $this->withReportData(Report::query(), $uid)->findOrFail($report->id);
 
         return response()->json($this->formatReport($report, $uid), 201);
+    }
+
+    /**
+     * Guarda la foto en el disco público. A un JPEG se le quitan antes el EXIF (con el GPS del
+     * teléfono) y el IPTC, porque las fotos de los reportes validados son públicas.
+     */
+    private function storePhoto(UploadedFile $photo, PhotoMetadataStripper $stripper): string
+    {
+        if ($photo->getMimeType() === 'image/jpeg') {
+            $clean = $stripper->stripJpeg((string) file_get_contents($photo->getRealPath()));
+
+            if ($clean !== null) {
+                $path = $photo->hashName('photos');
+                Storage::disk('public')->put($path, $clean);
+
+                return $path;
+            }
+        }
+
+        return $photo->store('photos', 'public');
     }
 
     public function userReports(Request $request)
