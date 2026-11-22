@@ -17,6 +17,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('reports', function (Blueprint $table) {
+            // En MySQL la FK de user_id se apoya en este unique: sin un índice propio no se puede borrar.
+            $table->index('user_id');
             $table->dropUnique(['user_id', 'client_uuid']);
             $table->unique(['client_uuid']);
         });

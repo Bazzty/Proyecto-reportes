@@ -327,7 +327,7 @@ class AdminReportController extends Controller
         });
 
         if (! $applied) {
-            abort(409, 'El estado del reporte cambió; recargá la lista antes de volver a intentarlo.');
+            abort(409, 'El estado del reporte cambió; recarga la lista antes de volver a intentarlo.');
         }
 
         // Respuesta liviana: se cargan solo las relaciones necesarias en vez de re-consultar todo.

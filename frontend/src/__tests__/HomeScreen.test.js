@@ -276,11 +276,40 @@ describe('HomeScreen', () => {
     const buttons = Alert.alert.mock.calls.at(-1)[2];
     await buttons.find((b) => b.text === 'Salir').onPress();
 
-    expect(api.post).toHaveBeenCalledWith('/logout');
+    expect(api.post).toHaveBeenCalledWith('/logout', null, { timeout: 3000 });
     expect(await AsyncStorage.getItem('token')).toBeNull();
     expect(await AsyncStorage.getItem('userId')).toBeNull();
     expect(clearAuthToken).toHaveBeenCalled();
     expect(navigation.reset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Home', params: { guest: true } }] });
+  });
+
+  it('no espera al POST /logout: si queda colgado igual limpia la sesión y vuelve al mapa', async () => {
+    await AsyncStorage.setItem('token', 't');
+    api.post.mockReturnValue(new Promise(() => {}));
+    const navigation = await setup();
+
+    await fireEvent.press(screen.getByText('Salir'));
+    const buttons = Alert.alert.mock.calls.at(-1)[2];
+    await act(async () => { buttons.find((b) => b.text === 'Salir').onPress(); });
+
+    await waitFor(() =>
+      expect(navigation.reset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Home', params: { guest: true } }] })
+    , { timeout: 500 });
+    expect(clearAuthToken).toHaveBeenCalled();
+    // El POST se lanza antes de borrar el header de autenticación
+    expect(api.post.mock.invocationCallOrder[0]).toBeLessThan(clearAuthToken.mock.invocationCallOrder[0]);
+  });
+
+  it('los botones de solo ícono tienen rol y etiqueta accesibles', async () => {
+    await AsyncStorage.setItem('isAdmin', '1');
+    Location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    Location.getCurrentPositionAsync.mockResolvedValue({ coords: { latitude: -41.3, longitude: -72.9 } });
+    await setup();
+    await screen.findByText('icon:locate');
+
+    for (const label of ['Notificaciones', 'Panel de administración', 'Crear reporte', 'Centrar en mi ubicación']) {
+      expect(screen.getByLabelText(label).props.accessibilityRole).toBe('button');
+    }
   });
 
   it('cierra la sesión localmente aunque /logout falle', async () => {

@@ -14,6 +14,13 @@ class ReportSeeder extends Seeder
 {
     public function run(): void
     {
+        // Datos de demo con contraseña conocida: nunca en producción, ni aunque se invoque con --class.
+        if (app()->isProduction()) {
+            $this->command?->warn('ReportSeeder omitido en producción.');
+
+            return;
+        }
+
         // Usuarios de prueba
         $users = [
             ['name' => 'Bastian Contreras', 'email' => 'bastian@demo.cl'],

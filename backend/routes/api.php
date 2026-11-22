@@ -12,19 +12,24 @@ use Illuminate\Support\Facades\Route;
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
-Route::get('/categories', [CategoryController::class, 'index']);
-Route::get('/reports/heatmap', [ReportController::class, 'heatmap']);
-// Huella barata de los datos del mapa: la app solo vuelve a pedir los listados si cambió.
-Route::get('/reports/version', [ReportController::class, 'version']);
-Route::get('/reports', [ReportController::class, 'index']);
-Route::get('/reports/{id}', [ReportController::class, 'show']);
-Route::get('/reports/{id}/comments', [CommentController::class, 'index']);
+// Lecturas públicas con un tope por IP holgado (ver AppServiceProvider): frena a un script que las
+// martillee sin afectar a una sala con muchos teléfonos detrás de la misma IP.
+Route::middleware('throttle:public')->group(function () {
+    Route::get('/categories', [CategoryController::class, 'index']);
+    Route::get('/reports/heatmap', [ReportController::class, 'heatmap']);
+    // Huella barata de los datos del mapa: la app solo vuelve a pedir los listados si cambió.
+    Route::get('/reports/version', [ReportController::class, 'version']);
+    Route::get('/reports', [ReportController::class, 'index']);
+    Route::get('/reports/{id}', [ReportController::class, 'show']);
+    Route::get('/reports/{id}/comments', [CommentController::class, 'index']);
+});
 
 // Protected routes (require Sanctum token)
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    Route::post('/reports', [ReportController::class, 'store']);
+    // Cada reporte sube una foto (hasta 5 MB): tope por usuario para que un script no llene el disco.
+    Route::post('/reports', [ReportController::class, 'store'])->middleware('throttle:reports');
     Route::get('/user/reports', [ReportController::class, 'userReports']);
 
     Route::post('/reports/{id}/confirm', [ConfirmationController::class, 'toggle'])->middleware('throttle:30,1');

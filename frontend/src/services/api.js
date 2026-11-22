@@ -31,7 +31,11 @@ api.interceptors.response.use(
   async (error) => {
     // Solo es "sesión vencida" si había token: sin él (invitado), un 401 es por ejemplo una
     // contraseña incorrecta en /login y la pantalla debe mostrar el error sin salir.
-    const hadToken = !!api.defaults.headers.common['Authorization'];
+    // Además debe ser el mismo token con el que se hizo la petición: un 401 tardío de una sesión
+    // anterior no debe cerrar la sesión nueva.
+    const current = api.defaults.headers.common['Authorization'];
+    const sentWith = error.config?.headers?.Authorization;
+    const hadToken = !!current && sentWith === current;
     if (error.response?.status === 401 && hadToken && _onUnauthorized) {
       clearAuthToken();
       // El handler (App.js) borra la sesión completa con clearSession y vuelve al mapa como invitado.

@@ -135,6 +135,29 @@ class DatabaseIntegrityTest extends TestCase
         $this->makeReport($user, $category, ['status' => 'Cerrado']);
     }
 
+    public function test_report_validation_status_is_restricted_to_allowed_values()
+    {
+        $this->requireMysql();
+
+        $user = User::factory()->create();
+        $category = Category::create(['name' => 'basura']);
+
+        $this->expectException(QueryException::class);
+        $this->makeReport($user, $category, ['validation_status' => 'quizas']);
+    }
+
+    public function test_rejection_reason_accepts_500_characters()
+    {
+        $this->requireMysql();
+
+        $report = $this->makeReport(User::factory()->create(), Category::create(['name' => 'basura']), [
+            'validation_status' => 'rechazado',
+            'rejection_reason' => str_repeat('ñ', 500),
+        ]);
+
+        $this->assertSame(str_repeat('ñ', 500), $report->fresh()->rejection_reason);
+    }
+
     public function test_category_with_reports_cannot_be_deleted()
     {
         $user = User::factory()->create();

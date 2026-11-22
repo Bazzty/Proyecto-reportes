@@ -27,8 +27,17 @@ class GrantAdmin extends Command
         $adminRole = Role::firstOrCreate(['name' => Role::ADMIN]);
 
         if ($this->option('revoke')) {
-            $user->roles()->detach($adminRole->id);
+            if ($user->roles()->detach($adminRole->id) === 0) {
+                $this->info('El usuario no era admin.');
+
+                return self::SUCCESS;
+            }
+
             $this->info("Rol admin removido de {$email}.");
+
+            if (! $adminRole->users()->exists()) {
+                $this->warn('No queda ningún administrador.');
+            }
 
             return self::SUCCESS;
         }

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   getNotifications,
   getUnreadCount,
+  clearNotifications,
   markAllRead,
   syncStatusNotifications,
 } from '../services/notifications';
@@ -102,5 +103,56 @@ describe('notifications', () => {
     await syncStatusNotifications([{ id: 1, status: 'Pendiente', validation_status: 'valido' }]);
 
     expect(await getNotifications()).toHaveLength(0);
+  });
+
+  it('clearNotifications durante un sync en vuelo: el sync no escribe nada después', async () => {
+    await syncStatusNotifications([{ id: 1, status: 'Pendiente' }]);
+    await AsyncStorage.removeItem('notifications');
+
+    const realGet = AsyncStorage.getItem.getMockImplementation();
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    jest.spyOn(AsyncStorage, 'getItem').mockImplementationOnce(async (key) => {
+      const value = await realGet(key);
+      await gate;
+      return value;
+    });
+
+    const syncing = syncStatusNotifications([{ id: 1, status: 'Resuelto' }]);
+    const clearing = clearNotifications();
+    await AsyncStorage.removeItem('reportStatusSnapshot'); // lo que hace clearSession
+    release();
+    await Promise.all([syncing, clearing]);
+
+    expect(await AsyncStorage.getItem('reportStatusSnapshot')).toBeNull();
+    expect(await getNotifications()).toHaveLength(0);
+  });
+
+  it('markAllRead y un aviso nuevo en paralelo no pierden el aviso', async () => {
+    await syncStatusNotifications([{ id: 1, status: 'Pendiente' }, { id: 2, status: 'Pendiente' }]);
+    await syncStatusNotifications([{ id: 1, status: 'Resuelto' }, { id: 2, status: 'Pendiente' }]);
+
+    // La primera lectura de avisos (la de markAllRead) es lenta: sin serializar, el aviso nuevo
+    // se escribe en medio y markAllRead lo pisa con su lista vieja.
+    const realGet = AsyncStorage.getItem.getMockImplementation();
+    let slowed = false;
+    const spy = jest.spyOn(AsyncStorage, 'getItem').mockImplementation(async (key) => {
+      const value = await realGet(key);
+      if (key === 'notifications' && !slowed) {
+        slowed = true;
+        await new Promise((resolve) => setTimeout(resolve, 30));
+      }
+      return value;
+    });
+
+    await Promise.all([
+      markAllRead(),
+      syncStatusNotifications([{ id: 1, status: 'Resuelto' }, { id: 2, status: 'Resuelto' }]),
+    ]);
+    spy.mockImplementation(realGet); // mockRestore dejaría el mock de AsyncStorage sin implementación
+
+    const list = await getNotifications();
+    expect(list).toHaveLength(2);
+    expect(list.some((item) => item.reportId === 2)).toBe(true);
   });
 });

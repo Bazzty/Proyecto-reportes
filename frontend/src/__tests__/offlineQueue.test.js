@@ -123,6 +123,47 @@ describe('offlineQueue', () => {
     expect(await getPending()).toHaveLength(0);
   });
 
+  describe('corte del bucle ante errores que afectan a todos los ítems', () => {
+    const enqueueThree = async () => {
+      await enqueue(report({ description: 'Uno' }));
+      await enqueue(report({ description: 'Dos' }));
+      await enqueue(report({ description: 'Tres' }));
+    };
+
+    it('con la red caída (sin response) intenta una sola vez y deja los 3 pendientes', async () => {
+      await enqueueThree();
+      api.post.mockRejectedValue(new Error('Network Error'));
+
+      const result = await syncPending();
+
+      expect(api.post).toHaveBeenCalledTimes(1);
+      expect(result.remaining).toBe(3);
+    });
+
+    it.each([429, 503])('con un %i corta el bucle y deja los ítems pendientes', async (status) => {
+      await enqueueThree();
+      api.post.mockRejectedValue({ response: { status } });
+
+      const result = await syncPending();
+
+      expect(api.post).toHaveBeenCalledTimes(1);
+      expect(result.remaining).toBe(3);
+    });
+
+    it('con un 422 en el primero lo marca fallido y sigue con los demás', async () => {
+      await enqueueThree();
+      api.post
+        .mockRejectedValueOnce({ response: { status: 422, data: { message: 'Datos inválidos' } } })
+        .mockResolvedValue({ data: {} });
+
+      const result = await syncPending();
+
+      expect(api.post).toHaveBeenCalledTimes(3);
+      expect(result).toEqual({ synced: 2, remaining: 0 });
+      expect((await getPending()).filter((q) => q.failed)).toHaveLength(1);
+    });
+  });
+
   it('reintenta 403/404 (transitorios) en vez de marcarlos fallidos', async () => {
     await enqueue(report());
     api.post.mockRejectedValue({ response: { status: 403 } });

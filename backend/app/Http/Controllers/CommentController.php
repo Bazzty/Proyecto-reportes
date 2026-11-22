@@ -8,6 +8,9 @@ use Illuminate\Http\Request;
 
 class CommentController extends Controller
 {
+    // Tope duro: los 200 comentarios más recientes (sin paginar para no romper APKs instalados).
+    private const INDEX_LIMIT = 200;
+
     public function index(Request $request, int $id)
     {
         // Ruta pública: el guard por defecto (web) no lee el Bearer.
@@ -15,7 +18,7 @@ class CommentController extends Controller
         abort_unless($report->isVisibleTo($request->user('sanctum')), 404);
 
         return response()->json(
-            $report->comments()->with('user:id,name')->latest()->latest('id')->get()
+            $report->comments()->with('user:id,name')->latest()->latest('id')->limit(self::INDEX_LIMIT)->get()
                 ->map(fn (Comment $c) => [
                     'id' => $c->id,
                     'body' => $c->body,

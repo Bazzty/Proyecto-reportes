@@ -1,6 +1,7 @@
 import { Alert, Keyboard, Platform } from 'react-native';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import LoginScreen from '../screens/LoginScreen';
 import api, { setAuthToken } from '../services/api';
 import { CONNECTION_ERROR_MESSAGE } from '../services/apiConfig';
@@ -46,7 +47,9 @@ describe('LoginScreen', () => {
     await waitFor(() => expect(navigation.reset).toHaveBeenCalledWith({ index: 0, routes: [{ name: 'Home' }] }));
     expect(api.post).toHaveBeenCalledWith('/login', { email: 'ana@example.com', password: 'password123' });
     expect(setAuthToken).toHaveBeenCalledWith('tok');
-    expect(await AsyncStorage.getItem('token')).toBe('tok');
+    // El token va al almacén seguro, no a AsyncStorage (texto plano).
+    expect(await SecureStore.getItemAsync('token')).toBe('tok');
+    expect(await AsyncStorage.getItem('token')).toBeNull();
     expect(await AsyncStorage.getItem('userName')).toBe('Ana');
     expect(await AsyncStorage.getItem('userId')).toBe('7');
   });
@@ -132,5 +135,37 @@ describe('LoginScreen', () => {
       await fireEvent.press(screen.getByText('Bienvenido de vuelta'));
       expect(dismiss).not.toHaveBeenCalled();
     });
+  });
+
+  it('envía el correo sin espacios sobrantes', async () => {
+    api.post.mockResolvedValue({ data: { token: 'tok', user: { id: 7, name: 'Ana' } } });
+    await setup();
+    await fill('  ana@example.com ', 'password123');
+    await fireEvent.press(screen.getByText('Ingresar'));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalled());
+    expect(api.post).toHaveBeenCalledWith('/login', { email: 'ana@example.com', password: 'password123' });
+  });
+
+  it('si el login fue bien pero falla el guardado local avisa de la sesión, no de la conexión', async () => {
+    api.post.mockResolvedValue({ data: { token: 'tok', user: { id: 7, name: 'Ana' } } });
+    jest.spyOn(SecureStore, 'setItemAsync').mockRejectedValueOnce(new Error('keystore'));
+    const navigation = await setup();
+    await fill('ana@example.com', 'password123');
+    await fireEvent.press(screen.getByText('Ingresar'));
+
+    await waitFor(() =>
+      expect(Alert.alert).toHaveBeenCalledWith('Error al iniciar sesión', 'No se pudo guardar la sesión en este dispositivo.')
+    );
+    expect(navigation.reset).not.toHaveBeenCalled();
+  });
+
+  it('el ojo de contraseña tiene rol y etiqueta accesibles que cambian al mostrarla', async () => {
+    await setup();
+
+    const eye = screen.getByLabelText('Mostrar contraseña');
+    expect(eye.props.accessibilityRole).toBe('button');
+    await fireEvent(eye, 'pressIn');
+    expect(screen.getByLabelText('Ocultar contraseña')).toBeTruthy();
   });
 });

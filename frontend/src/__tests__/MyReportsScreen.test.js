@@ -1,8 +1,8 @@
 import { Alert } from 'react-native';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 import MyReportsScreen from '../screens/MyReportsScreen';
 import api from '../services/api';
-import { getPending } from '../services/offlineQueue';
+import { getPending, subscribe } from '../services/offlineQueue';
 
 jest.mock('../services/api', () => ({
   __esModule: true,
@@ -11,6 +11,7 @@ jest.mock('../services/api', () => ({
 jest.mock('../services/offlineQueue', () => ({
   getPending: jest.fn(async () => []),
   subscribe: jest.fn(() => jest.fn()),
+  isSyncing: jest.fn(() => false),
 }));
 // useFocusEffect se comporta como un useEffect: corre al montar la pantalla
 jest.mock('@react-navigation/native', () => {
@@ -166,5 +167,64 @@ describe('MyReportsScreen', () => {
 
     expect(navigation.navigate).not.toHaveBeenCalledWith('DetalleReporte', expect.anything());
     expect(Alert.alert).toHaveBeenCalledWith('Pendiente de envío', expect.any(String));
+  });
+
+  it('en la vista de cuadrícula avisa de los reportes pendientes de envío', async () => {
+    getPending.mockResolvedValue([
+      {
+        localId: 'g1', description: 'Pendiente local', latitude: -41.3, longitude: -72.9,
+        categoryId: 7, photoUri: 'file:///doc/g1.jpg', createdAt: '2026-10-05T12:00:00.000Z',
+      },
+      {
+        localId: 'g2', description: 'Otro local', latitude: -41.3, longitude: -72.9,
+        categoryId: 7, photoUri: 'file:///doc/g2.jpg', createdAt: '2026-10-05T12:00:00.000Z', failed: true,
+      },
+    ]);
+    await setup([report()]);
+    await screen.findByText('Basura en la esquina');
+    expect(screen.queryByText(/pendientes de envío/)).toBeNull();
+
+    await fireEvent.press(screen.getByText('Cuadrícula'));
+
+    expect(await screen.findByText('2 reportes pendientes de envío: cámbiate a la vista de lista para verlos.')).toBeTruthy();
+  });
+
+  describe('cargas concurrentes', () => {
+    const deferred = () => {
+      let resolve;
+      const promise = new Promise((r) => { resolve = r; });
+      return { promise, resolve };
+    };
+
+    it('descarta la respuesta obsoleta cuando llegan fuera de orden', async () => {
+      let notify;
+      subscribe.mockImplementation((cb) => { notify = cb; return jest.fn(); });
+      const first = deferred();
+      const second = deferred();
+      const responses = [first.promise, second.promise];
+      api.get.mockImplementation((url) => (url === '/user/reports' ? responses.shift() : Promise.resolve({ data: [] })));
+      await render(<MyReportsScreen navigation={{ navigate: jest.fn(), goBack: jest.fn() }} />);
+
+      await act(async () => { notify(); });
+      expect(api.get.mock.calls.filter(([url]) => url === '/user/reports')).toHaveLength(2);
+
+      await act(async () => { second.resolve({ data: [report({ id: 2, description: 'Reciente' })] }); });
+      await act(async () => { first.resolve({ data: [report({ id: 1, description: 'Obsoleto' })] }); });
+
+      expect(await screen.findByText('Reciente')).toBeTruthy();
+      expect(screen.queryByText('Obsoleto')).toBeNull();
+    });
+
+    it('no muestra el spinner de pantalla completa al recargar con datos ya cargados', async () => {
+      let notify;
+      subscribe.mockImplementation((cb) => { notify = cb; return jest.fn(); });
+      await setup([report()]);
+      await screen.findByText('Basura en la esquina');
+
+      api.get.mockReturnValue(new Promise(() => {}));
+      await act(async () => { notify(); });
+
+      expect(screen.getByText('Basura en la esquina')).toBeTruthy();
+    });
   });
 });
