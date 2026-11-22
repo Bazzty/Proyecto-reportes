@@ -78,9 +78,16 @@ const markFailed = (localId, reason) => mutateQueue((queue) => queue.map((q) => 
   q.localId === localId ? { ...q, failed: true, failedReason: reason } : q
 )));
 
-export const getPending = () => readQueue();
+// Solo lo de quien tiene la sesión (y lo sin dueño de versiones anteriores): la cola puede guardar
+// reportes de otra cuenta cuya sesión venció, que no se muestran ni se envían con esta.
+const ownQueue = async () => {
+  const [queue, userId] = await Promise.all([readQueue(), currentUserId()]);
+  return queue.filter((q) => !q.ownerId || q.ownerId === userId);
+};
 
-export const getPendingCount = async () => (await readQueue()).filter((q) => !q.failed).length;
+export const getPending = () => ownQueue();
+
+export const getPendingCount = async () => (await ownQueue()).filter((q) => !q.failed).length;
 
 export const removeItem = (localId) => removeFromQueue(localId);
 
@@ -100,19 +107,12 @@ const currentUserId = async () => {
   }
 };
 
-// Al iniciar sesión: los reportes que dejó en la cola otro usuario del mismo dispositivo se descartan
-// (no se publican con esta cuenta) y los sin dueño (versiones anteriores) pasan a ser de quien entra.
-// Los del mismo usuario se conservan: si la sesión venció (401) siguen esperando a que vuelva a entrar.
+// Al iniciar sesión, los reportes sin dueño (versiones anteriores) pasan a ser de quien entra. Los de
+// otra cuenta cuya sesión venció (401) se conservan sin mostrarse ni enviarse: se publican cuando
+// su dueño vuelva a entrar. Cerrar sesión (clearQueue) sí los borra.
 export const claimQueue = async (userId) => {
   const owner = String(userId);
-  let discarded = [];
-  await mutateQueue((queue) => {
-    discarded = queue.filter((q) => q.ownerId && q.ownerId !== owner);
-    return queue
-      .filter((q) => !q.ownerId || q.ownerId === owner)
-      .map((q) => (q.ownerId ? q : { ...q, ownerId: owner }));
-  });
-  await Promise.all(discarded.map((q) => removePhoto(q.photoUri)));
+  await mutateQueue((queue) => queue.map((q) => (q.ownerId ? q : { ...q, ownerId: owner })));
 };
 
 export const enqueue = async ({ description, latitude, longitude, categoryId, photoUri, clientUuid }) => {

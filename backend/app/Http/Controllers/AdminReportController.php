@@ -20,6 +20,9 @@ class AdminReportController extends Controller
 
     private const PAGE_SIZE = 20;
 
+    // Autovalidación de versiones anteriores: el admin quedaba validado al crear su propio reporte.
+    private const AUTO_VALIDATION_SECONDS = 60;
+
     private const EXPORT_COLUMNS = [
         'id', 'categoria', 'descripcion', 'zona', 'autor', 'estado', 'validacion', 'motivo_rechazo',
         'confirmaciones', 'latitud', 'longitud', 'creado', 'validado_por', 'validado_en',
@@ -92,12 +95,17 @@ class AdminReportController extends Controller
     {
         // Promedio calculado en PHP (sin funciones de fecha de la BD): últimos 200 moderados. Cuentan
         // todos, también los de administradores: sus reportes esperan en la misma cola que el resto.
+        // Se excluye la autovalidación al crear de versiones anteriores (el autor se validó solo en
+        // el mismo minuto): no fue una espera en la cola y bajaría el promedio a casi cero.
         $moderated = Report::query()
             ->whereIn('validation_status', ['valido', 'rechazado'])
             ->whereNotNull('validated_at')
             ->latest('validated_at')->latest('id')
             ->limit(200)
-            ->get(['id', 'created_at', 'validated_at']);
+            ->get(['id', 'user_id', 'validated_by', 'created_at', 'validated_at'])
+            ->reject(fn (Report $r) => $r->validated_by !== null
+                && (int) $r->validated_by === (int) $r->user_id
+                && $r->validated_at->getTimestamp() - $r->created_at->getTimestamp() < self::AUTO_VALIDATION_SECONDS);
 
         $avg = $moderated->isEmpty() ? null : round(
             $moderated->avg(fn (Report $r) => max(0, $r->validated_at->getTimestamp() - $r->created_at->getTimestamp())) / 3600,
@@ -187,17 +195,17 @@ class AdminReportController extends Controller
     public function export(Request $request)
     {
         $filters = $this->validatedFilters($request);
-        $uid = $request->user()->id;
         $limit = (int) config('admin.export_limit', self::EXPORT_LIMIT);
 
-        $query = $this->applySort(
-            $this->applyFilters($this->adminQuery($uid), $filters),
-            $filters['sort'] ?? 'recientes'
-        );
+        $sort = $filters['sort'] ?? 'recientes';
 
         // Foto fija de los ids (en el orden pedido) antes de escribir: un reporte que llegue o cambie
         // durante la descarga no desplaza las páginas, así que no se repiten ni se omiten filas.
-        $ids = (clone $query)->limit($limit)->pluck('reports.id')->all();
+        // Consulta liviana: solo el id (y el conteo de confirmaciones si se ordena por él).
+        $idQuery = Report::query()->select('reports.id')
+            ->when($sort === 'confirmaciones', fn ($q) => $q->withCount('confirmations'));
+        $ids = $this->applySort($this->applyFilters($idQuery, $filters), $sort)
+            ->limit($limit)->pluck('reports.id')->all();
 
         return response()->streamDownload(function () use ($ids) {
             $out = fopen('php://output', 'w');
@@ -273,8 +281,14 @@ class AdminReportController extends Controller
                 return false;
             }
 
-            // Re-envío idempotente del mismo estado: nada que cambiar.
+            // Re-envío idempotente del mismo estado: nada que cambiar, salvo un motivo de rechazo nuevo
+            // (corregir el motivo de un reporte ya rechazado).
             if ($row->validation_status === $target) {
+                $reason = $data['rejection_reason'] ?? null;
+                if ($target === 'rechazado' && $reason !== null && $reason !== $row->rejection_reason) {
+                    $row->forceFill(['rejection_reason' => $reason])->save();
+                }
+
                 return true;
             }
 
@@ -303,7 +317,9 @@ class AdminReportController extends Controller
 
             $wasModerated = $row->validation_status !== 'pendiente';
 
-            if ($restore && $row->previous_validated_by !== null) {
+            // Basta con la fecha: si el moderador anterior se eliminó (nullOnDelete) la moderación se
+            // restaura igual, sin moderador, en vez de registrar como moderador a quien deshace.
+            if ($restore && ($row->previous_validated_by !== null || $row->previous_validated_at !== null)) {
                 $by = $row->previous_validated_by;
                 $at = $row->previous_validated_at ?? now();
                 $previous = [null, null];
