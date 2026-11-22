@@ -169,12 +169,20 @@ class ReportController extends Controller
      */
     public function version()
     {
-        $reports = DB::table('reports')->selectRaw('COUNT(*) as total, MAX(id) as max_id, MAX(updated_at) as updated')->first();
+        // Suma de timestamps y de zone_id: detectan lo que COUNT/MAX no ven (dos cambios en el mismo
+        // segundo, o `zones:assign`, que cambia zone_id sin tocar updated_at).
+        $epoch = DB::getDriverName() === 'sqlite'
+            ? "CAST(strftime('%s', updated_at) AS INTEGER)"
+            : 'UNIX_TIMESTAMP(updated_at)';
+        $reports = DB::table('reports')->selectRaw(
+            "COUNT(*) as total, MAX(id) as max_id, MAX(updated_at) as updated, SUM(COALESCE(zone_id, 0)) as zones, SUM(COALESCE($epoch, 0)) as epochs"
+        )->first();
         $confirmations = DB::table('confirmations')->selectRaw('COUNT(*) as total, MAX(id) as max_id')->first();
 
         return response()->json([
             'version' => sha1(json_encode([
                 (int) $reports->total, (int) $reports->max_id, (string) $reports->updated,
+                (int) $reports->zones, (int) $reports->epochs,
                 (int) $confirmations->total, (int) $confirmations->max_id,
             ])),
         ]);

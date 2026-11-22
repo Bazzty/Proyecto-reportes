@@ -28,8 +28,15 @@ class AppServiceProvider extends ServiceProvider
         Route::pattern('id', '[0-9]+');
 
         // Por email + IP: una IP compartida (NAT de la universidad) no bloquea a todos los usuarios.
-        RateLimiter::for('login', fn (Request $request) => Limit::perMinute(5)
-            ->by(strtolower((string) $request->input('email')).'|'.$request->ip()));
+        // Segundo tope por IP, más holgado, contra quien prueba muchos emails distintos desde una IP.
+        RateLimiter::for('login', function (Request $request) {
+            $email = $request->input('email');
+
+            return [
+                Limit::perMinute(5)->by((is_string($email) ? strtolower($email) : '').'|'.$request->ip()),
+                Limit::perMinute(30)->by('login-ip|'.$request->ip()),
+            ];
+        });
 
         // Crear reportes, por usuario: de sobra para uso real (la cola offline reintenta un 429 más
         // tarde) y corta un script que suba fotos de 5 MB en bucle.
