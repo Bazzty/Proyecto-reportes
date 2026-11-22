@@ -34,6 +34,12 @@ export async function saveToken(token) {
 
 // Borra las dos ubicaciones (incluida la de versiones anteriores).
 export async function deleteToken() {
-  await AsyncStorage.removeItem(KEY);
-  if (useSecureStore) await SecureStore.deleteItemAsync(KEY);
+  // Se intentan ambos borrados siempre: si uno falla, el token del otro no debe sobrevivir y
+  // restaurar la sesión anterior en el próximo arranque. Se relanza el primer error al final.
+  const results = await Promise.allSettled([
+    AsyncStorage.removeItem(KEY),
+    useSecureStore ? SecureStore.deleteItemAsync(KEY) : Promise.resolve(),
+  ]);
+  const failed = results.find((result) => result.status === 'rejected');
+  if (failed) throw failed.reason;
 }

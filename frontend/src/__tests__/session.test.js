@@ -49,4 +49,14 @@ describe('clearSession', () => {
     expect(clearNotifications).toHaveBeenCalledTimes(1);
     expect(await AsyncStorage.getItem('token')).toBeNull();
   });
+
+  it('si falla multiRemove no lanza y el header de auth queda limpio', async () => {
+    const realMultiRemove = AsyncStorage.multiRemove.getMockImplementation();
+    const spy = jest.spyOn(AsyncStorage, 'multiRemove').mockRejectedValue(new Error('disk'));
+
+    await expect(clearSession()).resolves.toBeUndefined();
+
+    expect(clearAuthToken).toHaveBeenCalledTimes(1);
+    spy.mockImplementation(realMultiRemove);
+  });
 });

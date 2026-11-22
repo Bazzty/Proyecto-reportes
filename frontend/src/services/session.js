@@ -18,6 +18,7 @@ export async function clearSession({ keepQueue = false } = {}) {
   }
   try { await clearNotifications(); } catch { /* se sigue limpiando el resto */ }
   try { await deleteToken(); } catch { /* se sigue limpiando el resto */ }
-  await AsyncStorage.multiRemove(SESSION_KEYS);
+  // El header de auth se limpia siempre, aunque falle el borrado de los datos de sesión.
+  try { await AsyncStorage.multiRemove(SESSION_KEYS); } catch { /* se sigue limpiando el resto */ }
   clearAuthToken();
 }

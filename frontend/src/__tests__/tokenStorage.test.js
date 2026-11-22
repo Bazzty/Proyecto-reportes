@@ -45,4 +45,15 @@ describe('tokenStorage', () => {
 
     expect(await getToken()).toBeNull();
   });
+
+  it('deleteToken borra el almacén seguro aunque falle AsyncStorage y relanza el error', async () => {
+    await saveToken('abc');
+    const realRemove = AsyncStorage.removeItem.getMockImplementation();
+    const spy = jest.spyOn(AsyncStorage, 'removeItem').mockRejectedValueOnce(new Error('disk'));
+
+    await expect(deleteToken()).rejects.toThrow('disk');
+
+    expect(await SecureStore.getItemAsync('token')).toBeNull();
+    spy.mockImplementation(realRemove);
+  });
 });
