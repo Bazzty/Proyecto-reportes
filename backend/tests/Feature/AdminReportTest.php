@@ -242,12 +242,46 @@ class AdminReportTest extends TestCase
             'validation_status' => 'rechazado',
             'rejection_reason' => 'Motivo',
             'expected_validation_status' => 'pendiente',
-        ])->assertStatus(409);
+        ])->assertStatus(409)
+            ->assertJsonPath('message', 'El estado del reporte cambió; recarga la lista antes de volver a intentarlo.');
 
         $this->assertDatabaseHas('reports', [
             'id' => $report->id,
             'validation_status' => 'valido',
         ]);
+    }
+
+    public function test_rejection_reason_of_400_characters_is_saved_in_full()
+    {
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->makeReport(User::factory()->create(), $category);
+        Sanctum::actingAs($this->makeAdmin(), ['*']);
+        $reason = str_repeat('Motivo largo. ', 28); // 392 caracteres
+        $reason = substr($reason, 0, 400).'.';
+
+        $this->patchJson("/api/admin/reports/{$report->id}/validation", [
+            'validation_status' => 'rechazado',
+            'rejection_reason' => $reason,
+            'expected_validation_status' => 'pendiente',
+        ])->assertOk();
+
+        $this->assertSame($reason, $report->fresh()->rejection_reason);
+    }
+
+    public function test_bulk_rejection_with_a_400_character_reason_is_saved_in_full()
+    {
+        $category = Category::create(['name' => 'basura']);
+        $report = $this->makeReport(User::factory()->create(), $category);
+        Sanctum::actingAs($this->makeAdmin(), ['*']);
+        $reason = str_repeat('a', 400);
+
+        $this->postJson('/api/admin/reports/bulk-validation', [
+            'ids' => [$report->id],
+            'validation_status' => 'rechazado',
+            'rejection_reason' => $reason,
+        ])->assertOk();
+
+        $this->assertSame($reason, $report->fresh()->rejection_reason);
     }
 
     public function test_update_validation_requires_expected_status()

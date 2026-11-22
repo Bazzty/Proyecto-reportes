@@ -40,6 +40,34 @@ FROM reports
 WHERE validation_status = 'pendiente'
   AND (validated_by IS NOT NULL OR validated_at IS NOT NULL OR rejection_reason IS NOT NULL);
 
+-- Un pendiente tampoco puede haber avanzado de estado (el "deshacer" lo devuelve a 'Pendiente'
+-- y borra status_updated_*; avanzar el estado exige validation_status = 'valido').
+INSERT INTO audit_findings
+SELECT 'pendientes con estado avanzado o con status_updated', COUNT(*)
+FROM reports
+WHERE validation_status = 'pendiente'
+  AND (status <> 'Pendiente' OR status_updated_by IS NOT NULL OR status_updated_at IS NOT NULL);
+
+-- Todo reporte moderado conserva la fecha. validated_by no se exige: queda NULL (ON DELETE SET NULL)
+-- si el administrador que moderó fue eliminado.
+INSERT INTO audit_findings
+SELECT 'moderados (valido/rechazado) sin validated_at', COUNT(*)
+FROM reports
+WHERE validation_status IN ('valido', 'rechazado')
+  AND validated_at IS NULL;
+
+INSERT INTO audit_findings
+SELECT 'rechazados sin rejection_reason', COUNT(*)
+FROM reports
+WHERE validation_status = 'rechazado'
+  AND (rejection_reason IS NULL OR TRIM(rejection_reason) = '');
+
+INSERT INTO audit_findings
+SELECT 'rejection_reason en reportes no rechazados', COUNT(*)
+FROM reports
+WHERE validation_status <> 'rechazado'
+  AND rejection_reason IS NOT NULL;
+
 INSERT INTO audit_findings
 SELECT 'coordenadas nulas o fuera de rango', COUNT(*)
 FROM reports
