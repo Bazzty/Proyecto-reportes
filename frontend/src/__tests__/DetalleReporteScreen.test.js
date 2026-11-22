@@ -439,6 +439,47 @@ describe('DetalleReporteScreen', () => {
     );
   });
 
+  const openRejectAndConfirm = async (reasonText) => {
+    await setup({ admin: true });
+    await screen.findByText('Basura acumulada');
+    await fireEvent.press(screen.getByText('Rechazar'));
+    await fireEvent.changeText(screen.getByPlaceholderText('Ej. No corresponde a contaminación'), reasonText);
+    await fireEvent.press(screen.getAllByText('Rechazar').at(-1));
+  };
+
+  it('si el rechazo falla el modal sigue abierto y conserva el motivo', async () => {
+    api.patch.mockRejectedValue({ response: { status: 500 } });
+    await openRejectAndConfirm('No corresponde');
+
+    await waitFor(() =>
+      expect(Alert.alert).toHaveBeenCalledWith('Error', 'No se pudo actualizar la validación del reporte.')
+    );
+    expect(screen.getByText('Motivo del rechazo')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Ej. No corresponde a contaminación').props.value).toBe('No corresponde');
+  });
+
+  it('si el rechazo da 409 avisa que el reporte cambió y lo recarga', async () => {
+    api.patch.mockRejectedValue({ response: { status: 409 } });
+    await openRejectAndConfirm('No corresponde');
+    const reportGets = () => api.get.mock.calls.filter(([url]) => /^\/reports\/\d+$/.test(url)).length;
+
+    await waitFor(() =>
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Error',
+        'El reporte cambió mientras lo revisabas. Se recargó con su estado actual.'
+      )
+    );
+    // Carga inicial + recarga tras el 409.
+    await waitFor(() => expect(reportGets()).toBe(2));
+  });
+
+  it('si el rechazo se guarda cierra el modal', async () => {
+    api.patch.mockResolvedValue({ data: { validation_status: 'rechazado', rejection_reason: 'No corresponde' } });
+    await openRejectAndConfirm('No corresponde');
+
+    await waitFor(() => expect(screen.queryByText('Motivo del rechazo')).toBeNull());
+  });
+
   it('un usuario normal no ve los controles de validación', async () => {
     await setup();
     await screen.findByText('Basura acumulada');

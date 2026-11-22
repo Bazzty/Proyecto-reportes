@@ -270,6 +270,21 @@ describe('NewReportScreen', () => {
     expect(navigation.navigate).toHaveBeenCalledWith('Home');
   });
 
+  it('dos toques seguidos sin conexión encolan una sola vez', async () => {
+    Network.getNetworkStateAsync.mockResolvedValue({ isConnected: false, isInternetReachable: false });
+    enqueue.mockImplementationOnce(() => new Promise((resolve) => { setTimeout(resolve, 100); }));
+    await setup();
+    await fillForm();
+    const button = screen.getByText('Enviar Reporte');
+    await fireEvent.press(button);
+    await fireEvent.press(button);
+
+    await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Guardado sin conexión', expect.any(String), expect.any(Array)));
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    // Espera a que el botón se libere para no dejar estado pendiente entre tests.
+    await screen.findByText('Enviar Reporte');
+  });
+
   it('si el envío falla por red guarda el reporte en la cola', async () => {
     api.post.mockRejectedValue(new Error('Network Error'));
     await setup();

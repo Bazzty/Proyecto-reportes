@@ -190,8 +190,21 @@ function DetalleReporte({ route, navigation }) {
         validation_status: data.validation_status,
         rejection_reason: data.rejection_reason,
       }));
-    } catch {
-      Alert.alert('Error', 'No se pudo actualizar la validación del reporte.');
+      return true;
+    } catch (error) {
+      if (error.response?.status === 409) {
+        // Otro admin ya resolvió el reporte: se recarga para mostrar su estado actual.
+        Alert.alert('Error', 'El reporte cambió mientras lo revisabas. Se recargó con su estado actual.');
+        try {
+          const { data } = await api.get(`/reports/${reportId}`);
+          setReport(data);
+        } catch {
+          // Si falla la recarga se mantiene lo mostrado; el admin puede volver a abrir el reporte.
+        }
+      } else {
+        Alert.alert('Error', 'No se pudo actualizar la validación del reporte.');
+      }
+      return false;
     }
   };
 
@@ -203,9 +216,11 @@ function DetalleReporte({ route, navigation }) {
     }
     setSavingValidation(true);
     try {
-      await handleValidation('rechazado', trimmed);
-      setRejecting(false);
-      setReason('');
+      const ok = await handleValidation('rechazado', trimmed);
+      if (ok) {
+        setRejecting(false);
+        setReason('');
+      }
     } finally {
       setSavingValidation(false);
     }

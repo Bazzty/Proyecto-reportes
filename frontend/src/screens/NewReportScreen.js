@@ -39,6 +39,7 @@ export default function NewReportScreen({ navigation, route = {} }) {
   const [showPicker, setShowPicker]         = useState(false);
   const pickerRef = useRef(null);
   const scrollRef = useRef(null);
+  const submittingRef = useRef(false);
 
   const keyboardHeight = useKeyboardHeight();
   const { location, locating, error: locationError, permanentlyDenied, refresh: refreshLocation } = useAutoLocation();
@@ -147,17 +148,21 @@ export default function NewReportScreen({ navigation, route = {} }) {
     if (!description.trim()){ Alert.alert('Falta descripción', 'Escribe una descripción.'); return; }
     if (!categoryId)        { Alert.alert('Falta categoría', 'Selecciona una categoría.');   return; }
 
+    // Guarda síncrona: evita que dos toques rápidos generen dos reportes (state llega tarde).
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+
     // Se genera una sola vez para el intento online y su eventual reenvío offline,
     // así el backend deduplica con client_uuid si el POST falla sin respuesta.
     const clientUuid = randomUUID();
 
-    if (!isConnected) {
-      await saveOffline(clientUuid);
-      return;
-    }
-
     setLoading(true);
     try {
+      if (!isConnected) {
+        await saveOffline(clientUuid);
+        return;
+      }
+
       const form = new FormData();
       form.append('description', description);
       form.append('latitude',    String(effectiveLocation.latitude));
@@ -198,6 +203,7 @@ export default function NewReportScreen({ navigation, route = {} }) {
         || 'No se pudo enviar el reporte.';
       Alert.alert('Error', message);
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
