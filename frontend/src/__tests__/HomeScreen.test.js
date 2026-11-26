@@ -228,6 +228,13 @@ describe('HomeScreen', () => {
     expect(navigation.navigate).toHaveBeenCalledWith('NewReport');
   });
 
+  it('el botón de ayuda navega a Ayuda', async () => {
+    const navigation = await setup();
+
+    await fireEvent.press(screen.getByTestId('help-button'));
+    expect(navigation.navigate).toHaveBeenCalledWith('Ayuda');
+  });
+
   it('un invitado no pide /user/reports', async () => {
     await setup({ guest: true });
     expect(api.get).not.toHaveBeenCalledWith('/user/reports');

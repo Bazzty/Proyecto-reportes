@@ -444,6 +444,15 @@ export default function HomeScreen({ navigation, route }) {
             <Text style={styles.greetingSubtitle}>Reporta incidencias ambientales en tu zona</Text>
           )}
         </View>
+        <TouchableOpacity
+          style={styles.bell}
+          testID="help-button"
+          accessibilityRole="button"
+          accessibilityLabel="Ayuda"
+          onPress={() => navigation.navigate('Ayuda')}
+        >
+          <Ionicons name="help-circle-outline" size={22} color="#0e7490" />
+        </TouchableOpacity>
         {isAdmin && !isGuest && (
           <TouchableOpacity
             style={styles.bell}
