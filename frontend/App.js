@@ -12,6 +12,7 @@ import DetalleReporteScreen from './src/screens/DetalleReporteScreen';
 import NewReportScreen from './src/screens/NewReportScreen';
 import MyReportsScreen from './src/screens/MyReportsScreen';
 import AdminReportsScreen from './src/screens/AdminReportsScreen';
+import AyudaScreen from './src/screens/AyudaScreen';
 import { setAuthToken, setUnauthorizedHandler } from './src/services/api';
 import { clearSession } from './src/services/session';
 import { getToken } from './src/services/tokenStorage';
@@ -110,6 +111,7 @@ export default function App() {
         <Stack.Screen name="NewReport" component={NewReportScreen} options={{ title: 'Nuevo Reporte', headerTintColor: '#0e7490' }} />
         <Stack.Screen name="MyReports" component={MyReportsScreen} options={{ headerShown: false }} />
         <Stack.Screen name="AdminReports" component={AdminReportsScreen} options={{ title: 'Revisión de Reportes', headerTintColor: '#0e7490' }} />
+        <Stack.Screen name="Ayuda" component={AyudaScreen} options={{ title: 'Ayuda', headerTintColor: '#0e7490' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
